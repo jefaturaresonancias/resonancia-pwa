@@ -90,9 +90,30 @@ const ListaView = (() => {
       if (!turno) {
         const bg    = slot.color || "#f5f5f5";
         const label = slot.label || slot.tipo || "";
-        return `<tr style="background:${bg}20">
-          <td class="td-hora" style="color:#999">${hora}</td>
-          <td colspan="6" style="color:#999;font-size:11px;font-style:italic">${label}</td>
+        const esFranja = slot.tipo === "franja" || slot.tipo === "franja_origen";
+        if (esFranja) {
+          // Detectar condición según tipo y label
+          const condicion = {
+            label,
+            tipo:    slot.tipo,
+            origen:  slot.tipo === "franja_origen" ? _detectarOrigen(label) : null,
+            filtro:  slot.tipo === "franja"        ? _detectarFiltroEstudio(label) : null
+          };
+          return `<tr class="fila-franja" data-mins="${mins}" data-fecha="${fechaStr}"
+                  data-condicion="${encodeURIComponent(JSON.stringify(condicion))}"
+                  style="cursor:pointer;background:${bg}22" title="Clic para asignar turno (${label})">
+            <td class="td-hora" style="color:#888">${hora}</td>
+            <td colspan="6" style="font-size:11px">
+              <span style="display:inline-block;background:${bg};color:#555;padding:2px 10px;border-radius:10px;font-weight:600">${label}</span>
+              <span style="color:#aaa;font-size:10px;margin-left:8px">clic para asignar</span>
+            </td>
+            <td></td><td></td>
+          </tr>`;
+        }
+        // Bloqueo puro (no cliqueable)
+        return `<tr style="background:${bg}18">
+          <td class="td-hora" style="color:#bbb">${hora}</td>
+          <td colspan="6" style="color:#bbb;font-size:11px;font-style:italic">${label}</td>
           <td></td><td></td>
         </tr>`;
       }
@@ -119,6 +140,18 @@ const ListaView = (() => {
         </td>
       </tr>`;
     }).join("");
+
+    // ── click en franja → asignar turno con condición ──
+    tbody.querySelectorAll(".fila-franja").forEach(tr => {
+      tr.addEventListener("click", () => {
+        const mins     = parseInt(tr.dataset.mins);
+        const fecha    = tr.dataset.fecha;
+        const condicion = JSON.parse(decodeURIComponent(tr.dataset.condicion));
+        const h = String(Math.floor(mins/60)).padStart(2,"0");
+        const m = String(mins%60).padStart(2,"0");
+        App.abrirTurnoConCondicion(fecha, `${h}:${m}`, condicion);
+      });
+    });
 
     // ── click en slot libre → asignar turno ──
     tbody.querySelectorAll(".fila-libre").forEach(tr => {
@@ -198,6 +231,23 @@ const ListaView = (() => {
     const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
     document.getElementById("lista-fecha-label").textContent =
       `${DIAS[_fecha.getDay()]} ${_fecha.getDate()} de ${MESES[_fecha.getMonth()]}`;
+  }
+
+  function _detectarOrigen(label) {
+    const l = (label||"").toLowerCase();
+    if (l.includes("intern")) return "INTERNACIÓN";
+    if (l.includes("guardia")) return "GUARDIA";
+    if (l.includes("direcci")) return "DIRECCIÓN";
+    if (l.includes("traslad")) return "TRASLADO";
+    return null;
+  }
+
+  function _detectarFiltroEstudio(label) {
+    const l = (label||"").toLowerCase();
+    if (l.includes("mamari")) return "mamaria";
+    if (l.includes("cardiolog")) return "cardiolog";
+    if (l.includes("neuroci") || l.includes("neuro")) return "cerebro";
+    return null;
   }
 
   function setFecha(fechaStr) {

@@ -445,3 +445,7 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 /* ── FILAS LIBRES EN LISTA DEL DÍA ──────────────────────────*/
 .fila-libre td { border-bottom: 1px solid #f0f0f0 !important; }
 .fila-libre:hover td { background: #f0faf0 !important; }
+
+/* ── FILAS DE FRANJA CLICLEABLES ─────────────────────────────*/
+.fila-franja td { border-bottom: 1px solid #f0f0f0 !important; }
+.fila-franja:hover td { filter: brightness(.95); }

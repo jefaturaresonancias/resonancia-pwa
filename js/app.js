@@ -196,7 +196,14 @@ const App = (() => {
     showView("lista");
   }
 
-  return { init, toast, showView, abrirTurnoConFechaHora, mostrarOpcionesTurno, refrescarAgenda, irAListaDia };
+  function abrirTurnoConCondicion(fecha, hora, condicion) {
+    showView("turno");
+    TurnoView.cargarEstudios().then(() => {
+      TurnoView.prefill(fecha, hora, condicion);
+    });
+  }
+
+  return { init, toast, showView, abrirTurnoConFechaHora, abrirTurnoConCondicion, mostrarOpcionesTurno, refrescarAgenda, irAListaDia };
 })();
 
 // Arrancar cuando el DOM esté listo

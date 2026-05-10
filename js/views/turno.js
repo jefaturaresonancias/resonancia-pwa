@@ -23,8 +23,8 @@ const TurnoView = (() => {
     }
   }
 
-  // ── prefill desde click en agenda ─────────────────────────
-  function prefill(fecha, hora) {
+  // ── prefill desde click en agenda / lista ────────────────
+  function prefill(fecha, hora, condicion) {
     _fechaPrefill = fecha;
     _horaPrefill  = hora;
 
@@ -33,8 +33,52 @@ const TurnoView = (() => {
       const p = fecha.split("/");
       document.getElementById("t-fecha").value = `${p[2]}-${p[1]}-${p[0]}`;
     }
-    // hora queda para seleccionar en los chips de slots
-    // pero lo mostramos pre-seleccionado si viene de un click directo
+
+    // Limpiar aviso anterior
+    const avisoEl = document.getElementById("turno-condicion-aviso");
+    if (avisoEl) avisoEl.remove();
+
+    if (condicion) {
+      // Pre-seleccionar origen si viene de franja por origen
+      if (condicion.origen) {
+        const sel = document.getElementById("t-origen");
+        for (const opt of sel.options) {
+          if (opt.value.toUpperCase() === condicion.origen.toUpperCase()) {
+            sel.value = opt.value;
+            break;
+          }
+        }
+        sel.style.borderColor = "#c9a000";
+        sel.title = `Pre-seleccionado por franja: ${condicion.label}`;
+      }
+
+      // Filtrar estudios si viene de franja por código
+      if (condicion.filtro) {
+        _filtrarEstudios(condicion.filtro);
+      }
+
+      // Mostrar aviso visual
+      const aviso = document.createElement("div");
+      aviso.id = "turno-condicion-aviso";
+      aviso.style.cssText = "background:#fff8e1;border-left:4px solid #f0c040;padding:8px 14px;border-radius:4px;font-size:12px;font-weight:600;color:#7a4f00;margin-bottom:1rem";
+      aviso.innerHTML = `⚠️ Franja con condición: <strong>${condicion.label}</strong>${condicion.filtro ? " — estudios filtrados" : ""}${condicion.origen ? " — origen pre-seleccionado" : ""}`;
+      const form = document.querySelector(".turno-form");
+      form.insertBefore(aviso, form.firstChild);
+    }
+  }
+
+  function _filtrarEstudios(filtro) {
+    const sel = document.getElementById("t-estudio");
+    let primerCoincidencia = null;
+    for (const opt of sel.options) {
+      if (opt.value === "") continue;
+      const coincide = opt.value.toLowerCase().includes(filtro.toLowerCase());
+      opt.hidden = !coincide;
+      if (coincide && !primerCoincidencia) primerCoincidencia = opt.value;
+    }
+    if (primerCoincidencia) sel.value = primerCoincidencia;
+    sel.style.borderColor = "#f0c040";
+    sel.title = `Filtrado por franja: ${filtro}`;
   }
 
   // ── buscar slots disponibles ──────────────────────────────
