@@ -329,6 +329,26 @@
           </div>
         </div>
 
+        <!-- ── VISTA: PROTOCOLOS ─── -->
+        <div id="view-protocolos" class="view hidden">
+          <div class="view-header">
+            <h2>Protocolos RMN</h2>
+            <div style="display:flex;gap:.5rem;align-items:center">
+              <button id="btn-protocolos-reload" class="btn-sm">↺ Recargar</button>
+              <a href="https://protocolos-rmn-santojanni.netlify.app/" target="_blank" class="btn-sm" style="text-decoration:none">↗ Abrir en pestaña</a>
+            </div>
+          </div>
+          <div style="flex:1;position:relative;">
+            <iframe
+              id="iframe-protocolos"
+              src="https://protocolos-rmn-santojanni.netlify.app/"
+              style="width:100%;height:100%;border:none;display:block;"
+              allow="clipboard-read; clipboard-write"
+              title="Protocolos RMN Santojanni">
+            </iframe>
+          </div>
+        </div>
+
         <!-- ── VISTA: RECLAMOS ─── -->
         <div id="view-reclamos" class="view hidden">
           <div class="view-header">
