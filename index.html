@@ -100,6 +100,10 @@
           <span class="nav-icon">🔍</span>
           <span class="nav-label">Buscar</span>
         </button>
+        <button class="nav-btn admin-only" data-view="reclamos" id="nav-reclamos">
+          <span class="nav-icon">📋</span>
+          <span class="nav-label">Reclamos</span>
+        </button>
       </nav>
 
       <!-- MAIN CONTENT ─────────────────────────── -->
@@ -267,6 +271,26 @@
             </div>
           </div>
           <div id="buscar-results" style="padding:1rem"></div>
+        </div>
+
+        <!-- ── VISTA: RECLAMOS ─── -->
+        <div id="view-reclamos" class="view hidden">
+          <div class="view-header">
+            <h2>Reclamos RMN</h2>
+            <div style="display:flex;gap:.5rem;align-items:center">
+              <button id="btn-reclamos-reload" class="btn-sm">↺ Recargar</button>
+              <a href="https://jefaturaresonancias.github.io/reclamos-rmn/" target="_blank" class="btn-sm" style="text-decoration:none">↗ Abrir en pestaña</a>
+            </div>
+          </div>
+          <div style="flex:1;position:relative;">
+            <iframe
+              id="iframe-reclamos"
+              src="https://jefaturaresonancias.github.io/reclamos-rmn/"
+              style="width:100%;height:100%;border:none;display:block;"
+              allow="clipboard-read; clipboard-write"
+              title="PWA Reclamos RMN">
+            </iframe>
+          </div>
         </div>
 
       </main>

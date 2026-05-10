@@ -456,3 +456,7 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 /* ── FILAS DE FRANJA CLICLEABLES ─────────────────────────────*/
 .fila-franja td { border-bottom: 1px solid #f0f0f0 !important; }
 .fila-franja:hover td { filter: brightness(.95); }
+
+/* ── VISTA RECLAMOS (iframe) ─────────────────────────────────*/
+#view-reclamos { overflow: hidden; }
+#view-reclamos > div { overflow: hidden; }

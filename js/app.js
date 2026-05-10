@@ -58,6 +58,11 @@ const App = (() => {
     // Vista default según rol
     const defaultView = rol === "tecnico" ? "lista" : "agenda";
 
+    // Mostrar/ocultar items solo para admin
+    document.querySelectorAll(".admin-only").forEach(el => {
+      el.style.display = rol === "administrativo" ? "" : "none";
+    });
+
     // Reordenar nav: técnico ve Lista primero
     const navAgenda = document.getElementById("nav-agenda");
     const navLista  = document.getElementById("nav-lista");
