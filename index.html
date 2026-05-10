@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1a3a5c">
+  <meta name="description" content="Agenda de Resonancia Magnética — Hospital Santojanni">
+  <title>RMN Santojanni</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+  <!-- ══════════════════════════════════════════════
+       SETUP SCREEN — primera vez / cambiar URL
+  ═══════════════════════════════════════════════ -->
+  <div id="screen-setup" class="screen">
+    <div class="setup-card">
+      <div class="logo">🏥</div>
+      <h1>RMN Santojanni</h1>
+      <p>Resonancia Magnética — Hospital Donación Francisco Santojanni</p>
+
+      <div class="form-group" style="text-align:left;margin-top:1.5rem">
+        <label for="input-api-url">URL del servidor (Apps Script)</label>
+        <input type="url" id="input-api-url"
+               placeholder="https://script.google.com/macros/s/.../exec"
+               autocomplete="off" autocorrect="off" spellcheck="false">
+      </div>
+
+      <button id="btn-setup-ok">Conectar</button>
+      <p class="setup-hint">Ingresá la URL proporcionada por la jefatura del servicio.<br>Se guarda localmente y no se vuelve a pedir.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       ROL SCREEN
+  ═══════════════════════════════════════════════ -->
+  <div id="screen-rol" class="screen hidden">
+    <div class="setup-card">
+      <div class="logo">🏥</div>
+      <h1>¿Desde dónde entrás?</h1>
+      <p>Elegí tu rol para ver la vista correspondiente. Podés cambiar en cualquier momento.</p>
+
+      <div class="rol-options">
+        <button class="rol-btn" data-rol="administrativo">
+          <span class="rol-icon">👨‍💼</span>
+          <span class="rol-label">Administrativo</span>
+          <span class="rol-desc">Vista de grilla semanal · Asignación de turnos</span>
+        </button>
+        <button class="rol-btn" data-rol="tecnico">
+          <span class="rol-icon">🧑‍⚕️</span>
+          <span class="rol-label">Técnico</span>
+          <span class="rol-desc">Lista del día · Registro de presentes</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       MAIN APP
+  ═══════════════════════════════════════════════ -->
+  <div id="app" class="hidden">
+
+    <!-- TOPBAR ─────────────────────────────────── -->
+    <header id="topbar">
+      <div class="topbar-brand">
+        <span class="brand-icon">🏥</span>
+        <span class="brand-name">RMN Santojanni</span>
+      </div>
+      <div class="topbar-center">
+        <span id="topbar-fecha"></span>
+      </div>
+      <div class="topbar-actions">
+        <span id="topbar-rol-label" class="rol-badge"></span>
+        <button id="btn-cambiar-rol" class="btn-ghost">Cambiar rol</button>
+        <button id="btn-refresh"     class="btn-ghost" title="Actualizar vista">↻ Actualizar</button>
+      </div>
+    </header>
+
+    <!-- BODY LAYOUT ─────────────────────────────── -->
+    <div id="layout">
+
+      <!-- SIDEBAR ──────────────────────────────── -->
+      <nav id="sidebar">
+        <button class="nav-btn" data-view="agenda" id="nav-agenda">
+          <span class="nav-icon">📅</span>
+          <span class="nav-label">Agenda</span>
+        </button>
+        <button class="nav-btn" data-view="lista" id="nav-lista">
+          <span class="nav-icon">📋</span>
+          <span class="nav-label">Lista del día</span>
+        </button>
+        <button class="nav-btn" data-view="turno" id="nav-turno">
+          <span class="nav-icon">➕</span>
+          <span class="nav-label">Nuevo turno</span>
+        </button>
+        <button class="nav-btn" data-view="buscar" id="nav-buscar">
+          <span class="nav-icon">🔍</span>
+          <span class="nav-label">Buscar</span>
+        </button>
+      </nav>
+
+      <!-- MAIN CONTENT ─────────────────────────── -->
+      <main id="main">
+
+        <!-- ── VISTA: AGENDA ─── -->
+        <div id="view-agenda" class="view hidden">
+          <div class="view-header">
+            <h2>Agenda semanal</h2>
+            <div class="agenda-controls">
+              <button id="btn-semana-ant">← Anterior</button>
+              <span id="agenda-rango-label"></span>
+              <button id="btn-semana-sig">Siguiente →</button>
+              <select id="agenda-paso" title="Paso de la grilla">
+                <option value="20">20 min</option>
+                <option value="40" selected>40 min</option>
+                <option value="60">60 min</option>
+              </select>
+              <button id="btn-agenda-hoy">Hoy</button>
+            </div>
+          </div>
+          <div id="agenda-loading" class="loading-bar hidden">⏳ Cargando agenda…</div>
+          <div id="agenda-container" class="agenda-container"></div>
+        </div>
+
+        <!-- ── VISTA: LISTA DEL DÍA ─── -->
+        <div id="view-lista" class="view hidden">
+          <div class="view-header">
+            <h2>Lista del día</h2>
+            <div class="lista-controls">
+              <button id="btn-dia-ant">← Anterior</button>
+              <span id="lista-fecha-label"></span>
+              <button id="btn-dia-sig">Siguiente →</button>
+              <button id="btn-lista-hoy">Hoy</button>
+              <input type="search" id="lista-filtro" placeholder="Filtrar por nombre o DNI…">
+            </div>
+          </div>
+          <div id="lista-loading" class="loading-bar hidden">⏳ Cargando…</div>
+          <div id="lista-stats" class="lista-stats"></div>
+          <div id="lista-container">
+            <table id="tabla-turnos">
+              <thead>
+                <tr>
+                  <th>Hora</th>
+                  <th>Nombre</th>
+                  <th>Apellido</th>
+                  <th>DNI</th>
+                  <th>Estudio</th>
+                  <th>Origen</th>
+                  <th>Observaciones</th>
+                  <th>Presente</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="lista-tbody"></tbody>
+            </table>
+            <div id="lista-empty" class="empty-state hidden">No hay turnos para este día.</div>
+          </div>
+        </div>
+
+        <!-- ── VISTA: NUEVO TURNO ─── -->
+        <div id="view-turno" class="view hidden">
+          <div class="view-header">
+            <h2>Asignar nuevo turno</h2>
+          </div>
+          <div class="turno-form-container">
+            <form id="form-turno" class="turno-form" autocomplete="off">
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Nombre *</label>
+                  <input type="text" id="t-nombre" required placeholder="Nombre del paciente">
+                </div>
+                <div class="form-group">
+                  <label>Apellido *</label>
+                  <input type="text" id="t-apellido" required placeholder="Apellido">
+                </div>
+                <div class="form-group">
+                  <label>DNI *</label>
+                  <input type="number" id="t-dni" required placeholder="Sin puntos ni guiones" min="1000000" max="99999999">
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group form-wide">
+                  <label>Estudio *</label>
+                  <select id="t-estudio" required>
+                    <option value="">— Seleccionar estudio —</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Origen *</label>
+                  <select id="t-origen">
+                    <option value="AMBULATORIO">AMBULATORIO</option>
+                    <option value="INTERNACIÓN">INTERNACIÓN</option>
+                    <option value="GUARDIA">GUARDIA</option>
+                    <option value="DIRECCIÓN">DIRECCIÓN</option>
+                    <option value="TRASLADO">TRASLADO</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Fecha *</label>
+                  <input type="date" id="t-fecha" required>
+                </div>
+                <div class="form-group form-wide">
+                  <label>Observaciones / Iniciales</label>
+                  <input type="text" id="t-obs" placeholder="Notas o iniciales del operador">
+                </div>
+              </div>
+
+              <div class="form-row">
+                <button type="button" id="btn-ver-slots" class="btn-primary">
+                  🔎 Ver horarios disponibles
+                </button>
+              </div>
+
+              <div id="slots-container" class="slots-container hidden">
+                <h3>Horarios disponibles</h3>
+                <p id="slots-loading" class="hidden" style="color:#666;font-size:.85rem">Buscando disponibilidad…</p>
+                <div id="slots-grid"></div>
+                <div id="slot-seleccionado" class="slot-seleccionado hidden">
+                  <span id="slot-hora-label"></span>
+                  <button type="submit" id="btn-confirmar" class="btn-success">✓ Confirmar turno</button>
+                </div>
+              </div>
+
+              <div id="turno-result" class="turno-result hidden"></div>
+
+            </form>
+          </div>
+        </div>
+
+        <!-- ── VISTA: BUSCAR ─── -->
+        <div id="view-buscar" class="view hidden">
+          <div class="view-header">
+            <h2>Buscar turno</h2>
+          </div>
+          <div class="buscar-form">
+            <div class="form-row" style="align-items:flex-end">
+              <div class="form-group">
+                <label>Apellido</label>
+                <input type="text" id="b-apellido" placeholder="Apellido del paciente">
+              </div>
+              <div class="form-group">
+                <label>DNI</label>
+                <input type="number" id="b-dni" placeholder="Número de DNI">
+              </div>
+              <button id="btn-buscar" class="btn-primary">Buscar</button>
+            </div>
+          </div>
+          <div id="buscar-results" style="padding:1rem"></div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- TOAST ──────────────────────────────────── -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- SCRIPTS ─────────────────────────────────── -->
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/views/agenda.js"></script>
+  <script src="js/views/lista.js"></script>
+  <script src="js/views/turno.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
