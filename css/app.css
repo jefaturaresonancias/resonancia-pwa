@@ -469,3 +469,18 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 #parte-tabla tbody tr { border-bottom: 1px solid var(--border); }
 #parte-tabla tbody tr:hover { background: var(--bg) !important; }
 #parte-tabla td { padding: 8px 10px; vertical-align: middle; }
+
+/* ── RIS EN AGENDA ───────────────────────────────────────────*/
+.slot-ris {
+  background: #f4f4f4;
+  border-left: 2px dashed #bbb !important;
+  cursor: default;
+}
+.slot-ris .slot-nombre { color: #999 !important; font-style: italic; font-weight: 500 !important; }
+.slot-ris .slot-estudio { color: #bbb !important; }
+.slot-ris-vacio { background: #fafafa; border: 1px solid #eee; }
+
+.cal-ris-badge { color: #888; font-size: 11px; font-weight: 600; }
+.cal-barra-ris-wrap { margin-top: 3px; }
+.cal-barra-ris { background: #ccc; height: 3px; border-radius: 2px; }
+.cal-pie-ris { color: #888; font-weight: 600; }

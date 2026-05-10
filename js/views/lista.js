@@ -19,7 +19,8 @@ const ListaView = (() => {
   }
 
   // ── render combinado: slots de agenda + turnos ────────────
-  function _render(agendaDia, turnos, filtro) {
+  function _render(agendaDia, turnos, filtro, risDelDia) {
+    risDelDia = risDelDia || [];
     const tbody  = document.getElementById("lista-tbody");
     const empty  = document.getElementById("lista-empty");
     const stats  = document.getElementById("lista-stats");
@@ -36,20 +37,25 @@ const ListaView = (() => {
     // Construir filas: un slot por cada entrada de la agenda (libres + ocupados)
     const filas = [];
     if (agendaDia && agendaDia.slots) {
-      // Agregar slots de la agenda (incluye libres, franjas, bloqueos)
       for (const s of agendaDia.slots) {
         if (s.mins < MIN_I || s.mins >= MIN_F) continue;
-        if (s.tipo === "continuacion") continue; // ocultar continuaciones
-
+        if (s.tipo === "continuacion") continue;
         const turno = turnoMap[s.mins];
-        filas.push({ slot: s, turno: turno || null, mins: s.mins });
+        filas.push({ slot: s, turno: turno || null, mins: s.mins, esRIS: false });
       }
     } else {
-      // Fallback: solo turnos si no hay agenda
       for (const t of turnos) {
-        filas.push({ slot: { tipo: "turno" }, turno: t, mins: t.mins });
+        filas.push({ slot: { tipo: "turno" }, turno: t, mins: t.mins, esRIS: false });
       }
     }
+
+    // Agregar filas RIS intercaladas
+    for (const r of risDelDia) {
+      const mins = _parseMins(r.hora);
+      if (mins < MIN_I || mins >= MIN_F) continue;
+      filas.push({ slot: { tipo: "ris" }, turno: null, mins, esRIS: true, ris: r });
+    }
+    filas.sort((a, b) => a.mins - b.mins);
 
     // Aplicar filtro
     const filasFiltradas = filtro
@@ -61,7 +67,8 @@ const ListaView = (() => {
       : filas;
 
     const presentes = turnos.filter(t => t.presente === "Presente").length;
-    stats.textContent = `${turnos.length} turnos · ${presentes} presentes · ${turnos.length - presentes} pendientes · ${filas.filter(f=>f.slot.tipo==="libre").length} slots libres`;
+    const cntRIS = risDelDia.length;
+    stats.textContent = `${turnos.length} turnos · ${presentes} presentes · ${turnos.length - presentes} pendientes · ${filas.filter(f=>f.slot&&f.slot.tipo==="libre").length} libres${cntRIS > 0 ? ` · 📋 ${cntRIS} RIS` : ""}`;
 
     if (filasFiltradas.length === 0) {
       tbody.innerHTML = "";
@@ -70,10 +77,25 @@ const ListaView = (() => {
     }
     empty.classList.add("hidden");
 
-    tbody.innerHTML = filasFiltradas.map(({ slot, turno, mins }) => {
+    tbody.innerHTML = filasFiltradas.map((fila) => {
+      const { slot, turno, mins, esRIS } = fila;
       const h = String(Math.floor(mins/60)).padStart(2,"0");
       const m = String(mins%60).padStart(2,"0");
       const hora = `${h}:${m}`;
+
+      // ── FILA RIS ──
+      if (esRIS) {
+        const r = fila.ris;
+        return `<tr style="background:#f5f5f5;border-left:3px solid #bbb">
+          <td class="td-hora" style="color:#999">${hora}</td>
+          <td style="color:#888;font-style:italic">${r.apellido_nombre}</td>
+          <td colspan="2" style="color:#aaa;font-size:11px;font-style:italic">${r.documento}</td>
+          <td colspan="2" style="color:#aaa;font-size:11px">${r.practica}</td>
+          <td></td>
+          <td><span style="font-size:10px;background:#eee;color:#888;padding:2px 8px;border-radius:10px;font-weight:600">RIS</span></td>
+          <td></td>
+        </tr>`;
+      }
 
       // ── SLOT LIBRE ──
       if (slot.tipo === "libre") {
@@ -209,13 +231,13 @@ const ListaView = (() => {
     loading.classList.remove("hidden");
     try {
       const fechaStr = API.fechaAStr(_fecha);
-      // Cargar agenda del día (slots) y turnos en paralelo
-      const [agendaArr, turnos] = await Promise.all([
-        API.agenda(fechaStr, 1, 20),   // paso 20 min para ver más granularidad
-        API.turnos(fechaStr)
+      const [agendaArr, turnos, risDelDia] = await Promise.all([
+        API.agenda(fechaStr, 1, 20),
+        API.turnos(fechaStr),
+        API.leerRIS(fechaStr).catch(() => [])
       ]);
       const agendaDia = agendaArr && agendaArr[0] ? agendaArr[0] : null;
-      _render(agendaDia, turnos, filtro);
+      _render(agendaDia, turnos, filtro, risDelDia);
     } catch(err) {
       App.toast("Error cargando lista: "+err.message, "error");
       document.getElementById("lista-tbody").innerHTML = "";
@@ -231,6 +253,12 @@ const ListaView = (() => {
     const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
     document.getElementById("lista-fecha-label").textContent =
       `${DIAS[_fecha.getDay()]} ${_fecha.getDate()} de ${MESES[_fecha.getMonth()]}`;
+  }
+
+  function _parseMins(hora) {
+    if (!hora) return 0;
+    const p = String(hora).replace(/a\.m\.|p\.m\./gi,"").trim().split(":");
+    return parseInt(p[0]||0)*60 + (parseInt(p[1]||0));
   }
 
   function _detectarOrigen(label) {

@@ -119,6 +119,32 @@ const API = (() => {
      */
     anular(fila) {
       return post({ action: "anular", fila });
+    },
+
+    // ── RIS ────────────────────────────────────────────────
+
+    /** Turnos RIS de una fecha. */
+    leerRIS(fecha) {
+      return get({ action: "leerRIS", fecha });
+    },
+
+    /** Turnos RIS de un rango de fechas → { "dd/MM/yyyy": [...] } */
+    leerRISRango(desde, dias = 7) {
+      return get({ action: "leerRISRango", desde, dias });
+    },
+
+    /** Hashes existentes para una fecha (dedup). */
+    verificarRIS(fecha) {
+      return get({ action: "verificarRIS", fecha });
+    },
+
+    /**
+     * Escribe filas RIS. Solo agrega las nuevas (por hash).
+     * @param {string} fecha  dd/MM/yyyy
+     * @param {Array}  filas  [{ hora, documento, apellido_nombre, practica }]
+     */
+    escribirRIS(fecha, filas) {
+      return post({ action: "escribirRIS", fecha, filas });
     }
   };
 })();

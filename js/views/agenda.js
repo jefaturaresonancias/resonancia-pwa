@@ -6,6 +6,12 @@ const AgendaView = (() => {
   let _mesBase    = _primeroDeMes(new Date());
   let _paso       = 40;
 
+  function parsearMinsJS(hora) {
+    if (!hora) return 0;
+    const p = String(hora).replace(/a\.m\.|p\.m\./g,"").trim().split(":");
+    return parseInt(p[0]||0)*60 + (parseInt(p[1]||0));
+  }
+
   function _lunesDeHoy() {
     const d = new Date();
     const dia = d.getDay();
@@ -41,7 +47,8 @@ const AgendaView = (() => {
   }
 
   // ── VISTA SEMANA ──────────────────────────────────────────
-  function _renderSemana(datos) {
+  function _renderSemana(datos, risMap) {
+    risMap = risMap || {};
     const container = document.getElementById("agenda-container");
     if (!datos || !datos.length) { container.innerHTML = '<div class="empty-state">Sin datos.</div>'; return; }
 
@@ -61,6 +68,38 @@ const AgendaView = (() => {
         html += s ? _renderSlot(s, dia.fecha, mins) : "<td></td>";
       }
       html += "</tr>";
+      // Filas RIS para este slot
+      const risEnSlot = [];
+      for (const dia of datos) {
+        const ris = (risMap[dia.fecha] || []).filter(r => {
+          const rm = parsearMinsJS(r.hora);
+          return rm >= mins && rm < mins + _paso;
+        });
+        risEnSlot.push({ fecha: dia.fecha, ris });
+      }
+      const hayRIS = risEnSlot.some(d => d.ris.length > 0);
+      if (hayRIS) {
+        for (const risEntry of risEnSlot[0]?.ris?.length ? [0] : []) { break; }
+        // Una fila RIS por cada turno RIS en cualquier día del slot
+        const maxRIS = Math.max(...risEnSlot.map(d => d.ris.length), 0);
+        for (let ri = 0; ri < maxRIS; ri++) {
+          html += `<tr>`;
+          html += `<td class="col-hora" style="font-size:9px;color:#aaa;background:#f4f4f4">RIS</td>`;
+          for (const d of risEnSlot) {
+            const r = d.ris[ri];
+            if (r) {
+              html += `<td class="slot-ris" title="${r.apellido_nombre} — ${r.practica}">
+                <div class="slot-content">
+                  <span class="slot-nombre" style="color:#888">${r.apellido_nombre}</span>
+                  <span class="slot-estudio" style="color:#aaa">${r.practica}</span>
+                </div></td>`;
+            } else {
+              html += `<td class="slot-ris-vacio"></td>`;
+            }
+          }
+          html += `</tr>`;
+        }
+      }
     }
     html += "</tbody></table>";
     container.innerHTML = html;
@@ -111,7 +150,8 @@ const AgendaView = (() => {
   }
 
   // ── VISTA MES ─────────────────────────────────────────────
-  function _renderMes(datos) {
+  function _renderMes(datos, risMes) {
+    risMes = risMes || {};
     const container = document.getElementById("agenda-container");
     const resumenMap = {};
     const MIN_I = 7*60, MIN_F = 22*60;
@@ -140,6 +180,8 @@ const AgendaView = (() => {
     for (const v of Object.values(resumenMap)) {
       if (!v.esFeriado) { totalOcup += v.ocupados; totalLibres += v.libres; }
     }
+
+    const totalRIS = Object.values(risMes).reduce((a,v) => a + v.length, 0);
 
     let html = `<div class="cal-mes-wrap">
       <table class="cal-mes-table"><thead><tr>`;
@@ -174,16 +216,19 @@ const AgendaView = (() => {
 
         const barOcup = total>0 ? Math.round((res.ocupados/total)*100) : 0;
 
+        const risDelDia = (risMes[fechaStr] || []).length;
         contenido = `
           <div class="cal-num">${dia}</div>
           <div class="cal-contadores">
             <span class="cal-lib-badge" title="Slots libres">▲ ${res.libres}</span>
             <span class="cal-ocu-badge" title="Turnos asignados">● ${res.ocupados}</span>
+            ${risDelDia > 0 ? `<span class="cal-ris-badge" title="Turnos RIS">📋 ${risDelDia}</span>` : ""}
           </div>
           <div class="cal-barra">
             <div class="cal-barra-ocu" style="width:${barOcup}%"></div>
             <div class="cal-barra-lib" style="width:${100-barOcup}%"></div>
-          </div>`;
+          </div>
+          ${risDelDia > 0 ? `<div class="cal-barra cal-barra-ris-wrap"><div class="cal-barra-ris" style="width:100%"></div></div>` : ""}`;
       }
 
       html += `<td class="${cls}" data-fecha="${fechaStr}" title="Clic para ver semana">${contenido}</td>`;
@@ -198,6 +243,7 @@ const AgendaView = (() => {
         <span class="cal-pie-lib">▲ ${totalLibres} slots libres en el mes</span>
         <span class="cal-pie-sep">·</span>
         <span class="cal-pie-ocu">● ${totalOcup} turnos asignados</span>
+        ${totalRIS > 0 ? `<span class="cal-pie-sep">·</span><span class="cal-pie-ris">📋 ${totalRIS} RIS</span>` : ""}
       </div>
     </div>`;
     container.innerHTML = html;
@@ -224,7 +270,13 @@ const AgendaView = (() => {
     const loading = document.getElementById("agenda-loading");
     document.getElementById("agenda-rango-label").textContent = _labelRango();
     loading.classList.remove("hidden");
-    try   { _renderSemana(await API.agenda(_strFecha(_fechaDesde), 7, _paso)); }
+    try {
+      const [datos, risMap] = await Promise.all([
+        API.agenda(_strFecha(_fechaDesde), 7, _paso),
+        API.leerRISRango(_strFecha(_fechaDesde), 7).catch(() => ({}))
+      ]);
+      _renderSemana(datos, risMap);
+    }
     catch (err) { App.toast("Error: "+err.message,"error"); }
     finally     { loading.classList.add("hidden"); }
   }
@@ -239,7 +291,11 @@ const AgendaView = (() => {
       const dow = p.getDay();
       const lunes = new Date(p);
       lunes.setDate(p.getDate()-(dow===0?6:dow-1));
-      _renderMes(await API.agenda(_strFecha(lunes), 42, _paso));
+      const [datosMes, risMes] = await Promise.all([
+        API.agenda(_strFecha(lunes), 42, _paso),
+        API.leerRISRango(_strFecha(lunes), 42).catch(() => ({}))
+      ]);
+      _renderMes(datosMes, risMes);
     } catch(err) { App.toast("Error: "+err.message,"error"); }
     finally      { loading.classList.add("hidden"); }
   }

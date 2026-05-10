@@ -239,6 +239,7 @@ const ParteView = (() => {
       document.getElementById("parte-archivo-label").textContent = `📄 ${file.name}`;
       document.getElementById("btn-parte-excel").disabled = false;
       document.getElementById("btn-parte-copiar").disabled = false;
+      document.getElementById("btn-parte-ris").disabled = false;
       document.getElementById("parte-filtro").value = "";
 
       _render(_filas, "");
@@ -249,6 +250,62 @@ const ParteView = (() => {
       progress.classList.add("hidden");
       zona.classList.remove("hidden");
       App.toast("Error al procesar el PDF: " + err.message, "error");
+    }
+  }
+
+  // ── Cargar a agenda RIS ──────────────────────────────────
+  async function _cargarRIS() {
+    if (!_filas.length || !_fecha) {
+      App.toast("Primero cargá un PDF.", "error"); return;
+    }
+    const btn = document.getElementById("btn-parte-ris");
+    btn.disabled = true;
+    btn.textContent = "⏳ Verificando…";
+
+    try {
+      // Verificar duplicados primero
+      const verif = await API.verificarRIS(_fecha);
+      const existentes = new Set(verif.hashes || []);
+
+      const nuevas = _filas.filter(f => {
+        const hash = `${_fecha}|${f.hora}|${(f.documento||"").trim().toUpperCase()}`;
+        return !existentes.has(hash);
+      });
+
+      if (nuevas.length === 0) {
+        App.toast(`Sin cambios — los ${_filas.length} registros ya estaban en la agenda RIS.`);
+        btn.disabled = false; btn.textContent = "📅 Cargar a agenda RIS";
+        return;
+      }
+
+      const descartadas = _filas.length - nuevas.length;
+      if (!confirm(
+        `Se agregarán ${nuevas.length} registro${nuevas.length!==1?"s":""} nuevos a la agenda RIS del ${_fecha}.
+` +
+        (descartadas > 0 ? `${descartadas} ya existían y se omiten.
+` : "") +
+        `
+¿Confirmar?`
+      )) {
+        btn.disabled = false; btn.textContent = "📅 Cargar a agenda RIS"; return;
+      }
+
+      btn.textContent = "⏳ Guardando…";
+      const resp = await API.escribirRIS(_fecha, nuevas);
+      App.toast(resp.mensaje, "ok");
+
+      // Marcar visualmente las filas cargadas
+      document.querySelectorAll("#parte-tbody tr").forEach((tr, i) => {
+        const f    = _filas[i];
+        if (!f) return;
+        const hash = `${_fecha}|${f.hora}|${(f.documento||"").trim().toUpperCase()}`;
+        if (!existentes.has(hash)) tr.style.background = "#e8f5e9";
+      });
+
+    } catch(err) {
+      App.toast("Error: " + err.message, "error");
+    } finally {
+      btn.disabled = false; btn.textContent = "📅 Cargar a agenda RIS";
     }
   }
 
@@ -278,6 +335,7 @@ const ParteView = (() => {
       document.getElementById("parte-dropzone").classList.remove("hidden");
       document.getElementById("btn-parte-excel").disabled = true;
       document.getElementById("btn-parte-copiar").disabled = true;
+      document.getElementById("btn-parte-ris").disabled = true;
       document.getElementById("parte-input-file").value = "";
     });
 
