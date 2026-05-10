@@ -34,22 +34,26 @@ function doPost(e) {
 
 function _routeGet(action, p) {
   switch (action) {
-    case "ping":    return { version: "3.0-pwa", status: "ok" };
-    case "config":  return _apiConfig();
-    case "agenda":  return _apiAgenda(p);
-    case "turnos":  return _apiTurnos(p);
-    case "slots":   return _apiSlots(p);
-    case "buscar":  return _apiBuscar(p);
-    default:        throw new Error("Acción no reconocida: " + action);
+    case "ping":         return { version: "3.0-pwa", status: "ok" };
+    case "config":       return _apiConfig();
+    case "agenda":       return _apiAgenda(p);
+    case "turnos":       return _apiTurnos(p);
+    case "slots":        return _apiSlots(p);
+    case "buscar":       return _apiBuscar(p);
+    case "leerRIS":      return _apiLeerRIS(p);
+    case "leerRISRango": return _apiLeerRISRango(p);
+    case "verificarRIS": return _apiVerificarRIS(p);
+    default:             throw new Error("Acción no reconocida: " + action);
   }
 }
 
 function _routePost(action, body) {
   switch (action) {
-    case "asignar":  return _apiAsignar(body);
-    case "presente": return _apiPresente(body);
-    case "anular":   return _apiAnular(body);
-    default:         throw new Error("Acción POST no reconocida: " + action);
+    case "asignar":     return _apiAsignar(body);
+    case "presente":    return _apiPresente(body);
+    case "anular":      return _apiAnular(body);
+    case "escribirRIS": return _apiEscribirRIS(body);
+    default:            throw new Error("Acción POST no reconocida: " + action);
   }
 }
 
