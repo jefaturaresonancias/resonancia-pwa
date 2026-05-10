@@ -196,16 +196,16 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 /* ── AGENDA GRID ─────────────────────────────────────────────*/
 .agenda-container { flex: 1; overflow: auto; padding: 0; }
 .agenda-table {
-  border-collapse: collapse; width: max-content; min-width: 100%;
+  border-collapse: collapse; width: 100%; table-layout: fixed;
   font-size: 12px;
 }
 .agenda-table th {
   position: sticky; top: 0; z-index: 10;
   background: var(--navy); color: #fff;
   padding: 8px 6px; font-size: 11px; font-weight: 700;
-  text-align: center; white-space: nowrap;
+  text-align: center; white-space: nowrap; overflow: hidden;
   border-right: 1px solid rgba(255,255,255,.15);
-  min-width: 130px;
+  min-width: 0;
 }
 .agenda-table th.col-hora { min-width: 58px; width: 58px; }
 .agenda-table th.feriado-col { background: #b71c1c; }

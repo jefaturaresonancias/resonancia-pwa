@@ -146,5 +146,12 @@ const ListaView = (() => {
     });
   }
 
-  return { init, cargar };
+  function setFecha(fechaStr) {
+    // fechaStr = "dd/MM/yyyy"
+    const p = fechaStr.split("/");
+    _fecha = new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0]));
+    _fecha.setHours(0,0,0,0);
+  }
+
+  return { init, cargar, setFecha };
 })();

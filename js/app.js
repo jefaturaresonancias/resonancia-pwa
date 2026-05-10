@@ -191,7 +191,12 @@ const App = (() => {
     });
   }
 
-  return { init, toast, showView, abrirTurnoConFechaHora, mostrarOpcionesTurno, refrescarAgenda };
+  function irAListaDia(fechaStr) {
+    ListaView.setFecha(fechaStr);
+    showView("lista");
+  }
+
+  return { init, toast, showView, abrirTurnoConFechaHora, mostrarOpcionesTurno, refrescarAgenda, irAListaDia };
 })();
 
 // Arrancar cuando el DOM esté listo

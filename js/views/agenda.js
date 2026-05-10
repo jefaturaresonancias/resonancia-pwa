@@ -196,16 +196,10 @@ const AgendaView = (() => {
     html += `</tr></tbody></table></div>`;
     container.innerHTML = html;
 
-    // Click en día → ir a semana
+    // Click en día → ir a Lista del día para esa fecha
     container.querySelectorAll(".cal-dia[data-fecha]").forEach(td => {
       td.addEventListener("click", () => {
-        const f = td.dataset.fecha.split("/");
-        const d = new Date(parseInt(f[2]), parseInt(f[1])-1, parseInt(f[0]));
-        d.setHours(0,0,0,0);
-        const dow = d.getDay();
-        d.setDate(d.getDate()-(dow===0?6:dow-1));
-        _fechaDesde = d;
-        _setModo("semana");
+        App.irAListaDia(td.dataset.fecha);
       });
     });
   }
