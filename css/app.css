@@ -196,18 +196,18 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 /* ── AGENDA GRID ─────────────────────────────────────────────*/
 .agenda-container { flex: 1; overflow: auto; padding: 0; }
 .agenda-table {
-  border-collapse: collapse; width: 100%; table-layout: fixed;
+  border-collapse: collapse; width: max-content; min-width: 100%;
   font-size: 12px;
 }
 .agenda-table th {
   position: sticky; top: 0; z-index: 10;
   background: var(--navy); color: #fff;
-  padding: 8px 4px; font-size: 11px; font-weight: 700;
-  text-align: center; white-space: nowrap; overflow: hidden;
+  padding: 8px 6px; font-size: 11px; font-weight: 700;
+  text-align: center; white-space: nowrap;
   border-right: 1px solid rgba(255,255,255,.15);
-  min-width: 0;
+  min-width: 130px;
 }
-.agenda-table th.col-hora { width: 58px; min-width: 58px; flex-shrink: 0; }
+.agenda-table th.col-hora { min-width: 58px; width: 58px; }
 .agenda-table th.feriado-col { background: #b71c1c; }
 .agenda-table td {
   padding: 3px 5px; border: 1px solid #e4e8ee;
@@ -371,3 +371,73 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
   animation: spin .6s linear infinite; vertical-align: middle;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── TOGGLE MODO SEMANA / MES ────────────────────────────────*/
+.modo-toggle { display: flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.modo-btn {
+  padding: 5px 14px; font-size: 12px; font-weight: 600;
+  border: none; background: var(--surface); color: var(--text-2);
+  cursor: pointer; transition: background .15s, color .15s;
+}
+.modo-btn:hover    { background: var(--bg); }
+.modo-btn.modo-activo { background: var(--navy); color: #fff; }
+
+/* ── CALENDARIO MENSUAL ──────────────────────────────────────*/
+.cal-mes-wrap { padding: 1rem 1.25rem; }
+
+.cal-leyenda {
+  display: flex; gap: 1.5rem; flex-wrap: wrap;
+  margin-bottom: 1rem; font-size: 11px; color: var(--text-2);
+}
+.cal-leg-item { display: flex; align-items: center; gap: 5px; }
+.cal-leg-dot  { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+.cal-mes-table {
+  width: 100%; border-collapse: collapse; table-layout: fixed;
+}
+.cal-mes-table thead th {
+  background: var(--navy); color: #fff;
+  padding: 8px 4px; font-size: 11px; font-weight: 700;
+  text-align: center; border-right: 1px solid rgba(255,255,255,.15);
+}
+
+.cal-dia {
+  border: 1px solid var(--border); vertical-align: top;
+  padding: 6px 8px; height: 90px; cursor: pointer;
+  transition: background .1s;
+  background: var(--surface);
+}
+.cal-dia:hover           { background: var(--accent-lt); }
+.cal-dia-vacio           { background: var(--bg); cursor: default; }
+.cal-dia-vacio:hover     { background: var(--bg); }
+.cal-dia-hoy             { border: 2px solid var(--navy) !important; }
+.cal-dia-dom             { background: #fafafa; }
+.cal-dia-feriado         { background: #ffebee !important; }
+.cal-dia-lleno           { background: #ffebee !important; }
+.cal-dia-casi-lleno      { background: #fff8e1 !important; }
+
+.cal-num {
+  font-size: 13px; font-weight: 700; color: var(--navy);
+  margin-bottom: 4px;
+}
+.cal-dia-hoy .cal-num {
+  background: var(--navy); color: #fff;
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; margin-bottom: 4px;
+}
+.cal-feriado-label { font-size: 10px; color: #c62828; font-weight: 600; }
+
+.cal-contadores {
+  display: flex; gap: 6px; font-size: 11px; font-weight: 600;
+  margin-bottom: 4px;
+}
+.cal-ocu { color: var(--success); }
+.cal-lib { color: var(--text-2); }
+
+.cal-barra {
+  display: flex; height: 4px; border-radius: 2px; overflow: hidden;
+  background: var(--border);
+}
+.cal-barra-ocu { background: #4a9e5c; }
+.cal-barra-lib { background: #b0c8e8; }

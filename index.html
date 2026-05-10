@@ -108,17 +108,29 @@
         <!-- ── VISTA: AGENDA ─── -->
         <div id="view-agenda" class="view hidden">
           <div class="view-header">
-            <h2>Agenda semanal</h2>
+            <h2>Agenda</h2>
             <div class="agenda-controls">
-              <button id="btn-semana-ant">← Anterior</button>
-              <span id="agenda-rango-label"></span>
-              <button id="btn-semana-sig">Siguiente →</button>
-              <select id="agenda-paso" title="Paso de la grilla">
-                <option value="20">20 min</option>
-                <option value="40" selected>40 min</option>
-                <option value="60">60 min</option>
-              </select>
-              <button id="btn-agenda-hoy">Hoy</button>
+              <div class="modo-toggle">
+                <button id="btn-modo-semana" class="modo-btn modo-activo">📅 Semana</button>
+                <button id="btn-modo-mes"    class="modo-btn">🗓 Mes</button>
+              </div>
+              <div id="ctrl-semana" style="display:flex;align-items:center;gap:.4rem">
+                <button id="btn-semana-ant">← Ant</button>
+                <span id="agenda-rango-label"></span>
+                <button id="btn-semana-sig">Sig →</button>
+                <select id="agenda-paso" title="Paso">
+                  <option value="20">20 min</option>
+                  <option value="40" selected>40 min</option>
+                  <option value="60">60 min</option>
+                </select>
+                <button id="btn-agenda-hoy">Hoy</button>
+              </div>
+              <div id="ctrl-mes" class="hidden" style="display:flex;align-items:center;gap:.4rem">
+                <button id="btn-mes-ant">← Ant</button>
+                <span id="agenda-mes-label" style="font-weight:600;color:#1a3a5c;min-width:160px;text-align:center"></span>
+                <button id="btn-mes-sig">Sig →</button>
+                <button id="btn-mes-hoy">Hoy</button>
+              </div>
             </div>
           </div>
           <div id="agenda-loading" class="loading-bar hidden">⏳ Cargando agenda…</div>

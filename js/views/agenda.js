@@ -1,36 +1,34 @@
-// js/views/agenda.js — Vista de grilla semanal (administrativo)
+// js/views/agenda.js — Vista de grilla semanal + calendario mensual (administrativo)
 
 const AgendaView = (() => {
-  // ── estado ────────────────────────────────────────────────
+  let _modo       = "semana";
   let _fechaDesde = _lunesDeHoy();
+  let _mesBase    = _primeroDeMes(new Date());
   let _paso       = 40;
-  let _datos      = null;
 
   function _lunesDeHoy() {
     const d = new Date();
-    const dia = d.getDay();                   // 0=Dom … 6=Sáb
+    const dia = d.getDay();
     d.setDate(d.getDate() - (dia === 0 ? 6 : dia - 1));
     d.setHours(0, 0, 0, 0);
     return d;
   }
-
-  // ── utilidades ────────────────────────────────────────────
-  function _strFecha(d) { return API.fechaAStr(d); }
+  function _primeroDeMes(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+  function _strFecha(d)     { return API.fechaAStr(d); }
 
   function _labelRango() {
     const fin = new Date(_fechaDesde);
     fin.setDate(_fechaDesde.getDate() + 6);
-    const opts = { day: "numeric", month: "short" };
-    return (
-      _fechaDesde.toLocaleDateString("es-AR", opts) +
-      " — " +
-      fin.toLocaleDateString("es-AR", opts)
-    );
+    const o = { day: "numeric", month: "short" };
+    return _fechaDesde.toLocaleDateString("es-AR", o) + " — " + fin.toLocaleDateString("es-AR", o);
+  }
+  function _labelMes() {
+    return _mesBase.toLocaleDateString("es-AR", { month: "long", year: "numeric" })
+      .replace(/^\w/, c => c.toUpperCase());
   }
 
-  // ── colores de origen ─────────────────────────────────────
-  function _coloresOrigen(origen) {
-    const map = {
+  function _coloresOrigen(o) {
+    const m = {
       "AMBULATORIO": { bg: "#a8d5a2", text: "#1a5e28", border: "#4a9e5c" },
       "GUARDIA":     { bg: "#5ba4cf", text: "#0a3d6b", border: "#2a7ab5" },
       "INTERNACIÓN": { bg: "#ffd966", text: "#7a4f00", border: "#c9a000" },
@@ -39,50 +37,31 @@ const AgendaView = (() => {
       "DIRECCION":   { bg: "#a98fd4", text: "#3d1e7a", border: "#7c5cb5" },
       "TRASLADO":    { bg: "#3c9ab8", text: "#0a3d52", border: "#1a6e8a" },
     };
-    return map[(origen || "").toUpperCase()] || { bg: "#e8a09a", text: "#7a1f35", border: "#c9506a" };
+    return m[(o||"").toUpperCase()] || { bg: "#e8a09a", text: "#7a1f35", border: "#c9506a" };
   }
 
-  // ── renderizado ───────────────────────────────────────────
-  function _render(datos) {
-    _datos = datos;
+  // ── VISTA SEMANA ──────────────────────────────────────────
+  function _renderSemana(datos) {
     const container = document.getElementById("agenda-container");
-    if (!datos || datos.length === 0) {
-      container.innerHTML = '<div class="empty-state">No hay datos de agenda.</div>';
-      return;
-    }
+    if (!datos || !datos.length) { container.innerHTML = '<div class="empty-state">Sin datos.</div>'; return; }
 
-    // Rango de horas visibles: 07:00 a 22:00
-    const MIN_INICIO = 7  * 60;
-    const MIN_FIN    = 22 * 60;
+    const MIN_I = 7*60, MIN_F = 22*60;
+    const slots = datos[0].slots.filter(s => s.mins >= MIN_I && s.mins < MIN_F).map(s => s.mins);
 
-    // Determinar slots visibles
-    const slotsVisibles = [];
-    if (datos[0]) {
-      for (const s of datos[0].slots) {
-        if (s.mins >= MIN_INICIO && s.mins < MIN_FIN) slotsVisibles.push(s.mins);
-      }
-    }
-
-    let html = '<table class="agenda-table"><thead><tr>';
-    html += '<th class="col-hora">Hora</th>';
-    for (const d of datos) {
-      const clsFer = d.esFeriado ? " feriado-col" : "";
-      html += `<th class="${clsFer}">${d.label}${d.esFeriado ? " 🚫" : ""}</th>`;
-    }
+    let html = '<table class="agenda-table"><thead><tr><th class="col-hora">Hora</th>';
+    for (const d of datos) html += `<th class="${d.esFeriado?"feriado-col":""}">${d.label}${d.esFeriado?" 🚫":""}</th>`;
     html += "</tr></thead><tbody>";
 
-    for (const mins of slotsVisibles) {
-      const h   = String(Math.floor(mins / 60)).padStart(2, "0");
-      const m   = String(mins % 60).padStart(2, "0");
+    for (const mins of slots) {
+      const h = String(Math.floor(mins/60)).padStart(2,"0");
+      const m = String(mins%60).padStart(2,"0");
       html += `<tr><td class="col-hora">${h}:${m}</td>`;
-
       for (const dia of datos) {
-        const slot = dia.slots.find(s => s.mins === mins);
-        html += slot ? _renderSlot(slot, dia.fecha, mins) : '<td></td>';
+        const s = dia.slots.find(s => s.mins === mins);
+        html += s ? _renderSlot(s, dia.fecha, mins) : "<td></td>";
       }
       html += "</tr>";
     }
-
     html += "</tbody></table>";
     container.innerHTML = html;
     _bindSlotClicks(container);
@@ -90,117 +69,196 @@ const AgendaView = (() => {
 
   function _renderSlot(slot, fecha, mins) {
     const tipo = slot.tipo || "libre";
-    const bg   = slot.color || "#ffffff";
-
+    const bg   = slot.color || "#fff";
     if (tipo === "libre") {
-      return `<td class="slot-libre" style="background:${bg}"
-              data-fecha="${fecha}" data-mins="${mins}"
-              title="Libre — hacer clic para asignar turno">
-              <div class="slot-content">
-                <span class="slot-label" style="color:#aaa;">+</span>
-              </div></td>`;
+      return `<td class="slot-libre" style="background:${bg}" data-fecha="${fecha}" data-mins="${mins}" title="Libre — clic para asignar"><div class="slot-content"><span class="slot-label" style="color:#ccc">+</span></div></td>`;
     }
-
     if (tipo === "turno") {
-      const col     = _coloresOrigen(slot.origen);
-      const pres    = slot.presente === "Presente" ? "✅" : "";
-      const tooltip = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones ? "\n📝 " + slot.observaciones : ""}${pres ? "\n✅ Presente" : ""}`;
-      return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border}"
-              data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}"
-              data-tooltip="${encodeURIComponent(tooltip)}"
-              title="">
-              <div class="slot-content">
-                <span class="slot-nombre" style="color:${col.text}">${slot.apellido}, ${slot.nombre} ${pres}</span>
-                <span class="slot-estudio" style="color:${col.text}">${slot.estudio}</span>
-              </div></td>`;
+      const col  = _coloresOrigen(slot.origen);
+      const pres = slot.presente === "Presente" ? "✅" : "";
+      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${pres?"\n✅ Presente":""}`;
+      return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border}" data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}"><div class="slot-content"><span class="slot-nombre" style="color:${col.text}">${slot.apellido}, ${slot.nombre} ${pres}</span><span class="slot-estudio" style="color:${col.text}">${slot.estudio}</span></div></td>`;
     }
-
-    if (tipo === "continuacion") {
-      return `<td class="slot-continua" style="background:${bg}"><div class="slot-content"></div></td>`;
-    }
-
-    // Bloqueo, feriado, franja
-    const label = slot.label || "";
-    return `<td class="slot-bloqueo" style="background:${bg}">
-            <div class="slot-content">
-              <span class="slot-label">${label}</span>
-            </div></td>`;
+    if (tipo === "continuacion") return `<td class="slot-continua" style="background:${bg}"><div class="slot-content"></div></td>`;
+    return `<td class="slot-bloqueo" style="background:${bg}"><div class="slot-content"><span class="slot-label">${slot.label||""}</span></div></td>`;
   }
 
   function _bindSlotClicks(container) {
-    // Click en slot libre → abrir formulario de asignación con fecha/hora prellenos
     container.querySelectorAll(".slot-libre").forEach(td => {
       td.addEventListener("click", () => {
-        const fecha = td.dataset.fecha;
-        const mins  = parseInt(td.dataset.mins);
-        const h     = String(Math.floor(mins / 60)).padStart(2, "0");
-        const m     = String(mins % 60).padStart(2, "0");
-        App.abrirTurnoConFechaHora(fecha, `${h}:${m}`);
+        const mins = parseInt(td.dataset.mins);
+        App.abrirTurnoConFechaHora(td.dataset.fecha,
+          String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0"));
       });
     });
-
-    // Tooltip en celdas con turno
-    let tooltipEl = null;
+    let tip = null;
     container.querySelectorAll("[data-tooltip]").forEach(td => {
-      td.addEventListener("mouseenter", (e) => {
-        const txt = decodeURIComponent(td.dataset.tooltip).replace(/\n/g, "<br>");
-        tooltipEl = document.createElement("div");
-        tooltipEl.className = "tooltip-turno";
-        tooltipEl.innerHTML = txt;
-        document.body.appendChild(tooltipEl);
-        _posTooltip(e, tooltipEl);
+      td.addEventListener("mouseenter", e => {
+        tip = document.createElement("div");
+        tip.className = "tooltip-turno";
+        tip.innerHTML = decodeURIComponent(td.dataset.tooltip).replace(/\n/g,"<br>");
+        document.body.appendChild(tip);
+        _posTip(e, tip);
       });
-      td.addEventListener("mousemove", (e) => { if (tooltipEl) _posTooltip(e, tooltipEl); });
-      td.addEventListener("mouseleave", () => { if (tooltipEl) { tooltipEl.remove(); tooltipEl = null; } });
+      td.addEventListener("mousemove", e => { if(tip) _posTip(e,tip); });
+      td.addEventListener("mouseleave", () => { if(tip){tip.remove();tip=null;} });
+      td.addEventListener("click", () => { if(td.dataset.fila) App.mostrarOpcionesTurno(td.dataset.fila); });
+    });
+  }
+  function _posTip(e, el) {
+    el.style.left = Math.min(e.clientX+12, window.innerWidth -el.offsetWidth -8)+"px";
+    el.style.top  = Math.min(e.clientY+12, window.innerHeight-el.offsetHeight-8)+"px";
+  }
 
-      // Click derecho o long-click → anular (futuro)
+  // ── VISTA MES ─────────────────────────────────────────────
+  function _renderMes(datos) {
+    const container = document.getElementById("agenda-container");
+    const resumenMap = {};
+    const MIN_I = 7*60, MIN_F = 22*60;
+
+    for (const dia of datos) {
+      let libres=0, ocupados=0, bloqueados=0;
+      for (const s of dia.slots) {
+        if (s.mins < MIN_I || s.mins >= MIN_F) continue;
+        if (s.tipo==="libre") libres++;
+        else if (s.tipo==="turno") ocupados++;
+        else bloqueados++;
+      }
+      resumenMap[dia.fecha] = { libres, ocupados, bloqueados, esFeriado: dia.esFeriado, feriado: dia.feriado };
+    }
+
+    const año = _mesBase.getFullYear(), mes = _mesBase.getMonth();
+    const diasMes = new Date(año, mes+1, 0).getDate();
+    let primerDia = new Date(año, mes, 1).getDay();
+    primerDia = primerDia===0 ? 6 : primerDia-1;
+
+    const hoyStr = _strFecha(new Date());
+    const DIAS = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+
+    let html = `<div class="cal-mes-wrap">
+      <div class="cal-leyenda">
+        <span class="cal-leg-item"><span class="cal-leg-dot" style="background:#2e7d32"></span>Turnos asignados</span>
+        <span class="cal-leg-item"><span class="cal-leg-dot" style="background:#1a3a5c"></span>Slots libres</span>
+        <span class="cal-leg-item"><span class="cal-leg-dot" style="background:#f0c040"></span>Pocos libres (&lt;25%)</span>
+        <span class="cal-leg-item"><span class="cal-leg-dot" style="background:#e06666"></span>Sin disponibilidad / Feriado</span>
+      </div>
+      <table class="cal-mes-table"><thead><tr>`;
+    for (const d of DIAS) html += `<th>${d}</th>`;
+    html += `</tr></thead><tbody><tr>`;
+
+    for (let i=0; i<primerDia; i++) html += `<td class="cal-dia cal-dia-vacio"></td>`;
+
+    let col = primerDia;
+    for (let dia=1; dia<=diasMes; dia++) {
+      const fechaDate = new Date(año, mes, dia);
+      const fechaStr  = _strFecha(fechaDate);
+      const res       = resumenMap[fechaStr];
+      const esHoy     = fechaStr === hoyStr;
+      const esDom     = fechaDate.getDay() === 0;
+
+      let cls = "cal-dia";
+      if (esHoy) cls += " cal-dia-hoy";
+      if (esDom) cls += " cal-dia-dom";
+
+      let contenido = "";
+      if (!res) {
+        contenido = `<div class="cal-num">${dia}</div>`;
+      } else if (res.esFeriado) {
+        cls += " cal-dia-feriado";
+        contenido = `<div class="cal-num">${dia}</div><div class="cal-feriado-label">🚫 ${res.feriado||"Feriado"}</div>`;
+      } else {
+        const total = res.libres + res.ocupados;
+        const pct   = total > 0 ? res.libres/total : 0;
+        if      (pct===0 && total>0)     cls += " cal-dia-lleno";
+        else if (pct>0 && pct<0.25)      cls += " cal-dia-casi-lleno";
+
+        const barOcup = total>0 ? Math.round((res.ocupados/total)*100) : 0;
+
+        contenido = `
+          <div class="cal-num">${dia}</div>
+          <div class="cal-contadores">
+            <span class="cal-ocu" title="Turnos asignados">🟢 ${res.ocupados}</span>
+            <span class="cal-lib" title="Slots libres">⬜ ${res.libres}</span>
+          </div>
+          <div class="cal-barra">
+            <div class="cal-barra-ocu" style="width:${barOcup}%"></div>
+            <div class="cal-barra-lib" style="width:${100-barOcup}%"></div>
+          </div>`;
+      }
+
+      html += `<td class="${cls}" data-fecha="${fechaStr}" title="Clic para ver semana">${contenido}</td>`;
+      col++;
+      if (col===7 && dia<diasMes) { html += `</tr><tr>`; col=0; }
+    }
+
+    const resto = col===0 ? 0 : 7-col;
+    for (let i=0; i<resto; i++) html += `<td class="cal-dia cal-dia-vacio"></td>`;
+    html += `</tr></tbody></table></div>`;
+    container.innerHTML = html;
+
+    // Click en día → ir a semana
+    container.querySelectorAll(".cal-dia[data-fecha]").forEach(td => {
       td.addEventListener("click", () => {
-        const fila = td.dataset.fila;
-        if (fila) App.mostrarOpcionesTurno(fila);
+        const f = td.dataset.fecha.split("/");
+        const d = new Date(parseInt(f[2]), parseInt(f[1])-1, parseInt(f[0]));
+        d.setHours(0,0,0,0);
+        const dow = d.getDay();
+        d.setDate(d.getDate()-(dow===0?6:dow-1));
+        _fechaDesde = d;
+        _setModo("semana");
       });
     });
   }
 
-  function _posTooltip(e, el) {
-    const x = Math.min(e.clientX + 12, window.innerWidth  - el.offsetWidth  - 8);
-    const y = Math.min(e.clientY + 12, window.innerHeight - el.offsetHeight - 8);
-    el.style.left = x + "px";
-    el.style.top  = y + "px";
+  // ── TOGGLE MODO ───────────────────────────────────────────
+  function _setModo(modo) {
+    _modo = modo;
+    document.getElementById("btn-modo-semana").classList.toggle("modo-activo", modo==="semana");
+    document.getElementById("btn-modo-mes").classList.toggle("modo-activo",    modo==="mes");
+    document.getElementById("ctrl-semana").classList.toggle("hidden", modo!=="semana");
+    document.getElementById("ctrl-mes").classList.toggle("hidden",    modo!=="mes");
+    if (modo==="semana") _cargarSemana(); else _cargarMes();
   }
 
-  // ── carga ─────────────────────────────────────────────────
-  async function cargar() {
+  async function _cargarSemana() {
     const loading = document.getElementById("agenda-loading");
-    const lbl     = document.getElementById("agenda-rango-label");
-    lbl.textContent = _labelRango();
+    document.getElementById("agenda-rango-label").textContent = _labelRango();
+    loading.classList.remove("hidden");
+    try   { _renderSemana(await API.agenda(_strFecha(_fechaDesde), 7, _paso)); }
+    catch (err) { App.toast("Error: "+err.message,"error"); }
+    finally     { loading.classList.add("hidden"); }
+  }
 
+  async function _cargarMes() {
+    const loading = document.getElementById("agenda-loading");
+    document.getElementById("agenda-mes-label").textContent = _labelMes();
     loading.classList.remove("hidden");
     try {
-      const datos = await API.agenda(_strFecha(_fechaDesde), 7, _paso);
-      _render(datos);
-    } catch (err) {
-      App.toast("Error cargando agenda: " + err.message, "error");
-      document.getElementById("agenda-container").innerHTML =
-        `<div class="empty-state">Error: ${err.message}</div>`;
-    } finally {
-      loading.classList.add("hidden");
-    }
+      const año = _mesBase.getFullYear(), mes = _mesBase.getMonth();
+      const p   = new Date(año, mes, 1);
+      const dow = p.getDay();
+      const lunes = new Date(p);
+      lunes.setDate(p.getDate()-(dow===0?6:dow-1));
+      _renderMes(await API.agenda(_strFecha(lunes), 42, _paso));
+    } catch(err) { App.toast("Error: "+err.message,"error"); }
+    finally      { loading.classList.add("hidden"); }
   }
 
-  // ── controles de navegación ───────────────────────────────
-  function _semanaAnt() { _fechaDesde.setDate(_fechaDesde.getDate() - 7); cargar(); }
-  function _semanaSig() { _fechaDesde.setDate(_fechaDesde.getDate() + 7); cargar(); }
-  function _irHoy()     { _fechaDesde = _lunesDeHoy(); cargar(); }
+  function cargar() { if(_modo==="semana") _cargarSemana(); else _cargarMes(); }
 
   function init() {
-    document.getElementById("btn-semana-ant").onclick = _semanaAnt;
-    document.getElementById("btn-semana-sig").onclick = _semanaSig;
-    document.getElementById("btn-agenda-hoy").onclick = _irHoy;
-    document.getElementById("agenda-paso").onchange = (e) => {
-      _paso = parseInt(e.target.value);
-      cargar();
-    };
+    document.getElementById("btn-semana-ant").onclick = () => { _fechaDesde.setDate(_fechaDesde.getDate()-7); _cargarSemana(); };
+    document.getElementById("btn-semana-sig").onclick = () => { _fechaDesde.setDate(_fechaDesde.getDate()+7); _cargarSemana(); };
+    document.getElementById("btn-agenda-hoy").onclick = () => { _fechaDesde = _lunesDeHoy(); _cargarSemana(); };
+    document.getElementById("agenda-paso").onchange   = e => { _paso = parseInt(e.target.value); cargar(); };
     document.getElementById("agenda-rango-label").textContent = _labelRango();
+
+    document.getElementById("btn-mes-ant").onclick = () => { _mesBase = _primeroDeMes(new Date(_mesBase.getFullYear(),_mesBase.getMonth()-1,1)); _cargarMes(); };
+    document.getElementById("btn-mes-sig").onclick = () => { _mesBase = _primeroDeMes(new Date(_mesBase.getFullYear(),_mesBase.getMonth()+1,1)); _cargarMes(); };
+    document.getElementById("btn-mes-hoy").onclick = () => { _mesBase = _primeroDeMes(new Date()); _cargarMes(); };
+
+    document.getElementById("btn-modo-semana").onclick = () => _setModo("semana");
+    document.getElementById("btn-modo-mes").onclick    = () => _setModo("mes");
   }
 
   return { init, cargar };
