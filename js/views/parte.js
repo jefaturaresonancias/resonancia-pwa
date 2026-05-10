@@ -1,0 +1,293 @@
+// js/views/parte.js — Lector de Parte Diario PDF (port del script Python)
+
+const ParteView = (() => {
+  let _filas    = [];
+  let _fecha    = "";
+  let _pdfLib   = null;
+
+  // ── Cargar PDF.js desde CDN ───────────────────────────────
+  async function _cargarPDFJS() {
+    if (_pdfLib) return _pdfLib;
+    return new Promise((resolve, reject) => {
+      if (window.pdfjsLib) { _pdfLib = window.pdfjsLib; resolve(_pdfLib); return; }
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+      s.onload = () => {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+          "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+        _pdfLib = window.pdfjsLib;
+        resolve(_pdfLib);
+      };
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  // ── Cargar SheetJS ────────────────────────────────────────
+  async function _cargarXLSX() {
+    if (window.XLSX) return window.XLSX;
+    return new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+      s.onload  = () => resolve(window.XLSX);
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  PARSER — fiel al script Python
+  // ══════════════════════════════════════════════════════════
+
+  const RE_HORA   = /(?<!\d)(\d{1,2}:\d{2})(?!\d)/g;
+  const RE_DOC    = /(DNI|CIBO|RP)\s+(\d+)/i;
+  const RE_NOMBRE = /\b([A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,})*,\s*[A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,})*)\b/;
+  const RE_PRAC   = /((?:RESONANCIA|ANGIORRESON|COLANGIO|TOMOGRAF|ECOGRAF|DENSITOM|RX\b|TAC\b).+?)(?=\bDNI\b|\bCIBO\b|\bRP\b|\bTURNO\b|\bSOBRETURNO\b|$)/is;
+  const RE_EMAIL  = /\S+@\S+/g;
+  const RE_FIN    = /\b(TURNO|SOBRETURNO|ESTADO|AS\b|AU\b|CN\b)/i;
+  const RE_ESTADO = /\d{3,}\s+([A-Z]{2,3})\s*$/;
+  const CANCELADOS = new Set(["CA","CN","CAN","NP","AUS"]);
+  const IGNORAR    = ["TIPO DE","APELLIDO Y","PARTE DIARIO","HOSP SANTOJANNI"];
+
+  function _limpiar(s) { return s.replace(/\s+/g, " ").trim(); }
+
+  function _procesarBloque(hora, bloque) {
+    bloque = _limpiar(bloque);
+
+    // Filtrar cancelados
+    const mEstado = RE_ESTADO.exec(bloque);
+    if (mEstado && CANCELADOS.has(mEstado[1].toUpperCase())) return null;
+
+    // Documento
+    const mDoc = RE_DOC.exec(bloque);
+    if (!mDoc) return null;
+    const documento = `${mDoc[1].toUpperCase()} ${mDoc[2]}`;
+    const posDoc    = bloque.indexOf(mDoc[0]);
+    const posDocEnd = posDoc + mDoc[0].length;
+
+    // Práctica — antes del doc
+    let practica = "";
+    const antes = bloque.slice(0, posDoc);
+    const mP = RE_PRAC.exec(antes);
+    if (mP) {
+      practica = _limpiar(mP[1]);
+    } else {
+      // Después del doc (formato Técnico)
+      let despues = bloque.slice(posDocEnd).replace(/\d{1,2}\/\d{1,2}\/\d{4}/g, "");
+      const mP2 = RE_PRAC.exec(despues);
+      if (mP2) practica = _limpiar(mP2[1]);
+    }
+    if (practica) practica = RE_FIN.exec(practica)
+      ? practica.slice(0, RE_FIN.exec(practica).index).trim()
+      : practica;
+
+    // Apellido y nombre
+    const bloquesinEmail = bloque.replace(RE_EMAIL, "");
+    const nombres = [];
+    let m;
+    const reN = new RegExp(RE_NOMBRE.source, "g");
+    while ((m = reN.exec(bloquesinEmail)) !== null) nombres.push(_limpiar(m[1]));
+
+    let apellido = "";
+    for (const n of nombres) {
+      if (n.length > 4 && !IGNORAR.some(ig => n.toUpperCase().includes(ig))) {
+        apellido = n; break;
+      }
+    }
+
+    if (!documento || !apellido) return null;
+    return { hora, documento, apellido_nombre: apellido, practica };
+  }
+
+  function _parsearTexto(texto) {
+    // Fecha
+    let fecha = "";
+    let mF = /FECHA[:\s]+(\d{1,2}\/\d{1,2}\/\d{4})/i.exec(texto);
+    if (mF) fecha = mF[1];
+    else {
+      mF = /\b(\d{1,2}\/\d{1,2}\/\d{4})\b/.exec(texto);
+      if (mF) fecha = mF[1];
+    }
+
+    // Dividir por hora
+    const textoPlano = _limpiar(texto);
+    const reH = /(?<!\d)(\d{1,2}:\d{2})(?!\d)/g;
+    const partes = textoPlano.split(reH);
+
+    const registros = [];
+    for (let i = 0; i < partes.length; i++) {
+      if (/^\d{1,2}:\d{2}$/.test(partes[i].trim())) {
+        const hora   = partes[i].trim();
+        const bloque = partes[i + 1] || "";
+        const rec    = _procesarBloque(hora, bloque);
+        if (rec) registros.push(rec);
+        i++;
+      }
+    }
+
+    // Deduplicar
+    const vistos = new Set();
+    const unicos = [];
+    for (const r of registros) {
+      const clave = `${r.hora}|${r.documento}`;
+      if (!vistos.has(clave)) { vistos.add(clave); unicos.push(r); }
+    }
+
+    return { fecha, filas: unicos };
+  }
+
+  // ── Extraer texto del PDF ─────────────────────────────────
+  async function _extraerTexto(arrayBuffer) {
+    const lib  = await _cargarPDFJS();
+    const pdf  = await lib.getDocument({ data: arrayBuffer }).promise;
+    let texto  = "";
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page    = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      texto += content.items.map(i => i.str).join(" ") + "\n";
+    }
+    return texto;
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  RENDER TABLA
+  // ══════════════════════════════════════════════════════════
+
+  function _render(filas, filtro) {
+    const tbody = document.getElementById("parte-tbody");
+    const info  = document.getElementById("parte-info");
+
+    const lista = filtro
+      ? filas.filter(f =>
+          Object.values(f).some(v => v.toLowerCase().includes(filtro.toLowerCase())))
+      : filas;
+
+    info.textContent = filtro
+      ? `${lista.length} de ${filas.length} registros`
+      : `${filas.length} registros`;
+
+    tbody.innerHTML = lista.map((f, i) => `
+      <tr class="${i%2===0?"parte-par":"parte-impar"}">
+        <td style="text-align:center;font-weight:700;color:var(--navy)">${i+1}</td>
+        <td style="text-align:center;font-weight:700;font-size:15px">${f.hora}</td>
+        <td style="text-align:center;font-family:monospace">${f.documento}</td>
+        <td style="font-weight:600">${f.apellido_nombre}</td>
+        <td style="color:var(--text-2)">${f.practica}</td>
+      </tr>`).join("");
+  }
+
+  // ── Exportar Excel ────────────────────────────────────────
+  async function _exportarExcel() {
+    if (!_filas.length) return;
+    const XLSX = await _cargarXLSX();
+
+    const datos = [
+      ["N°","HORA","DOCUMENTO","APELLIDO Y NOMBRE","TIPO DE PRÁCTICA"],
+      ..._filas.map((f,i) => [i+1, f.hora, f.documento, f.apellido_nombre, f.practica])
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(datos);
+    ws["!cols"] = [{wch:5},{wch:8},{wch:16},{wch:30},{wch:55}];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Parte Diario");
+
+    const fn = `Parte_Diario_${(_fecha||"").replace(/\//g,"-")}.xlsx`;
+    XLSX.writeFile(wb, fn);
+    App.toast(`Excel descargado: ${fn}`, "ok");
+  }
+
+  // ── Copiar al portapapeles ────────────────────────────────
+  function _copiar() {
+    if (!_filas.length) return;
+    const lineas = [
+      `Fecha: ${_fecha}`,
+      "HORA\tDOCUMENTO\tAPELLIDO Y NOMBRE\tTIPO DE PRÁCTICA",
+      ..._filas.map(f => `${f.hora}\t${f.documento}\t${f.apellido_nombre}\t${f.practica}`)
+    ];
+    navigator.clipboard.writeText(lineas.join("\n"))
+      .then(() => App.toast(`${_filas.length} registros copiados al portapapeles`, "ok"))
+      .catch(() => App.toast("Error al copiar", "error"));
+  }
+
+  // ── Procesar archivo ──────────────────────────────────────
+  async function _procesarArchivo(file) {
+    if (!file || file.type !== "application/pdf") {
+      App.toast("Seleccioná un archivo PDF válido.", "error"); return;
+    }
+
+    const zona     = document.getElementById("parte-dropzone");
+    const progress = document.getElementById("parte-progress");
+    const tabla    = document.getElementById("parte-tabla-wrap");
+
+    zona.classList.add("hidden");
+    progress.classList.remove("hidden");
+    progress.textContent = "⏳ Leyendo PDF...";
+
+    try {
+      const buffer = await file.arrayBuffer();
+      progress.textContent = "⏳ Extrayendo texto...";
+      const texto  = await _extraerTexto(buffer);
+      progress.textContent = "⏳ Procesando registros...";
+      const result = _parsearTexto(texto);
+
+      _fecha = result.fecha;
+      _filas = result.filas;
+
+      document.getElementById("parte-fecha-label").textContent =
+        _fecha ? `Fecha del parte: ${_fecha}` : "Fecha no detectada";
+      document.getElementById("parte-archivo-label").textContent = `📄 ${file.name}`;
+      document.getElementById("btn-parte-excel").disabled = false;
+      document.getElementById("btn-parte-copiar").disabled = false;
+      document.getElementById("parte-filtro").value = "";
+
+      _render(_filas, "");
+      progress.classList.add("hidden");
+      tabla.classList.remove("hidden");
+      App.toast(`${_filas.length} registros cargados`, "ok");
+    } catch(err) {
+      progress.classList.add("hidden");
+      zona.classList.remove("hidden");
+      App.toast("Error al procesar el PDF: " + err.message, "error");
+    }
+  }
+
+  // ── Init ──────────────────────────────────────────────────
+  function init() {
+    // Drag & drop
+    const zona = document.getElementById("parte-dropzone");
+    zona.addEventListener("dragover", e => { e.preventDefault(); zona.classList.add("parte-drag"); });
+    zona.addEventListener("dragleave", () => zona.classList.remove("parte-drag"));
+    zona.addEventListener("drop", e => {
+      e.preventDefault(); zona.classList.remove("parte-drag");
+      const file = e.dataTransfer.files[0];
+      if (file) _procesarArchivo(file);
+    });
+
+    document.getElementById("parte-input-file").addEventListener("change", e => {
+      if (e.target.files[0]) _procesarArchivo(e.target.files[0]);
+    });
+
+    document.getElementById("btn-parte-abrir").addEventListener("click", () => {
+      document.getElementById("parte-input-file").click();
+    });
+
+    document.getElementById("btn-parte-nuevo").addEventListener("click", () => {
+      _filas = []; _fecha = "";
+      document.getElementById("parte-tabla-wrap").classList.add("hidden");
+      document.getElementById("parte-dropzone").classList.remove("hidden");
+      document.getElementById("btn-parte-excel").disabled = true;
+      document.getElementById("btn-parte-copiar").disabled = true;
+      document.getElementById("parte-input-file").value = "";
+    });
+
+    document.getElementById("btn-parte-excel").addEventListener("click", _exportarExcel);
+    document.getElementById("btn-parte-copiar").addEventListener("click", _copiar);
+
+    document.getElementById("parte-filtro").addEventListener("input", e => {
+      _render(_filas, e.target.value.trim());
+    });
+  }
+
+  return { init };
+})();

@@ -460,3 +460,12 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 /* ── VISTA RECLAMOS (iframe) ─────────────────────────────────*/
 #view-reclamos { overflow: hidden; }
 #view-reclamos > div { overflow: hidden; }
+
+/* ── PARTE DIARIO ────────────────────────────────────────────*/
+#parte-dropzone .parte-drag,
+#parte-dropzone.parte-drag { border-color: var(--accent) !important; background: var(--accent-lt) !important; }
+.parte-par  { background: #f8fafc; }
+.parte-impar { background: #ffffff; }
+#parte-tabla tbody tr { border-bottom: 1px solid var(--border); }
+#parte-tabla tbody tr:hover { background: var(--bg) !important; }
+#parte-tabla td { padding: 8px 10px; vertical-align: middle; }

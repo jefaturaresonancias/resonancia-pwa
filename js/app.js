@@ -172,6 +172,7 @@ const App = (() => {
     ListaView.init();
     TurnoView.init();
     BuscarView.init();
+    ParteView.init();
 
     // Si ya tiene URL guardada, saltar el setup
     if (Config.isReady()) {

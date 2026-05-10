@@ -104,6 +104,10 @@
           <span class="nav-icon">📋</span>
           <span class="nav-label">Reclamos</span>
         </button>
+        <button class="nav-btn admin-only" data-view="parte" id="nav-parte">
+          <span class="nav-icon">📄</span>
+          <span class="nav-label">Parte diario</span>
+        </button>
       </nav>
 
       <!-- MAIN CONTENT ─────────────────────────── -->
@@ -273,6 +277,57 @@
           <div id="buscar-results" style="padding:1rem"></div>
         </div>
 
+        <!-- ── VISTA: PARTE DIARIO ─── -->
+        <div id="view-parte" class="view hidden">
+          <div class="view-header">
+            <h2>Parte diario — Lector PDF</h2>
+            <div style="display:flex;gap:.5rem;align-items:center">
+              <span id="parte-fecha-label" style="font-size:12px;color:var(--text-2);font-weight:600"></span>
+              <button id="btn-parte-nuevo" class="btn-sm">↺ Nuevo</button>
+              <button id="btn-parte-excel" class="btn-sm" disabled style="color:#217346;border-color:#217346">📊 Excel</button>
+              <button id="btn-parte-copiar" class="btn-sm" disabled>📋 Copiar</button>
+            </div>
+          </div>
+
+          <!-- Drop zone -->
+          <div id="parte-dropzone" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5rem;padding:2rem">
+            <div style="border:2px dashed var(--border);border-radius:var(--radius-lg);padding:3rem 4rem;text-align:center;background:var(--surface);max-width:520px;width:100%">
+              <div style="font-size:3.5rem;margin-bottom:1rem">📄</div>
+              <div style="font-size:1.1rem;font-weight:600;color:var(--navy);margin-bottom:.5rem">Arrastrar el PDF aquí</div>
+              <div style="font-size:.85rem;color:var(--text-2);margin-bottom:1.5rem">o hacer clic para seleccionar el archivo</div>
+              <button id="btn-parte-abrir" class="btn-primary" style="padding:10px 28px;font-size:14px">📂 Abrir PDF</button>
+              <input type="file" id="parte-input-file" accept=".pdf" style="display:none">
+              <div style="margin-top:1rem;font-size:.75rem;color:var(--text-3)">Compatible con formato Técnico y Administrativo del Hospital Santojanni</div>
+            </div>
+          </div>
+
+          <!-- Progress -->
+          <div id="parte-progress" class="hidden" style="flex:1;display:flex;align-items:center;justify-content:center;font-size:1rem;color:var(--text-2);font-weight:600"></div>
+
+          <!-- Tabla -->
+          <div id="parte-tabla-wrap" class="hidden" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+            <div style="display:flex;align-items:center;gap:1rem;padding:.5rem 1.25rem;background:var(--surface);border-bottom:1px solid var(--border)">
+              <span id="parte-archivo-label" style="font-size:12px;color:var(--text-2);flex:1"></span>
+              <input type="search" id="parte-filtro" placeholder="🔍 Filtrar por cualquier campo…" style="width:280px;padding:5px 10px;border-radius:var(--radius);border:1px solid var(--border);font-size:12px">
+              <span id="parte-info" style="font-size:12px;font-weight:600;color:var(--navy);white-space:nowrap"></span>
+            </div>
+            <div style="flex:1;overflow:auto">
+              <table id="parte-tabla" style="width:100%;border-collapse:collapse;font-size:13px">
+                <thead>
+                  <tr>
+                    <th style="background:var(--navy);color:#fff;padding:8px 10px;text-align:center;font-size:11px;white-space:nowrap;width:48px">N°</th>
+                    <th style="background:var(--navy);color:#fff;padding:8px 10px;text-align:center;font-size:11px;white-space:nowrap;width:70px">HORA</th>
+                    <th style="background:var(--navy);color:#fff;padding:8px 10px;text-align:center;font-size:11px;white-space:nowrap;width:140px">DOCUMENTO</th>
+                    <th style="background:var(--navy);color:#fff;padding:8px 10px;text-align:left;font-size:11px;width:220px">APELLIDO Y NOMBRE</th>
+                    <th style="background:var(--navy);color:#fff;padding:8px 10px;text-align:left;font-size:11px">TIPO DE PRÁCTICA</th>
+                  </tr>
+                </thead>
+                <tbody id="parte-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
         <!-- ── VISTA: RECLAMOS ─── -->
         <div id="view-reclamos" class="view hidden">
           <div class="view-header">
@@ -302,6 +357,7 @@
 
   <!-- SCRIPTS ─────────────────────────────────── -->
   <script src="js/config.js"></script>
+  <script src="js/views/parte.js"></script>
   <script src="js/api.js"></script>
   <script src="js/views/agenda.js"></script>
   <script src="js/views/lista.js"></script>
