@@ -135,13 +135,13 @@ const AgendaView = (() => {
     const hoyStr = _strFecha(new Date());
     const DIAS = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 
+    // Totales del mes para el pie
+    let totalOcup = 0, totalLibres = 0;
+    for (const v of Object.values(resumenMap)) {
+      if (!v.esFeriado) { totalOcup += v.ocupados; totalLibres += v.libres; }
+    }
+
     let html = `<div class="cal-mes-wrap">
-      <div class="cal-leyenda">
-        <span class="cal-leg-item"><span class="cal-leg-dot" style="background:#2e7d32"></span>Turnos asignados</span>
-        <span class="cal-leg-item"><span class="cal-leg-dot" style="background:#1a3a5c"></span>Slots libres</span>
-        <span class="cal-leg-item"><span class="cal-leg-dot" style="background:#f0c040"></span>Pocos libres (&lt;25%)</span>
-        <span class="cal-leg-item"><span class="cal-leg-dot" style="background:#e06666"></span>Sin disponibilidad / Feriado</span>
-      </div>
       <table class="cal-mes-table"><thead><tr>`;
     for (const d of DIAS) html += `<th>${d}</th>`;
     html += `</tr></thead><tbody><tr>`;
@@ -177,8 +177,8 @@ const AgendaView = (() => {
         contenido = `
           <div class="cal-num">${dia}</div>
           <div class="cal-contadores">
-            <span class="cal-ocu" title="Turnos asignados">🟢 ${res.ocupados}</span>
-            <span class="cal-lib" title="Slots libres">⬜ ${res.libres}</span>
+            <span class="cal-lib-badge" title="Slots libres">▲ ${res.libres}</span>
+            <span class="cal-ocu-badge" title="Turnos asignados">● ${res.ocupados}</span>
           </div>
           <div class="cal-barra">
             <div class="cal-barra-ocu" style="width:${barOcup}%"></div>
@@ -193,7 +193,13 @@ const AgendaView = (() => {
 
     const resto = col===0 ? 0 : 7-col;
     for (let i=0; i<resto; i++) html += `<td class="cal-dia cal-dia-vacio"></td>`;
-    html += `</tr></tbody></table></div>`;
+    html += `</tr></tbody></table>
+      <div class="cal-pie">
+        <span class="cal-pie-lib">▲ ${totalLibres} slots libres en el mes</span>
+        <span class="cal-pie-sep">·</span>
+        <span class="cal-pie-ocu">● ${totalOcup} turnos asignados</span>
+      </div>
+    </div>`;
     container.innerHTML = html;
 
     // Click en día → ir a Lista del día para esa fecha

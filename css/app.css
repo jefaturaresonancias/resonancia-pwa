@@ -383,17 +383,14 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 .modo-btn.modo-activo { background: var(--navy); color: #fff; }
 
 /* ── CALENDARIO MENSUAL ──────────────────────────────────────*/
-.cal-mes-wrap { padding: 1rem 1.25rem; }
-
-.cal-leyenda {
-  display: flex; gap: 1.5rem; flex-wrap: wrap;
-  margin-bottom: 1rem; font-size: 11px; color: var(--text-2);
+.cal-mes-wrap {
+  display: flex; flex-direction: column;
+  height: 100%; padding: .5rem .75rem .75rem;
 }
-.cal-leg-item { display: flex; align-items: center; gap: 5px; }
-.cal-leg-dot  { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
 
 .cal-mes-table {
   width: 100%; border-collapse: collapse; table-layout: fixed;
+  flex: 1;
 }
 .cal-mes-table thead th {
   background: var(--navy); color: #fff;
@@ -403,9 +400,10 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 
 .cal-dia {
   border: 1px solid var(--border); vertical-align: top;
-  padding: 6px 8px; height: 90px; cursor: pointer;
-  transition: background .1s;
-  background: var(--surface);
+  padding: 6px 8px; cursor: pointer;
+  transition: background .1s; background: var(--surface);
+  height: calc((100vh - 180px) / 6);
+  min-height: 80px;
 }
 .cal-dia:hover           { background: var(--accent-lt); }
 .cal-dia-vacio           { background: var(--bg); cursor: default; }
@@ -418,29 +416,38 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 
 .cal-num {
   font-size: 13px; font-weight: 700; color: var(--navy);
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 .cal-dia-hoy .cal-num {
   background: var(--navy); color: #fff;
   width: 22px; height: 22px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px; margin-bottom: 4px;
+  font-size: 11px; margin-bottom: 5px;
 }
 .cal-feriado-label { font-size: 10px; color: #c62828; font-weight: 600; }
 
 .cal-contadores {
-  display: flex; gap: 6px; font-size: 11px; font-weight: 600;
-  margin-bottom: 4px;
+  display: flex; gap: 8px; font-size: 12px; font-weight: 700;
+  margin-bottom: 5px;
 }
-.cal-ocu { color: var(--success); }
-.cal-lib { color: var(--text-2); }
+.cal-lib-badge { color: #2e7d32; }
+.cal-ocu-badge { color: #c62828; }
 
 .cal-barra {
   display: flex; height: 4px; border-radius: 2px; overflow: hidden;
   background: var(--border);
 }
-.cal-barra-ocu { background: #4a9e5c; }
-.cal-barra-lib { background: #b0c8e8; }
+.cal-barra-ocu { background: #e05555; }
+.cal-barra-lib { background: #4a9e5c; }
+
+.cal-pie {
+  display: flex; gap: 1rem; align-items: center;
+  padding: .6rem 0 .25rem; font-size: 12px; font-weight: 600;
+  border-top: 1px solid var(--border); margin-top: .5rem;
+}
+.cal-pie-lib  { color: #2e7d32; }
+.cal-pie-sep  { color: var(--text-3); }
+.cal-pie-ocu  { color: #c62828; }
 
 /* ── FILAS LIBRES EN LISTA DEL DÍA ──────────────────────────*/
 .fila-libre td { border-bottom: 1px solid #f0f0f0 !important; }
