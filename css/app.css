@@ -441,3 +441,7 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 }
 .cal-barra-ocu { background: #4a9e5c; }
 .cal-barra-lib { background: #b0c8e8; }
+
+/* ── FILAS LIBRES EN LISTA DEL DÍA ──────────────────────────*/
+.fila-libre td { border-bottom: 1px solid #f0f0f0 !important; }
+.fila-libre:hover td { background: #f0faf0 !important; }
