@@ -77,11 +77,16 @@ const ListaView = (() => {
     }
     empty.classList.add("hidden");
 
+    const esTecnico = Config.getRol() === "tecnico";
+
     tbody.innerHTML = filasFiltradas.map((fila) => {
       const { slot, turno, mins, esRIS } = fila;
       const h = String(Math.floor(mins/60)).padStart(2,"0");
       const m = String(mins%60).padStart(2,"0");
       const hora = `${h}:${m}`;
+
+      // Técnico no ve slots libres ni continuaciones
+      if (esTecnico && !turno && !esRIS) return "";
 
       // ── FILA RIS ──
       if (esRIS) {
@@ -97,8 +102,9 @@ const ListaView = (() => {
         </tr>`;
       }
 
-      // ── SLOT LIBRE ──
+      // ── SLOT LIBRE — solo para administrativo ──
       if (slot.tipo === "libre") {
+        if (esTecnico) return "";
         return `<tr class="fila-libre" data-mins="${mins}" data-fecha="${fechaStr}" style="cursor:pointer" title="Clic para asignar turno en este horario">
           <td class="td-hora" style="color:#aaa">${hora}</td>
           <td colspan="6" style="color:#bbb;font-style:italic;font-size:12px">
@@ -132,7 +138,8 @@ const ListaView = (() => {
             <td></td><td></td>
           </tr>`;
         }
-        // Bloqueo puro (no cliqueable)
+        // Bloqueo puro — ocultar en vista técnico
+        if (esTecnico) return "";
         return `<tr style="background:${bg}18">
           <td class="td-hora" style="color:#bbb">${hora}</td>
           <td colspan="6" style="color:#bbb;font-size:11px;font-style:italic">${label}</td>
