@@ -72,18 +72,24 @@ const AgendaView = (() => {
       // ── Filas RIS intercaladas ──
       // Excluir RIS cuyo documento ya aparece en la agenda propia del día
       const risXDia = datos.map(dia => {
-        // Construir set de DNIs ya en agenda propia (cualquier tipo que tenga dni)
-        const docsEnAgenda = new Set(
-          (dia.slots || [])
-            .filter(s => s.dni)
-            .map(s => String(s.dni).trim().replace(/^0+/, ""))
-        );
+        // Construir sets de DNI y apellido desde todos los slots con datos
+        const dniAgenda = new Set();
+        const apellAgenda = new Set();
+        for (const s of (dia.slots || [])) {
+          if (s.dni) dniAgenda.add(String(s.dni).trim().replace(/^0+/, ""));
+          if (s.apellido) apellAgenda.add(s.apellido.trim().toUpperCase());
+        }
         return (risMap[dia.fecha] || []).filter(r => {
           const rm = typeof r.mins === "number" ? r.mins : parsearMinsJS(r.hora);
           if (rm < mins || rm >= mins + _paso) return false;
+          // Extraer DNI del documento RIS
           const dniRIS = String(r.documento || "")
             .replace(/^(DNI|CIBO|RP)\s*/i, "").trim().replace(/^0+/, "");
-          return !docsEnAgenda.has(dniRIS);
+          if (dniAgenda.has(dniRIS)) return false;
+          // Extraer apellido del campo apellido_nombre ("APELLIDO, NOMBRE")
+          const apellRIS = String(r.apellido_nombre || "").split(",")[0].trim().toUpperCase();
+          if (apellAgenda.has(apellRIS)) return false;
+          return true;
         });
       });
       const maxRIS = Math.max(...risXDia.map(d => d.length), 0);

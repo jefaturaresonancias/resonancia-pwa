@@ -50,15 +50,15 @@ const ListaView = (() => {
     }
 
     // Agregar filas RIS intercaladas — excluir duplicados con agenda propia
-    const dnisPropios = new Set(
-      turnos.map(t => String(t.dni).trim().replace(/^0+/, ""))
-    );
+    // Sets de DNI y apellido de la agenda propia
+    const dnisPropios    = new Set(turnos.map(t => String(t.dni).trim().replace(/^0+/, "")));
+    const apellPropios   = new Set(turnos.map(t => (t.apellido||"").trim().toUpperCase()));
     for (const r of risDelDia) {
       const mins = _parseMins(r.hora);
       if (mins < MIN_I || mins >= MIN_F) continue;
-      const dniRIS = String(r.documento || "")
-        .replace(/^(DNI|CIBO|RP)\s*/i, "").trim().replace(/^0+/, "");
-      if (dnisPropios.has(dniRIS)) continue; // ya está en agenda propia
+      const dniRIS   = String(r.documento || "").replace(/[A-Z]+\s*/i,"").trim().replace(/^0+/,"");
+      const apellRIS = String(r.apellido_nombre || "").split(",")[0].trim().toUpperCase();
+      if (dnisPropios.has(dniRIS) || apellPropios.has(apellRIS)) continue;
       filas.push({ slot: { tipo: "ris" }, turno: null, mins, esRIS: true, ris: r });
     }
     filas.sort((a, b) => a.mins - b.mins);
