@@ -341,6 +341,7 @@ const ParteView = (() => {
 
     document.getElementById("btn-parte-excel").addEventListener("click", _exportarExcel);
     document.getElementById("btn-parte-copiar").addEventListener("click", _copiar);
+    document.getElementById("btn-parte-ris").addEventListener("click", _cargarRIS);
 
     document.getElementById("parte-filtro").addEventListener("input", e => {
       _render(_filas, e.target.value.trim());
