@@ -28,6 +28,7 @@ const App = (() => {
     if (id === "agenda") AgendaView.cargar();
     if (id === "lista")  ListaView.cargar();
     if (id === "turno")  TurnoView.cargarEstudios();
+    if (id === "stats")  StatsView.cargar();
   }
 
   // ── Abrir turno con fecha/hora prellenos (desde agenda) ───
@@ -56,14 +57,17 @@ const App = (() => {
     badge.textContent = rol === "tecnico" ? "Técnico" : "Administrativo";
 
     // Vista default según rol
-    const defaultView = rol === "tecnico" ? "lista" : "agenda";
+    const defaultView = rol === "tecnico" ? "lista" : rol === "jefatura" ? "stats" : "agenda";
 
     // Mostrar/ocultar items según rol
     document.querySelectorAll(".admin-only").forEach(el => {
-      el.style.display = rol === "administrativo" ? "" : "none";
+      el.style.display = (rol === "administrativo" || rol === "jefatura") ? "" : "none";
     });
     document.querySelectorAll(".tecnico-only").forEach(el => {
       el.style.display = rol === "tecnico" ? "" : "none";
+    });
+    document.querySelectorAll(".jefatura-only").forEach(el => {
+      el.style.display = rol === "jefatura" ? "" : "none";
     });
 
     // Reordenar nav: técnico ve Lista primero
@@ -78,6 +82,55 @@ const App = (() => {
     }
 
     showView(defaultView);
+  }
+
+  // ── PIN de jefatura ──────────────────────────────────────
+  const PIN_CORRECTO = "1234"; // ← CAMBIÁ ESTE PIN
+  let _pinActual = "";
+
+  function _initPin() {
+    document.getElementById("btn-jefatura-acceso").addEventListener("click", () => {
+      _pinActual = "";
+      _actualizarPuntos();
+      document.getElementById("screen-rol").classList.add("hidden");
+      document.getElementById("screen-pin").classList.remove("hidden");
+      document.getElementById("pin-error").textContent = "";
+    });
+
+    document.querySelectorAll(".pin-btn[data-n]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        if (_pinActual.length >= 4) return;
+        _pinActual += btn.dataset.n;
+        _actualizarPuntos();
+        if (_pinActual.length === 4) {
+          if (_pinActual === PIN_CORRECTO) {
+            Config.setRol("jefatura");
+            document.getElementById("screen-pin").classList.add("hidden");
+            document.getElementById("app").classList.remove("hidden");
+            _actualizarRolUI();
+          } else {
+            document.getElementById("pin-error").textContent = "PIN incorrecto";
+            setTimeout(() => { _pinActual = ""; _actualizarPuntos(); document.getElementById("pin-error").textContent = ""; }, 800);
+          }
+        }
+      });
+    });
+
+    document.getElementById("pin-cancel").addEventListener("click", () => {
+      _pinActual = _pinActual.slice(0,-1);
+      _actualizarPuntos();
+    });
+    document.getElementById("pin-clear").addEventListener("click", () => {
+      _pinActual = "";
+      _actualizarPuntos();
+    });
+  }
+
+  function _actualizarPuntos() {
+    for (let i = 1; i <= 4; i++) {
+      const d = document.getElementById("pin-d"+i);
+      d.classList.toggle("pin-dot-active", i <= _pinActual.length);
+    }
   }
 
   // ── Setup screen ──────────────────────────────────────────
@@ -143,7 +196,9 @@ const App = (() => {
     });
 
     document.getElementById("btn-cambiar-rol").addEventListener("click", () => {
+      Config.setRol("");
       document.getElementById("screen-rol").classList.remove("hidden");
+      document.getElementById("screen-pin").classList.add("hidden");
       document.getElementById("app").classList.add("hidden");
     });
 
@@ -173,6 +228,8 @@ const App = (() => {
     TurnoView.init();
     BuscarView.init();
     ParteView.init();
+    StatsView.init();
+    _initPin();
 
     // Si ya tiene URL guardada, saltar el setup
     if (Config.isReady()) {

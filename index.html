@@ -56,6 +56,39 @@
         </button>
       </div>
     </div>
+    <button id="btn-jefatura-acceso" style="position:absolute;bottom:1rem;right:1rem;font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:inherit">Jefatura</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       PIN SCREEN — jefatura
+  ═══════════════════════════════════════════════ -->
+  <div id="screen-pin" class="screen hidden" style="position:relative">
+    <div class="setup-card" style="width:320px">
+      <div class="logo">🔐</div>
+      <h1 style="font-size:1.2rem">Acceso Jefatura</h1>
+      <p>Ingresá el PIN de acceso</p>
+      <div style="display:flex;gap:8px;justify-content:center;margin:1.5rem 0" id="pin-dots">
+        <div class="pin-dot" id="pin-d1"></div>
+        <div class="pin-dot" id="pin-d2"></div>
+        <div class="pin-dot" id="pin-d3"></div>
+        <div class="pin-dot" id="pin-d4"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:220px;margin:0 auto">
+        <button class="pin-btn" data-n="1">1</button>
+        <button class="pin-btn" data-n="2">2</button>
+        <button class="pin-btn" data-n="3">3</button>
+        <button class="pin-btn" data-n="4">4</button>
+        <button class="pin-btn" data-n="5">5</button>
+        <button class="pin-btn" data-n="6">6</button>
+        <button class="pin-btn" data-n="7">7</button>
+        <button class="pin-btn" data-n="8">8</button>
+        <button class="pin-btn" data-n="9">9</button>
+        <button class="pin-btn pin-cancel" id="pin-cancel">←</button>
+        <button class="pin-btn" data-n="0">0</button>
+        <button class="pin-btn pin-clear" id="pin-clear">✕</button>
+      </div>
+      <p id="pin-error" style="color:#e53e3e;font-size:.8rem;margin-top:1rem;min-height:1.2rem"></p>
+    </div>
   </div>
 
   <!-- ══════════════════════════════════════════════
@@ -103,6 +136,14 @@
         <button class="nav-btn admin-only" data-view="reclamos" id="nav-reclamos">
           <span class="nav-icon">📋</span>
           <span class="nav-label">Reclamos</span>
+        </button>
+        <button class="nav-btn jefatura-only" data-view="stats" id="nav-stats">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Estadísticas</span>
+        </button>
+        <button class="nav-btn jefatura-only" data-view="guardias" id="nav-guardias">
+          <span class="nav-icon">🚑</span>
+          <span class="nav-label">Guardias</span>
         </button>
         <button class="nav-btn tecnico-only" data-view="protocolos" id="nav-protocolos">
           <span class="nav-icon">📖</span>
@@ -354,6 +395,46 @@
           </div>
         </div>
 
+        <!-- ── VISTA: ESTADÍSTICAS ─── -->
+        <div id="view-stats" class="view hidden">
+          <div class="view-header">
+            <h2>Estadísticas del servicio</h2>
+            <div style="display:flex;gap:.5rem;align-items:center">
+              <select id="stats-mes" style="padding:5px 8px;border-radius:6px;border:1px solid var(--border);font-size:12px">
+                <option value="1">Enero</option><option value="2">Febrero</option>
+                <option value="3">Marzo</option><option value="4">Abril</option>
+                <option value="5">Mayo</option><option value="6">Junio</option>
+                <option value="7">Julio</option><option value="8">Agosto</option>
+                <option value="9">Septiembre</option><option value="10">Octubre</option>
+                <option value="11">Noviembre</option><option value="12">Diciembre</option>
+              </select>
+              <input type="number" id="stats-anio" value="2026" min="2024" max="2030" style="width:80px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);font-size:12px">
+              <button id="btn-stats-ver" class="btn-primary" style="font-size:12px;padding:6px 16px">Ver</button>
+              <button id="btn-stats-excel" class="btn-sm" disabled style="color:#217346;border-color:#217346">📊 Excel</button>
+            </div>
+          </div>
+          <div id="stats-loading" class="loading-bar hidden">⏳ Calculando estadísticas…</div>
+          <div id="stats-content" style="padding:1rem;overflow-y:auto;flex:1"></div>
+        </div>
+
+        <!-- ── VISTA: GUARDIAS ─── -->
+        <div id="view-guardias" class="view hidden">
+          <div class="view-header">
+            <h2>Guardias RMN</h2>
+            <div style="display:flex;gap:.5rem">
+              <button id="btn-guardias-reload" class="btn-sm">↺ Recargar</button>
+              <a href="https://script.google.com/macros/s/AKfycbz_ZP2rlEZliEiwOyCWPqBU2shDht2EVasVhrjrdOdC6nJ5Fk4iqhJgmVXNro2KbFPG/exec" target="_blank" class="btn-sm" style="text-decoration:none">↗ Abrir en pestaña</a>
+            </div>
+          </div>
+          <div style="flex:1;position:relative">
+            <iframe id="iframe-guardias"
+              src="https://script.google.com/macros/s/AKfycbz_ZP2rlEZliEiwOyCWPqBU2shDht2EVasVhrjrdOdC6nJ5Fk4iqhJgmVXNro2KbFPG/exec"
+              style="width:100%;height:100%;border:none;display:block"
+              title="Guardias RMN">
+            </iframe>
+          </div>
+        </div>
+
         <!-- ── VISTA: RECLAMOS ─── -->
         <div id="view-reclamos" class="view hidden">
           <div class="view-header">
@@ -388,6 +469,7 @@
   <script src="js/views/lista.js"></script>
   <script src="js/views/turno.js"></script>
   <script src="js/views/parte.js"></script>
+  <script src="js/views/stats.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

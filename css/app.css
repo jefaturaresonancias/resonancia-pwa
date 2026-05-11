@@ -631,3 +631,46 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 /* Ocultar tabla cuando el técnico usa tarjetas */
 .tecnico-cards #tabla-turnos { display: none; }
 .admin-tabla #lista-cards { display: none; }
+
+/* ── PIN SCREEN ──────────────────────────────────────────────*/
+.pin-dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--navy); background: transparent;
+  transition: background .15s;
+}
+.pin-dot-active { background: var(--navy); }
+.pin-btn {
+  padding: 14px; font-size: 20px; font-weight: 600;
+  border-radius: var(--radius-lg); border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); cursor: pointer;
+  transition: background .1s;
+}
+.pin-btn:hover    { background: var(--bg); }
+.pin-btn:active   { background: var(--border); }
+.pin-cancel, .pin-clear { font-size: 16px; color: var(--text-2); }
+
+/* ── ESTADÍSTICAS ────────────────────────────────────────────*/
+.st-header-row {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 1rem; flex-wrap: wrap; gap: .5rem;
+}
+.st-mes { font-size: 1.1rem; font-weight: 700; color: var(--navy); }
+.st-summary { display: flex; gap: .5rem; flex-wrap: wrap; }
+.st-chip {
+  font-size: 12px; font-weight: 600; padding: 4px 12px;
+  border-radius: 12px; background: var(--accent-lt); color: var(--navy);
+}
+.st-chip-contrast { background: #fff3e0; color: #7a4510; }
+
+.st-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.st-table th, .st-table td { padding: 7px 12px; border: 1px solid var(--border); }
+.st-th-region { background: var(--navy); color: #fff; text-align: left; min-width: 160px; }
+.st-th-sin { background: #e8f5e9; color: #1a5e28; text-align: center; }
+.st-th-con { background: #fff3e0; color: #7a4510; text-align: center; }
+.st-th-n, .st-th-p { background: inherit; text-align: center; font-size: 11px; }
+.st-region { font-weight: 600; color: var(--text); }
+.st-num { text-align: center; font-weight: 600; color: var(--navy); }
+.st-con { color: #c07000 !important; }
+.st-pct { text-align: center; color: var(--text-2); font-size: 12px; }
+.st-total td { background: var(--bg); border-top: 2px solid var(--navy); }
+.st-table tbody tr:hover { background: var(--bg); }
