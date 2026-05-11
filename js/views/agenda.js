@@ -79,8 +79,10 @@ const AgendaView = (() => {
       );
       const maxRIS = Math.max(...risXDia.map(d => d.length), 0);
       for (let ri = 0; ri < maxRIS; ri++) {
+        const risHora = risXDia.find(d => d[ri])?.[ri]?.hora || "";
+        const risH = risHora ? risHora : "";
         html += `<tr>`;
-        html += `<td class="col-hora" style="font-size:9px;color:#aaa;background:#f0f0f0;font-weight:600">RIS</td>`;
+        html += `<td class="col-hora" style="font-size:10px;color:#999;background:#f0f0f0;font-weight:700">${risH}</td>`;
         for (let di = 0; di < datos.length; di++) {
           const r = risXDia[di][ri];
           if (r) {
