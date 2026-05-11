@@ -1,276 +1,700 @@
-// js/app.js — Controlador principal de la PWA
+/* ── VARIABLES ─────────────────────────────────────────────── */
+:root {
+  --navy:      #1a3a5c;
+  --navy-dark: #0f2440;
+  --navy-mid:  #2a5080;
+  --accent:    #4a86c8;
+  --accent-lt: #d0e4f7;
+  --bg:        #f4f6f9;
+  --surface:   #ffffff;
+  --border:    #d0d7e2;
+  --text:      #1a2332;
+  --text-2:    #4a5568;
+  --text-3:    #8a96a8;
+  --success:   #2e7d32;
+  --success-bg:#e8f5e9;
+  --warn:      #e65100;
+  --warn-bg:   #fff3e0;
+  --danger:    #c62828;
+  --danger-bg: #ffebee;
+  --radius:    6px;
+  --radius-lg: 10px;
+  --shadow:    0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.08);
+  --topbar-h:  52px;
+  --sidebar-w: 200px;
+}
 
-const App = (() => {
-  let _viewActual = "";
-  let _toastTimer = null;
+/* ── RESET ─────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; color: var(--text); background: var(--bg); }
+a { color: var(--accent); }
+button { cursor: pointer; font-family: inherit; }
+input, select, textarea { font-family: inherit; font-size: 13px; }
+.hidden { display: none !important; }
 
-  // ── Toast global ──────────────────────────────────────────
-  function toast(msg, tipo = "") {
-    const el = document.getElementById("toast");
-    el.textContent = msg;
-    el.className = "toast" + (tipo ? " " + tipo : "");
-    el.classList.remove("hidden");
-    clearTimeout(_toastTimer);
-    _toastTimer = setTimeout(() => el.classList.add("hidden"), 4000);
-  }
+/* ── SCREENS (setup / rol) ─────────────────────────────────── */
+.screen {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy-mid) 100%);
+}
+.setup-card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 2.5rem 2rem;
+  width: 440px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.25);
+  text-align: center;
+}
+.setup-card .logo { font-size: 3rem; margin-bottom: .75rem; }
+.setup-card h1 { font-size: 1.5rem; color: var(--navy); margin-bottom: .25rem; }
+.setup-card > p { color: var(--text-2); font-size: .85rem; margin-bottom: 1.75rem; }
+.setup-hint { margin-top: 1rem; font-size: .78rem; color: var(--text-3); }
 
-  // ── Mostrar / ocultar views ───────────────────────────────
-  function showView(id) {
-    document.querySelectorAll(".view").forEach(v => v.classList.add("hidden"));
-    document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
-    const view = document.getElementById("view-" + id);
-    const btn  = document.getElementById("nav-" + id);
-    if (view) view.classList.remove("hidden");
-    if (btn)  btn.classList.add("active");
-    _viewActual = id;
+.rol-options { display: flex; gap: 1rem; margin-top: 1.5rem; }
+.rol-btn {
+  flex: 1; padding: 1.25rem 1rem;
+  border: 2px solid var(--border); border-radius: var(--radius-lg);
+  background: var(--surface); text-align: center;
+  transition: border-color .15s, background .15s;
+  display: flex; flex-direction: column; align-items: center; gap: .35rem;
+}
+.rol-btn:hover { border-color: var(--accent); background: var(--accent-lt); }
+.rol-icon  { font-size: 2rem; }
+.rol-label { font-weight: 600; color: var(--navy); font-size: .95rem; }
+.rol-desc  { font-size: .75rem; color: var(--text-2); }
 
-    // Cargar datos de la vista al activarla
-    if (id === "agenda") AgendaView.cargar();
-    if (id === "lista")  ListaView.cargar();
-    if (id === "turno")  TurnoView.cargarEstudios();
-    if (id === "stats")  StatsView.cargar();
-  }
+/* ── FORM ELEMENTS ─────────────────────────────────────────── */
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group label { font-size: .78rem; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: .03em; }
+.form-group input,
+.form-group select {
+  border: 1.5px solid var(--border); border-radius: var(--radius);
+  padding: 7px 10px; font-size: 13px; color: var(--text);
+  background: var(--surface); transition: border-color .15s;
+  width: 100%;
+}
+.form-group input:focus, .form-group select:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(74,134,200,.15);
+}
 
-  // ── Abrir turno con fecha/hora prellenos (desde agenda) ───
-  function abrirTurnoConFechaHora(fecha, hora) {
-    showView("turno");
-    TurnoView.cargarEstudios().then(() => {
-      TurnoView.prefill(fecha, hora);
-    });
-  }
+/* ── BUTTONS ─────────────────────────────────────────────────*/
+.btn-primary {
+  background: var(--navy); color: #fff; border: none;
+  padding: 9px 20px; border-radius: var(--radius); font-size: 13px; font-weight: 600;
+  transition: background .15s;
+}
+.btn-primary:hover { background: var(--navy-mid); }
+.btn-success {
+  background: var(--success); color: #fff; border: none;
+  padding: 9px 20px; border-radius: var(--radius); font-size: 13px; font-weight: 600;
+}
+.btn-danger {
+  background: var(--danger); color: #fff; border: none;
+  padding: 6px 14px; border-radius: var(--radius); font-size: 12px; font-weight: 600;
+}
+.btn-ghost {
+  background: transparent; border: 1px solid rgba(255,255,255,.35);
+  color: #fff; padding: 5px 12px; border-radius: var(--radius); font-size: 12px;
+  transition: background .15s;
+}
+.btn-ghost:hover { background: rgba(255,255,255,.12); }
+.btn-sm {
+  padding: 4px 10px; font-size: 11px; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-2); font-weight: 600;
+}
+.btn-sm:hover { background: var(--bg); }
+#btn-setup-ok {
+  width: 100%; padding: 10px; margin-top: 1.25rem;
+  background: var(--navy); color: #fff; border: none;
+  border-radius: var(--radius); font-size: 14px; font-weight: 600;
+  transition: background .15s;
+}
+#btn-setup-ok:hover { background: var(--navy-mid); }
 
-  // ── Mostrar opciones de un turno (click en celda) ─────────
-  function mostrarOpcionesTurno(fila) {
-    // Por ahora sólo avisa; en el futuro se puede abrir un modal de anular/modificar
-    // toast(`Turno seleccionado (fila ${fila}). Usá Buscar para modificarlo.`);
-  }
+/* ── APP LAYOUT ──────────────────────────────────────────────*/
+#app { height: 100vh; display: flex; flex-direction: column; }
 
-  // ── Refrescar agenda tras asignar turno ───────────────────
-  function refrescarAgenda() {
-    if (_viewActual === "agenda") AgendaView.cargar();
-  }
+/* TOPBAR */
+#topbar {
+  height: var(--topbar-h); background: var(--navy);
+  display: flex; align-items: center; padding: 0 1rem; gap: 1rem;
+  flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,.2);
+}
+.topbar-brand { display: flex; align-items: center; gap: .5rem; }
+.brand-icon  { font-size: 1.3rem; }
+.brand-name  { font-weight: 700; color: #fff; font-size: 1rem; white-space: nowrap; }
+.topbar-center { flex: 1; text-align: center; color: rgba(255,255,255,.7); font-size: .8rem; }
+.topbar-actions { display: flex; align-items: center; gap: .5rem; }
+.rol-badge {
+  font-size: .7rem; padding: 3px 10px;
+  border: 1px solid rgba(255,255,255,.4); border-radius: 20px;
+  color: rgba(255,255,255,.9); font-weight: 600;
+}
 
-  // ── Actualizar label del rol en topbar ───────────────────
-  function _actualizarRolUI() {
-    const rol = Config.getRol();
-    const badge = document.getElementById("topbar-rol-label");
-    badge.textContent = rol === "tecnico" ? "Técnico" : "Administrativo";
+/* BODY */
+#layout { flex: 1; display: flex; overflow: hidden; }
 
-    // Vista default según rol
-    const defaultView = rol === "tecnico" ? "lista" : rol === "jefatura" ? "stats" : "agenda";
+/* SIDEBAR */
+#sidebar {
+  width: var(--sidebar-w); background: var(--navy-dark); flex-shrink: 0;
+  display: flex; flex-direction: column; padding: .75rem .5rem; gap: .25rem;
+  overflow-y: auto;
+}
+.nav-btn {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .6rem .75rem; border-radius: var(--radius);
+  border: none; background: transparent; color: rgba(255,255,255,.65);
+  font-size: .85rem; text-align: left; transition: background .15s, color .15s;
+  width: 100%;
+}
+.nav-btn:hover    { background: rgba(255,255,255,.08); color: #fff; }
+.nav-btn.active   { background: var(--accent); color: #fff; }
+.nav-icon         { font-size: 1.1rem; width: 20px; text-align: center; flex-shrink: 0; }
 
-    // Mostrar/ocultar items según rol
-    document.querySelectorAll(".admin-only").forEach(el => {
-      el.style.display = (rol === "administrativo" || rol === "jefatura") ? "" : "none";
-    });
-    document.querySelectorAll(".tecnico-only").forEach(el => {
-      el.style.display = rol === "tecnico" ? "" : "none";
-    });
-    document.querySelectorAll(".jefatura-only").forEach(el => {
-      el.style.display = rol === "jefatura" ? "" : "none";
-    });
+/* MAIN */
+#main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
 
-    // Reordenar nav: técnico ve Lista primero
-    const navAgenda = document.getElementById("nav-agenda");
-    const navLista  = document.getElementById("nav-lista");
-    if (rol === "tecnico") {
-      navLista.style.order  = "1";
-      navAgenda.style.order = "2";
-    } else {
-      navAgenda.style.order = "1";
-      navLista.style.order  = "2";
-    }
+/* ── VIEWS ───────────────────────────────────────────────────*/
+.view { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.view-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .75rem 1.25rem; background: var(--surface);
+  border-bottom: 1px solid var(--border); flex-shrink: 0; gap: 1rem;
+}
+.view-header h2 { font-size: 1rem; font-weight: 700; color: var(--navy); }
 
-    showView(defaultView);
-  }
+/* Controls bars */
+.agenda-controls, .lista-controls {
+  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+}
+.agenda-controls button, .lista-controls button {
+  padding: 5px 12px; font-size: 12px; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  font-weight: 600;
+}
+.agenda-controls button:hover, .lista-controls button:hover { background: var(--bg); }
+.agenda-controls select {
+  padding: 5px 8px; border-radius: var(--radius); border: 1px solid var(--border);
+  font-size: 12px; background: var(--surface);
+}
+#agenda-rango-label, #lista-fecha-label {
+  font-weight: 600; color: var(--navy); font-size: .85rem; min-width: 180px; text-align: center;
+}
+#lista-filtro {
+  padding: 5px 10px; border-radius: var(--radius); border: 1px solid var(--border);
+  font-size: 12px; width: 200px;
+}
 
-  // ── PIN de jefatura ──────────────────────────────────────
-  const PIN_CORRECTO = "1504"; // ← CAMBIÁ ESTE PIN
-  let _pinActual = "";
+.loading-bar {
+  background: var(--accent-lt); color: var(--accent);
+  padding: .4rem 1.25rem; font-size: .8rem; font-weight: 600; flex-shrink: 0;
+}
 
-  function _initPin() {
-    document.getElementById("btn-jefatura-acceso").addEventListener("click", () => {
-      _pinActual = "";
-      _actualizarPuntos();
-      document.getElementById("screen-rol").classList.add("hidden");
-      document.getElementById("screen-pin").classList.remove("hidden");
-      document.getElementById("pin-error").textContent = "";
-    });
+/* ── AGENDA GRID ─────────────────────────────────────────────*/
+.agenda-container { flex: 1; overflow: auto; padding: 0; }
+.agenda-table {
+  border-collapse: collapse; width: 100%; table-layout: fixed;
+  font-size: 12px;
+}
+.agenda-table th {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--navy); color: #fff;
+  padding: 8px 6px; font-size: 11px; font-weight: 700;
+  text-align: center; white-space: nowrap; overflow: hidden;
+  border-right: 1px solid rgba(255,255,255,.15);
+  min-width: 0;
+}
+.agenda-table th.col-hora { min-width: 58px; width: 58px; }
+.agenda-table th.feriado-col { background: #b71c1c; }
+.agenda-table td {
+  padding: 3px 5px; border: 1px solid #e4e8ee;
+  vertical-align: top; height: 36px;
+}
+.agenda-table td.col-hora {
+  position: sticky; left: 0; z-index: 5;
+  background: #e8eaf0; font-weight: 700; color: var(--text-2);
+  font-size: 11px; text-align: center; white-space: nowrap;
+  border-right: 2px solid var(--border); padding: 3px 6px;
+}
 
-    document.querySelectorAll(".pin-btn[data-n]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        if (_pinActual.length >= 4) return;
-        _pinActual += btn.dataset.n;
-        _actualizarPuntos();
-        if (_pinActual.length === 4) {
-          if (_pinActual === PIN_CORRECTO) {
-            Config.setRol("jefatura");
-            document.getElementById("screen-pin").classList.add("hidden");
-            document.getElementById("app").classList.remove("hidden");
-            _actualizarRolUI();
-          } else {
-            document.getElementById("pin-error").textContent = "PIN incorrecto";
-            setTimeout(() => { _pinActual = ""; _actualizarPuntos(); document.getElementById("pin-error").textContent = ""; }, 800);
-          }
-        }
-      });
-    });
+/* Slot types */
+.slot-libre {
+  background: #fff; cursor: pointer;
+  transition: background .1s;
+}
+.slot-libre:hover { background: #e8f4e8 !important; }
+.slot-turno    { cursor: pointer; }
+.slot-turno:hover { filter: brightness(.95); }
+.slot-bloqueo  { cursor: default; }
+.slot-feriado  { cursor: default; }
+.slot-franja   { cursor: default; }
+.slot-continua { cursor: default; }
 
-    document.getElementById("pin-cancel").addEventListener("click", () => {
-      _pinActual = _pinActual.slice(0,-1);
-      _actualizarPuntos();
-    });
-    document.getElementById("pin-clear").addEventListener("click", () => {
-      _pinActual = "";
-      _actualizarPuntos();
-    });
-  }
+.slot-content {
+  height: 100%; display: flex; flex-direction: column; justify-content: center;
+  padding: 2px 3px; overflow: hidden;
+}
+.slot-nombre   { font-weight: 600; font-size: 11px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slot-estudio  { font-size: 10px; line-height: 1.2; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slot-label    { font-size: 10px; font-weight: 600; text-align: center; opacity: .8; }
+.slot-presente { font-size: 9px; color: var(--success); font-weight: 700; }
 
-  function _actualizarPuntos() {
-    for (let i = 1; i <= 4; i++) {
-      const d = document.getElementById("pin-d"+i);
-      d.classList.toggle("pin-dot-active", i <= _pinActual.length);
-    }
-  }
+/* ── LISTA DEL DÍA ──────────────────────────────────────────*/
+.lista-stats {
+  padding: .5rem 1.25rem;
+  font-size: .8rem; color: var(--text-2); background: var(--surface);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+#lista-container { flex: 1; overflow: auto; }
+#tabla-turnos {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+#tabla-turnos thead th {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--navy); color: #fff;
+  padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
+  border-right: 1px solid rgba(255,255,255,.15);
+}
+#tabla-turnos tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+#tabla-turnos tbody tr:hover { background: var(--bg); }
+#tabla-turnos tbody tr.presente-row { background: #f0faf0; }
+#tabla-turnos td { padding: 8px 12px; vertical-align: middle; }
+.td-hora   { font-weight: 700; color: var(--navy); white-space: nowrap; font-size: 14px; }
+.td-nombre { font-weight: 600; }
+.td-dni    { font-family: monospace; color: var(--text-2); }
+.td-obs    { color: var(--text-2); font-size: 12px; max-width: 200px; }
 
-  // ── Setup screen ──────────────────────────────────────────
-  function _initSetup() {
-    const input = document.getElementById("input-api-url");
-    const btn   = document.getElementById("btn-setup-ok");
+.origen-tag {
+  display: inline-block; padding: 2px 10px; border-radius: 12px;
+  font-size: 11px; font-weight: 700; border: 1px solid;
+  white-space: nowrap;
+}
+.presente-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 700; color: var(--success);
+}
+.btn-presente {
+  padding: 5px 14px; border-radius: var(--radius);
+  border: 1.5px solid var(--navy); background: transparent;
+  color: var(--navy); font-size: 11px; font-weight: 700;
+  transition: all .15s;
+}
+.btn-presente:hover { background: var(--navy); color: #fff; }
+.btn-presente.done  { border-color: var(--success); color: var(--success); cursor: default; }
 
-    // Pre-rellenar si ya hay URL guardada
-    input.value = Config.getUrl();
+.empty-state {
+  text-align: center; padding: 3rem; color: var(--text-3); font-size: .9rem;
+}
 
-    btn.addEventListener("click", async () => {
-      const url = input.value.trim();
-      if (!url || !url.startsWith("https://")) {
-        toast("Ingresá una URL válida (debe comenzar con https://)", "error");
-        return;
-      }
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Verificando…';
-      try {
-        Config.setUrl(url);
-        await API.ping();
-        _irARol();
-      } catch (err) {
-        toast("No se pudo conectar. Verificá la URL. Error: " + err.message, "error");
-        Config.clearUrl();
-        btn.disabled = false;
-        btn.textContent = "Conectar";
-      }
-    });
+/* ── NUEVO TURNO ─────────────────────────────────────────────*/
+.turno-form-container { flex: 1; overflow-y: auto; padding: 1.25rem; }
+.turno-form { background: var(--surface); border-radius: var(--radius-lg); padding: 1.5rem; max-width: 800px; }
+.form-row { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.form-row .form-group { flex: 1; min-width: 140px; }
+.form-row .form-wide  { flex: 2; }
 
-    // Enter en el input
-    input.addEventListener("keydown", e => { if (e.key === "Enter") btn.click(); });
-  }
+.slots-container {
+  margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 1.25rem;
+}
+.slots-container h3 { font-size: .9rem; color: var(--navy); margin-bottom: .75rem; font-weight: 700; }
+#slots-grid { display: flex; flex-wrap: wrap; gap: .4rem; }
+.slot-chip {
+  padding: 6px 14px; border-radius: var(--radius);
+  border: 1.5px solid var(--border); background: var(--surface);
+  font-size: 12px; font-weight: 600; color: var(--text);
+  cursor: pointer; transition: all .12s;
+}
+.slot-chip:hover   { border-color: var(--accent); background: var(--accent-lt); color: var(--navy); }
+.slot-chip.selected { border-color: var(--navy); background: var(--navy); color: #fff; }
 
-  function _irARol() {
-    document.getElementById("screen-setup").classList.add("hidden");
-    document.getElementById("screen-rol").classList.remove("hidden");
-  }
+.slot-seleccionado {
+  margin-top: 1rem; display: flex; align-items: center; gap: 1rem;
+  padding: .75rem; background: var(--bg); border-radius: var(--radius);
+}
+#slot-hora-label { font-weight: 700; color: var(--navy); font-size: 1rem; }
+.turno-result {
+  margin-top: 1rem; padding: 1rem 1.25rem;
+  border-radius: var(--radius); font-weight: 600;
+}
+.turno-result.ok      { background: var(--success-bg); color: var(--success); }
+.turno-result.error   { background: var(--danger-bg);  color: var(--danger);  }
 
-  function _irASetup() {
-    document.getElementById("screen-setup").classList.remove("hidden");
-    document.getElementById("screen-rol").classList.add("hidden");
-    document.getElementById("app").classList.add("hidden");
-  }
+/* ── BUSCAR ──────────────────────────────────────────────────*/
+.buscar-form { padding: 1.25rem; background: var(--surface); border-bottom: 1px solid var(--border); }
+.buscar-form .form-row { align-items: flex-end; }
+#buscar-results { padding: 1.25rem; }
+.buscar-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 1rem 1.25rem; margin-bottom: .75rem;
+}
+.buscar-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .5rem; }
+.buscar-nombre { font-weight: 700; color: var(--navy); font-size: .95rem; }
+.buscar-estado { font-size: .75rem; font-weight: 700; padding: 2px 10px; border-radius: 12px; }
+.estado-activo  { background: var(--success-bg); color: var(--success); }
+.estado-anulado { background: var(--danger-bg);  color: var(--danger); }
+.estado-mod     { background: var(--warn-bg);    color: var(--warn);   }
+.buscar-detalle { font-size: .82rem; color: var(--text-2); display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; }
+.buscar-detalle span { white-space: nowrap; }
 
-  // ── Role screen ───────────────────────────────────────────
-  function _initRol() {
-    document.querySelectorAll(".rol-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const rol = btn.dataset.rol;
-        Config.setRol(rol);
-        document.getElementById("screen-rol").classList.add("hidden");
-        document.getElementById("app").classList.remove("hidden");
-        _actualizarRolUI();
-      });
-    });
-  }
+/* ── TOOLTIP INFO TURNO ──────────────────────────────────────*/
+.tooltip-turno {
+  position: fixed; z-index: 100;
+  background: var(--navy-dark); color: #fff;
+  border-radius: var(--radius); padding: .6rem .9rem;
+  font-size: 11px; line-height: 1.6; max-width: 260px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  pointer-events: none;
+}
 
-  // ── Nav ───────────────────────────────────────────────────
-  function _initNav() {
-    document.querySelectorAll(".nav-btn[data-view]").forEach(btn => {
-      btn.addEventListener("click", () => showView(btn.dataset.view));
-    });
+/* ── TOAST ───────────────────────────────────────────────────*/
+.toast {
+  position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 1000;
+  background: var(--navy-dark); color: #fff;
+  padding: .75rem 1.25rem; border-radius: var(--radius);
+  font-size: .85rem; font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
+  max-width: 360px;
+  transition: opacity .3s;
+}
+.toast.ok    { background: var(--success); }
+.toast.error { background: var(--danger);  }
 
-    document.getElementById("btn-cambiar-rol").addEventListener("click", () => {
-      Config.setRol("");
-      document.getElementById("screen-rol").classList.remove("hidden");
-      document.getElementById("screen-pin").classList.add("hidden");
-      document.getElementById("app").classList.add("hidden");
-    });
+/* ── LOADING SPINNER ─────────────────────────────────────────*/
+.spinner {
+  display: inline-block; width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff; border-radius: 50%;
+  animation: spin .6s linear infinite; vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
-    document.getElementById("btn-refresh").addEventListener("click", () => {
-      if (_viewActual === "agenda") AgendaView.cargar();
-      if (_viewActual === "lista")  ListaView.cargar();
-    });
-  }
+/* ── TOGGLE MODO SEMANA / MES ────────────────────────────────*/
+.modo-toggle { display: flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.modo-btn {
+  padding: 5px 14px; font-size: 12px; font-weight: 600;
+  border: none; background: var(--surface); color: var(--text-2);
+  cursor: pointer; transition: background .15s, color .15s;
+}
+.modo-btn:hover    { background: var(--bg); }
+.modo-btn.modo-activo { background: var(--navy); color: #fff; }
 
-  // ── Topbar fecha ──────────────────────────────────────────
-  function _actualizarFecha() {
-    const DIAS  = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
-    const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
-    const d = new Date();
-    document.getElementById("topbar-fecha").textContent =
-      `${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
-  }
+/* ── CALENDARIO MENSUAL ──────────────────────────────────────*/
+.cal-mes-wrap {
+  display: flex; flex-direction: column;
+  height: 100%; padding: .5rem .75rem .75rem;
+}
 
-  // ── INIT ──────────────────────────────────────────────────
-  function init() {
-    _actualizarFecha();
-    _initSetup();
-    _initRol();
-    _initNav();
-    AgendaView.init();
-    ListaView.init();
-    TurnoView.init();
-    BuscarView.init();
-    ParteView.init();
-    StatsView.init();
-    _initPin();
+.cal-mes-table {
+  width: 100%; border-collapse: collapse; table-layout: fixed;
+  flex: 1;
+}
+.cal-mes-table thead th {
+  background: var(--navy); color: #fff;
+  padding: 8px 4px; font-size: 11px; font-weight: 700;
+  text-align: center; border-right: 1px solid rgba(255,255,255,.15);
+}
 
-    // Si ya tiene URL guardada, saltar el setup
-    if (Config.isReady()) {
-      // Verificar conexión en segundo plano
-      API.ping().catch(() => {
-        toast("⚠️ No se pudo conectar con el servidor. Verificá la conexión.", "error");
-      });
+.cal-dia {
+  border: 1px solid var(--border); vertical-align: top;
+  padding: 6px 8px; cursor: pointer;
+  transition: background .1s; background: var(--surface);
+  height: calc((100vh - 180px) / 6);
+  min-height: 80px;
+}
+.cal-dia:hover           { background: var(--accent-lt); }
+.cal-dia-vacio           { background: var(--bg); cursor: default; }
+.cal-dia-vacio:hover     { background: var(--bg); }
+.cal-dia-hoy             { border: 2px solid var(--navy) !important; }
+.cal-dia-dom             { background: #fafafa; }
+.cal-dia-feriado         { background: #ffebee !important; }
+.cal-dia-lleno           { background: #ffebee !important; }
+.cal-dia-casi-lleno      { background: #fff8e1 !important; }
 
-      // Si tiene rol guardado, ir directo a la app
-      if (Config.getRol()) {
-        document.getElementById("screen-setup").classList.add("hidden");
-        document.getElementById("screen-rol").classList.add("hidden");
-        document.getElementById("app").classList.remove("hidden");
-        _actualizarRolUI();
-      } else {
-        _irARol();
-      }
-    }
-  }
+.cal-num {
+  font-size: 13px; font-weight: 700; color: var(--navy);
+  margin-bottom: 5px;
+}
+.cal-dia-hoy .cal-num {
+  background: var(--navy); color: #fff;
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; margin-bottom: 5px;
+}
+.cal-feriado-label { font-size: 10px; color: #c62828; font-weight: 600; }
 
-  // ── Service Worker ────────────────────────────────────────
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/sw.js").catch(err => {
-      console.warn("SW no registrado:", err);
-    });
-  }
+.cal-contadores {
+  display: flex; gap: 8px; font-size: 12px; font-weight: 700;
+  margin-bottom: 5px;
+}
+.cal-lib-badge { color: #2e7d32; }
+.cal-ocu-badge { color: #c62828; }
 
-  function irAListaDia(fechaStr) {
-    ListaView.setFecha(fechaStr);
-    showView("lista");
-  }
+.cal-barra {
+  display: flex; height: 4px; border-radius: 2px; overflow: hidden;
+  background: var(--border);
+}
+.cal-barra-ocu { background: #e05555; }
+.cal-barra-lib { background: #4a9e5c; }
 
-  function abrirTurnoConCondicion(fecha, hora, condicion) {
-    showView("turno");
-    TurnoView.cargarEstudios().then(() => {
-      TurnoView.prefill(fecha, hora, condicion);
-    });
-  }
+.cal-pie {
+  display: flex; gap: 1rem; align-items: center;
+  padding: .6rem 0 .25rem; font-size: 12px; font-weight: 600;
+  border-top: 1px solid var(--border); margin-top: .5rem;
+}
+.cal-pie-lib  { color: #2e7d32; }
+.cal-pie-sep  { color: var(--text-3); }
+.cal-pie-ocu  { color: #c62828; }
 
-  return { init, toast, showView, abrirTurnoConFechaHora, abrirTurnoConCondicion, mostrarOpcionesTurno, refrescarAgenda, irAListaDia };
-})();
+/* ── FILAS LIBRES EN LISTA DEL DÍA ──────────────────────────*/
+.fila-libre td { border-bottom: 1px solid #f0f0f0 !important; }
+.fila-libre:hover td { background: #f0faf0 !important; }
 
-// Arrancar cuando el DOM esté listo
-document.addEventListener("DOMContentLoaded", () => App.init());
+/* ── FILAS DE FRANJA CLICLEABLES ─────────────────────────────*/
+.fila-franja td { border-bottom: 1px solid #f0f0f0 !important; }
+.fila-franja:hover td { filter: brightness(.95); }
+
+/* ── VISTA RECLAMOS (iframe) ─────────────────────────────────*/
+#view-reclamos { overflow: hidden; }
+#view-reclamos > div { overflow: hidden; }
+
+/* ── PARTE DIARIO ────────────────────────────────────────────*/
+#parte-dropzone .parte-drag,
+#parte-dropzone.parte-drag { border-color: var(--accent) !important; background: var(--accent-lt) !important; }
+.parte-par  { background: #f8fafc; }
+.parte-impar { background: #ffffff; }
+#parte-tabla tbody tr { border-bottom: 1px solid var(--border); }
+#parte-tabla tbody tr:hover { background: var(--bg) !important; }
+#parte-tabla td { padding: 8px 10px; vertical-align: middle; }
+
+/* ── RIS EN AGENDA ───────────────────────────────────────────*/
+.slot-ris {
+  background: #f4f4f4;
+  border-left: 2px dashed #bbb !important;
+  cursor: default;
+}
+.slot-ris .slot-nombre { color: #999 !important; font-style: italic; font-weight: 500 !important; }
+.slot-ris .slot-estudio { color: #bbb !important; }
+.slot-ris-vacio { background: #fafafa; border: 1px solid #eee; }
+
+.cal-ris-badge { color: #888; font-size: 11px; font-weight: 600; }
+.cal-barra-ris-wrap { margin-top: 3px; }
+.cal-barra-ris { background: #ccc; height: 3px; border-radius: 2px; }
+.cal-pie-ris { color: #888; font-weight: 600; }
+
+/* ── MEJORAS VISUALES VISTA TÉCNICO ─────────────────────────*/
+
+/* Filas de turno propio — más altura y jerarquía clara */
+#tabla-turnos tbody tr:not(.fila-ris-row):not(.fila-libre) {
+  border-left: 4px solid #1a3a5c;
+  border-bottom: 1px solid var(--border);
+}
+#tabla-turnos tbody tr:not(.fila-ris-row):not(.fila-libre) td {
+  padding: 10px 12px;
+}
+#tabla-turnos .td-hora {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--navy);
+  white-space: nowrap;
+  letter-spacing: -.3px;
+}
+#tabla-turnos .td-nombre { font-size: 14px; font-weight: 700; }
+
+/* Fila RIS — discreta, borde punteado */
+.fila-ris-row {
+  background: #f7f7f7;
+  border-left: 3px dashed #ccc !important;
+  border-bottom: 1px solid #eeeeee !important;
+}
+.fila-ris-row td { padding: 5px 12px !important; }
+.ris-nombre { font-size: 12px; color: #888; font-style: italic; }
+.ris-dni    { font-size: 11px; color: #aaa; font-family: monospace; }
+.ris-estudio{ font-size: 11px; color: #999; }
+.ris-badge  {
+  font-size: 9px; font-weight: 700; letter-spacing: .05em;
+  background: #e8e8e8; color: #888;
+  padding: 2px 7px; border-radius: 8px;
+  text-transform: uppercase;
+}
+
+/* Presente ya marcado — fila verde suave */
+#tabla-turnos tbody tr.presente-row {
+  background: #f0faf0 !important;
+  border-left: 4px solid #4a9e5c !important;
+}
+#tabla-turnos tbody tr.presente-row .td-hora { color: #2e7d32; }
+
+/* Botón presente más grande y visible */
+.btn-presente {
+  padding: 7px 18px !important;
+  font-size: 12px !important;
+  border-radius: var(--radius) !important;
+  font-weight: 700 !important;
+}
+
+/* Stats bar más informativa */
+#lista-stats {
+  font-size: 13px;
+  font-weight: 600;
+  padding: .6rem 1.25rem;
+  background: var(--navy);
+  color: rgba(255,255,255,.85);
+  border-bottom: none;
+}
+
+/* Header de la tabla sticky más visible */
+#tabla-turnos thead th {
+  font-size: 10px !important;
+  letter-spacing: .08em !important;
+  padding: 10px 12px !important;
+}
+
+/* ── WORKLIST TÉCNICO — TARJETAS ─────────────────────────────*/
+.lista-cards-wrap { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+
+.card-turno {
+  background: var(--surface);
+  border-radius: 10px;
+  border: 1px solid #c8d4e8;
+  border-bottom: 3px solid var(--navy);
+  padding: 10px 14px;
+  display: grid;
+  grid-template-columns: 72px 1fr auto;
+  gap: 0 12px;
+  align-items: center;
+}
+.card-turno.presente {
+  border-color: #b0d8b8;
+  border-bottom-color: #4a9e5c;
+  background: #f5fbf6;
+}
+.hora-big     { font-size: 20px; font-weight: 800; color: var(--navy); line-height: 1; }
+.hora-big.ok  { color: var(--success); }
+.hora-sub     { font-size: 9px; color: var(--text-3); font-weight: 600; letter-spacing: .05em; margin-top: 3px; }
+.card-nombre  { font-size: 14px; font-weight: 700; color: var(--text); }
+.card-nombre.ok { color: var(--success); }
+.card-estudio { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+.card-meta    { display: flex; gap: 8px; margin-top: 4px; align-items: center; flex-wrap: wrap; }
+.card-dni     { font-size: 11px; font-family: monospace; color: var(--text-3); }
+.card-obs     { font-size: 11px; color: var(--text-3); font-style: italic; }
+.card-right   { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+
+.btn-card-pres {
+  padding: 7px 16px; border-radius: 8px;
+  border: 1.5px solid var(--navy); background: transparent;
+  color: var(--navy); font-size: 12px; font-weight: 700; cursor: pointer;
+  transition: background .15s;
+}
+.btn-card-pres:hover { background: var(--navy); color: #fff; }
+.btn-card-done {
+  padding: 7px 16px; border-radius: 8px;
+  border: 1.5px solid var(--success); background: var(--success-bg);
+  color: var(--success); font-size: 12px; font-weight: 700;
+}
+.btn-card-anular {
+  padding: 4px 10px; border-radius: 6px;
+  border: 1px solid #e0b0b0; background: transparent;
+  color: #c08080; font-size: 10px; font-weight: 600; cursor: pointer;
+}
+.btn-card-anular:hover { background: var(--danger-bg); color: var(--danger); border-color: var(--danger); }
+.origen-tag-card {
+  font-size: 10px; font-weight: 700; padding: 2px 9px;
+  border-radius: 10px; border: 1px solid;
+}
+.origen-tag-card.int { background: #fff8e1; border-color: #c9a000; color: #7a4f00; }
+
+.row-ris {
+  display: grid;
+  grid-template-columns: 72px 1fr auto;
+  gap: 0 12px;
+  padding: 5px 14px;
+  border-left: 3px dashed #ccc;
+  border-radius: 6px;
+  background: #f4f4f4;
+  align-items: center;
+  margin-left: 4px;
+}
+.hora-ris    { font-size: 12px; font-weight: 600; color: #bbb; }
+.ris-body    { min-width: 0; }
+.ris-nombre  { font-size: 12px; color: #888; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ris-estudio { font-size: 11px; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ris-badge   {
+  font-size: 9px; font-weight: 700; letter-spacing: .05em;
+  background: #e0e0e0; color: #888;
+  padding: 2px 7px; border-radius: 8px; white-space: nowrap;
+}
+
+/* Ocultar tabla cuando el técnico usa tarjetas */
+.tecnico-cards #tabla-turnos { display: none; }
+.admin-tabla #lista-cards { display: none; }
+
+/* ── PIN SCREEN ──────────────────────────────────────────────*/
+.pin-dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--navy); background: transparent;
+  transition: background .15s;
+}
+.pin-dot-active { background: var(--navy); }
+.pin-btn {
+  padding: 14px; font-size: 20px; font-weight: 600;
+  border-radius: var(--radius-lg); border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); cursor: pointer;
+  transition: background .1s;
+}
+.pin-btn:hover    { background: var(--bg); }
+.pin-btn:active   { background: var(--border); }
+.pin-cancel, .pin-clear { font-size: 16px; color: var(--text-2); }
+
+/* ── ESTADÍSTICAS ────────────────────────────────────────────*/
+.st-header-row {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 1rem; flex-wrap: wrap; gap: .5rem;
+}
+.st-mes { font-size: 1.1rem; font-weight: 700; color: var(--navy); }
+.st-summary { display: flex; gap: .5rem; flex-wrap: wrap; }
+.st-chip {
+  font-size: 12px; font-weight: 600; padding: 4px 12px;
+  border-radius: 12px; background: var(--accent-lt); color: var(--navy);
+}
+.st-chip-contrast { background: #fff3e0; color: #7a4510; }
+
+.st-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.st-table th, .st-table td { padding: 7px 12px; border: 1px solid var(--border); }
+.st-th-region { background: var(--navy); color: #fff; text-align: left; min-width: 160px; }
+.st-th-sin { background: #e8f5e9; color: #1a5e28; text-align: center; }
+.st-th-con { background: #fff3e0; color: #7a4510; text-align: center; }
+.st-th-n, .st-th-p { background: inherit; text-align: center; font-size: 11px; }
+.st-region { font-weight: 600; color: var(--text); }
+.st-num { text-align: center; font-weight: 600; color: var(--navy); }
+.st-con { color: #c07000 !important; }
+.st-pct { text-align: center; color: var(--text-2); font-size: 12px; }
+.st-total td { background: var(--bg); border-top: 2px solid var(--navy); }
+.st-table tbody tr:hover { background: var(--bg); }
+
+/* ── SELECTOR DE MÚLTIPLES ESTUDIOS ─────────────────────────*/
+.estudios-chips-wrap {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  min-height: 32px; padding: 4px 0;
+}
+.estudio-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--accent-lt); color: var(--navy);
+  border: 1px solid var(--accent); border-radius: 20px;
+  padding: 4px 10px 4px 12px; font-size: 12px; font-weight: 600;
+}
+.chip-remove {
+  background: none; border: none; cursor: pointer;
+  color: var(--navy); font-size: 14px; line-height: 1;
+  padding: 0 2px; opacity: .6;
+}
+.chip-remove:hover { opacity: 1; }
+
+.tiempo-total {
+  background: #e8f4ff; border-left: 3px solid var(--accent);
+  padding: 6px 12px; border-radius: var(--radius);
+  font-size: 13px; color: var(--navy);
+}

@@ -250,13 +250,25 @@
                 </div>
               </div>
 
-              <div class="form-row">
-                <div class="form-group form-wide">
-                  <label>Estudio *</label>
-                  <select id="t-estudio" required>
-                    <option value="">— Seleccionar estudio —</option>
-                  </select>
+              <!-- Estudios múltiples -->
+              <div class="form-row" style="flex-direction:column;gap:6px">
+                <div class="form-group">
+                  <label>Estudios *</label>
+                  <div style="display:flex;gap:6px;align-items:center">
+                    <input type="text" id="t-estudio-buscar" placeholder="Buscar estudio…" style="width:200px;font-size:12px">
+                    <select id="t-estudio-sel" style="flex:1;font-size:12px">
+                      <option value="">— Seleccionar —</option>
+                    </select>
+                    <button type="button" id="btn-agregar-estudio" class="btn-primary" style="padding:7px 14px;font-size:12px;white-space:nowrap">+ Agregar</button>
+                  </div>
                 </div>
+                <div id="t-estudios-chips" class="estudios-chips-wrap">
+                  <span style="color:var(--text-3);font-size:12px;font-style:italic">Ningún estudio seleccionado</span>
+                </div>
+                <div id="t-tiempo-total" class="tiempo-total hidden"></div>
+              </div>
+
+              <div class="form-row">
                 <div class="form-group">
                   <label>Origen *</label>
                   <select id="t-origen">

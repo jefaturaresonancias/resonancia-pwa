@@ -1,63 +1,121 @@
-// js/views/turno.js — Formulario de asignación y buscador
+// js/views/turno.js — Formulario de asignación con múltiples estudios
 
 const TurnoView = (() => {
-  let _slotSeleccionado = null;  // { mins, hora }
+  let _slotSeleccionado = null;
   let _fechaPrefill     = null;
   let _horaPrefill      = null;
+  let _estudiosConfig   = {};        // { nombre: { duracion, restriccion } }
+  let _estudiosElegidos = [];        // array de nombres elegidos
 
-  // ── cargar lista de estudios desde config ─────────────────
+  // ── Cargar estudios ───────────────────────────────────────
   async function cargarEstudios() {
-    const sel = document.getElementById("t-estudio");
-    if (sel.options.length > 1) return; // ya cargados
+    if (Object.keys(_estudiosConfig).length > 0) return;
     try {
-      const cfg    = await API.config();
-      const estudios = Object.keys(cfg.estudios || {}).sort();
-      estudios.forEach(e => {
-        const opt = document.createElement("option");
-        opt.value = e;
-        opt.textContent = e;
-        sel.appendChild(opt);
-      });
+      const cfg = await API.config();
+      _estudiosConfig = cfg.estudios || {};
+      _poblarSelect();
     } catch (err) {
       App.toast("Error cargando estudios: " + err.message, "error");
     }
   }
 
-  // ── prefill desde click en agenda / lista ────────────────
+  function _poblarSelect(filtro) {
+    const sel = document.getElementById("t-estudio-sel");
+    sel.innerHTML = '<option value="">— Seleccionar estudio —</option>';
+    const nombres = Object.keys(_estudiosConfig).sort();
+    for (const n of nombres) {
+      if (filtro && !n.toLowerCase().includes(filtro.toLowerCase())) continue;
+      if (_estudiosElegidos.includes(n)) continue; // ya agregado
+      const opt = document.createElement("option");
+      opt.value = n; opt.textContent = n;
+      sel.appendChild(opt);
+    }
+  }
+
+  // ── Agregar estudio elegido ───────────────────────────────
+  function _agregarEstudio(nombre) {
+    if (!nombre || _estudiosElegidos.includes(nombre)) return;
+    _estudiosElegidos.push(nombre);
+    _renderChips();
+    _actualizarTiempo();
+    _poblarSelect();
+    document.getElementById("t-estudio-sel").value = "";
+    // Limpiar slots anteriores
+    _limpiarSlots();
+  }
+
+  function _quitarEstudio(nombre) {
+    _estudiosElegidos = _estudiosElegidos.filter(e => e !== nombre);
+    _renderChips();
+    _actualizarTiempo();
+    _poblarSelect();
+    _limpiarSlots();
+  }
+
+  function _renderChips() {
+    const wrap = document.getElementById("t-estudios-chips");
+    if (_estudiosElegidos.length === 0) {
+      wrap.innerHTML = '<span style="color:var(--text-3);font-size:12px;font-style:italic">Ningún estudio seleccionado</span>';
+      return;
+    }
+    wrap.innerHTML = _estudiosElegidos.map(n => `
+      <span class="estudio-chip">
+        ${n}
+        <button type="button" class="chip-remove" data-est="${encodeURIComponent(n)}" title="Quitar">×</button>
+      </span>`).join("");
+    wrap.querySelectorAll(".chip-remove").forEach(btn => {
+      btn.addEventListener("click", () => _quitarEstudio(decodeURIComponent(btn.dataset.est)));
+    });
+  }
+
+  function _actualizarTiempo() {
+    const durTotal = _estudiosElegidos.reduce((sum, n) =>
+      sum + (_estudiosConfig[n]?.duracion || 0), 0);
+    const el = document.getElementById("t-tiempo-total");
+    if (durTotal > 0) {
+      const h = Math.floor(durTotal / 60);
+      const m = durTotal % 60;
+      const label = h > 0 ? `${h}h ${m > 0 ? m + "min" : ""}` : `${m} min`;
+      el.innerHTML = `⏱ Tiempo total estimado: <strong>${label}</strong>`;
+      el.classList.remove("hidden");
+    } else {
+      el.classList.add("hidden");
+    }
+  }
+
+  function _limpiarSlots() {
+    document.getElementById("slots-container").classList.add("hidden");
+    document.getElementById("slot-seleccionado").classList.add("hidden");
+    document.getElementById("slots-grid").innerHTML = "";
+    document.getElementById("turno-result").classList.add("hidden");
+    _slotSeleccionado = null;
+  }
+
+  // ── Prefill desde agenda/lista ────────────────────────────
   function prefill(fecha, hora, condicion) {
     _fechaPrefill = fecha;
     _horaPrefill  = hora;
 
-    // Convertir dd/MM/yyyy → yyyy-MM-dd para input[type=date]
     if (fecha) {
       const p = fecha.split("/");
       document.getElementById("t-fecha").value = `${p[2]}-${p[1]}-${p[0]}`;
     }
 
-    // Limpiar aviso anterior
     const avisoEl = document.getElementById("turno-condicion-aviso");
     if (avisoEl) avisoEl.remove();
 
     if (condicion) {
-      // Pre-seleccionar origen si viene de franja por origen
       if (condicion.origen) {
         const sel = document.getElementById("t-origen");
         for (const opt of sel.options) {
           if (opt.value.toUpperCase() === condicion.origen.toUpperCase()) {
-            sel.value = opt.value;
-            break;
+            sel.value = opt.value; break;
           }
         }
         sel.style.borderColor = "#c9a000";
-        sel.title = `Pre-seleccionado por franja: ${condicion.label}`;
       }
+      if (condicion.filtro) _filtrarEstudios(condicion.filtro);
 
-      // Filtrar estudios si viene de franja por código
-      if (condicion.filtro) {
-        _filtrarEstudios(condicion.filtro);
-      }
-
-      // Mostrar aviso visual
       const aviso = document.createElement("div");
       aviso.id = "turno-condicion-aviso";
       aviso.style.cssText = "background:#fff8e1;border-left:4px solid #f0c040;padding:8px 14px;border-radius:4px;font-size:12px;font-weight:600;color:#7a4f00;margin-bottom:1rem";
@@ -68,31 +126,25 @@ const TurnoView = (() => {
   }
 
   function _filtrarEstudios(filtro) {
-    const sel = document.getElementById("t-estudio");
-    let primerCoincidencia = null;
-    for (const opt of sel.options) {
-      if (opt.value === "") continue;
-      const coincide = opt.value.toLowerCase().includes(filtro.toLowerCase());
-      opt.hidden = !coincide;
-      if (coincide && !primerCoincidencia) primerCoincidencia = opt.value;
-    }
-    if (primerCoincidencia) sel.value = primerCoincidencia;
+    document.getElementById("t-estudio-buscar").value = filtro;
+    _poblarSelect(filtro);
+    const sel = document.getElementById("t-estudio-sel");
+    if (sel.options.length > 1) sel.value = sel.options[1].value;
     sel.style.borderColor = "#f0c040";
-    sel.title = `Filtrado por franja: ${filtro}`;
   }
 
-  // ── buscar slots disponibles ──────────────────────────────
+  // ── Buscar slots ──────────────────────────────────────────
   async function _buscarSlots() {
-    const estudio = document.getElementById("t-estudio").value;
-    const origen  = document.getElementById("t-origen").value;
-    const fechaRaw = document.getElementById("t-fecha").value;  // yyyy-MM-dd
+    if (_estudiosElegidos.length === 0) {
+      App.toast("Agregá al menos un estudio.", "error"); return;
+    }
+    const origen   = document.getElementById("t-origen").value;
+    const fechaRaw = document.getElementById("t-fecha").value;
+    if (!fechaRaw) { App.toast("Ingresá una fecha.", "error"); return; }
 
-    if (!estudio) { App.toast("Seleccioná un estudio primero.", "error"); return; }
-    if (!fechaRaw){ App.toast("Ingresá una fecha.", "error"); return; }
-
-    // Convertir yyyy-MM-dd → dd/MM/yyyy
     const [y, m, d] = fechaRaw.split("-");
     const fecha = `${d}/${m}/${y}`;
+    const estudioStr = _estudiosElegidos.join(", ");
 
     const slotsContainer = document.getElementById("slots-container");
     const slotsGrid      = document.getElementById("slots-grid");
@@ -106,17 +158,15 @@ const TurnoView = (() => {
     _slotSeleccionado = null;
 
     try {
-      const result = await API.slots(fecha, estudio, origen);
-
+      const result = await API.slots(fecha, estudioStr, origen);
       if (result.esFeriado) {
         slotsGrid.innerHTML = `<p style="color:#c62828;font-weight:600">🚫 ${fecha} es feriado: ${result.feriado}</p>`;
         return;
       }
       if (result.total === 0) {
-        slotsGrid.innerHTML = `<p style="color:#666">Sin turnos disponibles para esta fecha y estudio.<br>Probá con otra fecha.</p>`;
+        slotsGrid.innerHTML = `<p style="color:#666">Sin turnos disponibles para esta fecha.<br>Probá con otra fecha.</p>`;
         return;
       }
-
       result.libres.forEach(slot => {
         const chip = document.createElement("button");
         chip.type = "button";
@@ -124,16 +174,10 @@ const TurnoView = (() => {
         chip.textContent = slot.hora;
         chip.dataset.mins = slot.mins;
         chip.dataset.hora = slot.hora;
-
-        // Si viene prefill de hora, auto-seleccionar
-        if (_horaPrefill && slot.hora === _horaPrefill) {
-          _elegirSlot(chip, slot);
-        }
-
+        if (_horaPrefill && slot.hora === _horaPrefill) _elegirSlot(chip, slot);
         chip.addEventListener("click", () => _elegirSlot(chip, slot));
         slotsGrid.appendChild(chip);
       });
-
     } catch (err) {
       slotsGrid.innerHTML = `<p style="color:#c62828">Error: ${err.message}</p>`;
     } finally {
@@ -149,77 +193,73 @@ const TurnoView = (() => {
     document.getElementById("slot-seleccionado").classList.remove("hidden");
   }
 
-  // ── confirmar turno ───────────────────────────────────────
+  // ── Confirmar turno ───────────────────────────────────────
   async function _confirmar(e) {
     e.preventDefault();
+    if (_estudiosElegidos.length === 0) { App.toast("Agregá al menos un estudio.", "error"); return; }
+    if (!_slotSeleccionado)             { App.toast("Seleccioná un horario.", "error"); return; }
 
-    if (!_slotSeleccionado) {
-      App.toast("Seleccioná un horario disponible.", "error");
-      return;
-    }
+    const nombre   = document.getElementById("t-nombre").value.trim();
+    const apellido = document.getElementById("t-apellido").value.trim();
+    const dni      = document.getElementById("t-dni").value.trim();
+    const origen   = document.getElementById("t-origen").value;
+    const obs      = document.getElementById("t-obs").value.trim();
+    const fechaRaw = document.getElementById("t-fecha").value;
 
-    const nombre  = document.getElementById("t-nombre").value.trim();
-    const apellido= document.getElementById("t-apellido").value.trim();
-    const dni     = document.getElementById("t-dni").value.trim();
-    const estudio = document.getElementById("t-estudio").value;
-    const origen  = document.getElementById("t-origen").value;
-    const obs     = document.getElementById("t-obs").value.trim();
-    const fechaRaw= document.getElementById("t-fecha").value;  // yyyy-MM-dd
-
-    if (!nombre || !apellido || !dni) {
-      App.toast("Completá nombre, apellido y DNI.", "error");
-      return;
-    }
+    if (!nombre || !apellido || !dni) { App.toast("Completá nombre, apellido y DNI.", "error"); return; }
 
     const [y, m, d] = fechaRaw.split("-");
     const fecha = `${d}/${m}/${y}`;
+    const estudio = _estudiosElegidos.join(", ");
 
     const btn = document.getElementById("btn-confirmar");
-    btn.disabled = true;
-    btn.textContent = "Guardando…";
-
-    const result = document.getElementById("turno-result");
-    result.classList.add("hidden");
+    btn.disabled = true; btn.textContent = "Guardando…";
+    document.getElementById("turno-result").classList.add("hidden");
 
     try {
-      const resp = await API.asignar({
-        nombre, apellido, dni, estudio, origen,
-        fecha, hora: _slotSeleccionado.hora,
-        observaciones: obs
-      });
-
+      await API.asignar({ nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs });
+      const result = document.getElementById("turno-result");
       result.className = "turno-result ok";
-      result.innerHTML = `✅ Turno confirmado correctamente<br>
-        <strong>${apellido}, ${nombre}</strong> · ${estudio}<br>
-        📅 ${fecha} · 🕐 ${_slotSeleccionado.hora} hs`;
+      result.innerHTML = `✅ Turno confirmado<br><strong>${apellido}, ${nombre}</strong><br>${estudio}<br>📅 ${fecha} · 🕐 ${_slotSeleccionado.hora} hs`;
       result.classList.remove("hidden");
-
-      App.toast(`Turno asignado: ${apellido}, ${nombre} — ${_slotSeleccionado.hora} hs`, "ok");
+      App.toast(`Turno asignado: ${apellido} — ${_slotSeleccionado.hora} hs`, "ok");
       _resetForm();
       App.refrescarAgenda();
-
     } catch (err) {
+      const result = document.getElementById("turno-result");
       result.className = "turno-result error";
       result.textContent = "❌ Error: " + err.message;
       result.classList.remove("hidden");
       App.toast("Error: " + err.message, "error");
     } finally {
-      btn.disabled = false;
-      btn.textContent = "✓ Confirmar turno";
+      btn.disabled = false; btn.textContent = "✓ Confirmar turno";
     }
   }
 
   function _resetForm() {
     document.getElementById("form-turno").reset();
-    document.getElementById("slots-container").classList.add("hidden");
-    document.getElementById("slot-seleccionado").classList.add("hidden");
-    document.getElementById("slots-grid").innerHTML = "";
-    _slotSeleccionado = null;
+    _estudiosElegidos = [];
+    _renderChips();
+    _actualizarTiempo();
+    _poblarSelect();
+    _limpiarSlots();
     _fechaPrefill = null;
     _horaPrefill  = null;
   }
 
   function init() {
+    // Agregar estudio al hacer clic en el botón o cambiar select
+    document.getElementById("btn-agregar-estudio").addEventListener("click", () => {
+      const sel = document.getElementById("t-estudio-sel");
+      _agregarEstudio(sel.value);
+    });
+    document.getElementById("t-estudio-sel").addEventListener("change", (e) => {
+      if (e.target.value) _agregarEstudio(e.target.value);
+    });
+    // Buscar/filtrar estudios en tiempo real
+    document.getElementById("t-estudio-buscar").addEventListener("input", (e) => {
+      _poblarSelect(e.target.value);
+    });
     document.getElementById("btn-ver-slots").onclick = _buscarSlots;
     document.getElementById("form-turno").addEventListener("submit", _confirmar);
   }
@@ -244,37 +284,31 @@ const BuscarView = (() => {
   async function buscar() {
     const apellido = document.getElementById("b-apellido").value.trim();
     const dni      = document.getElementById("b-dni").value.trim();
-
     if (!apellido && !dni) { App.toast("Ingresá apellido o DNI.", "error"); return; }
 
     const btn = document.getElementById("btn-buscar");
     btn.disabled = true; btn.textContent = "Buscando…";
-
     const div = document.getElementById("buscar-results");
     div.innerHTML = '<p style="color:#666;padding:1rem">Buscando…</p>';
 
     try {
       const turnos = await API.buscar(apellido, dni);
       if (turnos.length === 0) {
-        div.innerHTML = '<div class="empty-state">Sin resultados para los criterios ingresados.</div>';
-        return;
+        div.innerHTML = '<div class="empty-state">Sin resultados.</div>'; return;
       }
-
       div.innerHTML = turnos.map(t => {
         const est = _origen(t.origen);
         const estadoCls = t.tipoMod === "Anular" ? "estado-anulado"
                         : t.tipoMod && t.tipoMod !== "" ? "estado-mod" : "estado-activo";
         const estadoTxt = t.tipoMod === "Anular" ? "🔴 Anulado"
                         : t.tipoMod && t.tipoMod !== "" ? `🟡 Mod. ${t.tipoMod}` : "🟢 Activo";
-
         return `<div class="buscar-card">
           <div class="buscar-card-header">
             <span class="buscar-nombre">${t.apellido}, ${t.nombre} · DNI ${t.dni}</span>
             <span class="buscar-estado ${estadoCls}">${estadoTxt}</span>
           </div>
           <div class="buscar-detalle">
-            <span>📅 ${t.fecha}</span>
-            <span>🕐 ${t.hora} hs</span>
+            <span>📅 ${t.fecha}</span><span>🕐 ${t.hora} hs</span>
             <span>🔬 ${t.estudio}</span>
             <span><span class="origen-tag" style="background:${est.bg};border-color:${est.border};color:${est.text}">${t.origen}</span></span>
             ${t.observaciones ? `<span>📝 ${t.observaciones}</span>` : ""}
@@ -284,10 +318,9 @@ const BuscarView = (() => {
         </div>`;
       }).join("");
 
-      // Anular desde buscar
       div.querySelectorAll(".btn-anular-busq").forEach(btn => {
         btn.addEventListener("click", async () => {
-          const fila   = parseInt(btn.dataset.fila);
+          const fila = parseInt(btn.dataset.fila);
           const nombre = btn.dataset.nombre;
           if (!confirm(`¿Anular el turno de ${nombre}?`)) return;
           btn.disabled = true;
@@ -301,7 +334,6 @@ const BuscarView = (() => {
           }
         });
       });
-
     } catch (err) {
       div.innerHTML = `<div class="empty-state">Error: ${err.message}</div>`;
       App.toast("Error: " + err.message, "error");
