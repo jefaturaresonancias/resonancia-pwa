@@ -25,7 +25,7 @@ const ListaView = (() => {
     const empty  = document.getElementById("lista-empty");
     const stats  = document.getElementById("lista-stats");
 
-    const MIN_I = 7*60, MIN_F = 23*60;
+    const MIN_I = 0, MIN_F = 24*60;
     const fechaStr = API.fechaAStr(_fecha);
 
     // Construir mapa minutos → turno
@@ -51,13 +51,13 @@ const ListaView = (() => {
 
     // Agregar filas RIS intercaladas — excluir duplicados con agenda propia
     const dnisPropios = new Set(
-      turnos.map(t => String(t.dni).trim())
+      turnos.map(t => String(t.dni).trim().replace(/^0+/, ""))
     );
     for (const r of risDelDia) {
       const mins = _parseMins(r.hora);
       if (mins < MIN_I || mins >= MIN_F) continue;
-      // Extraer número del documento RIS (ej: "DNI 12345678" → "12345678")
-      const dniRIS = String(r.documento || "").replace(/^(DNI|CIBO|RP)\s*/i, "").trim();
+      const dniRIS = String(r.documento || "")
+        .replace(/^(DNI|CIBO|RP)\s*/i, "").trim().replace(/^0+/, "");
       if (dnisPropios.has(dniRIS)) continue; // ya está en agenda propia
       filas.push({ slot: { tipo: "ris" }, turno: null, mins, esRIS: true, ris: r });
     }

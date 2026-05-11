@@ -52,7 +52,7 @@ const AgendaView = (() => {
     const container = document.getElementById("agenda-container");
     if (!datos || !datos.length) { container.innerHTML = '<div class="empty-state">Sin datos.</div>'; return; }
 
-    const MIN_I = 7*60, MIN_F = 22*60;
+    const MIN_I = 0, MIN_F = 24*60;
     const slots = datos[0].slots.filter(s => s.mins >= MIN_I && s.mins < MIN_F).map(s => s.mins);
 
     let html = '<table class="agenda-table"><thead><tr><th class="col-hora">Hora</th>';
@@ -72,17 +72,17 @@ const AgendaView = (() => {
       // ── Filas RIS intercaladas ──
       // Excluir RIS cuyo documento ya aparece en la agenda propia del día
       const risXDia = datos.map(dia => {
-        // Construir set de documentos ya en agenda propia (turnos)
+        // Construir set de DNIs ya en agenda propia (cualquier tipo que tenga dni)
         const docsEnAgenda = new Set(
           (dia.slots || [])
-            .filter(s => s.tipo === "turno" && s.dni)
-            .map(s => String(s.dni).trim())
+            .filter(s => s.dni)
+            .map(s => String(s.dni).trim().replace(/^0+/, ""))
         );
         return (risMap[dia.fecha] || []).filter(r => {
           const rm = typeof r.mins === "number" ? r.mins : parsearMinsJS(r.hora);
           if (rm < mins || rm >= mins + _paso) return false;
-          // Extraer número de DNI del documento RIS (ej: "DNI 12345678" → "12345678")
-          const dniRIS = String(r.documento || "").replace(/^(DNI|CIBO|RP)\s*/i, "").trim();
+          const dniRIS = String(r.documento || "")
+            .replace(/^(DNI|CIBO|RP)\s*/i, "").trim().replace(/^0+/, "");
           return !docsEnAgenda.has(dniRIS);
         });
       });
