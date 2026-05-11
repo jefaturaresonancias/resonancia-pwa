@@ -85,7 +85,7 @@ const App = (() => {
   }
 
   // ── PIN de jefatura ──────────────────────────────────────
-  const PIN_CORRECTO = "1234"; // ← CAMBIÁ ESTE PIN
+  const PIN_CORRECTO = "1504"; // ← CAMBIÁ ESTE PIN
   let _pinActual = "";
 
   function _initPin() {
