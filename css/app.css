@@ -552,3 +552,82 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
   letter-spacing: .08em !important;
   padding: 10px 12px !important;
 }
+
+/* ── WORKLIST TÉCNICO — TARJETAS ─────────────────────────────*/
+.lista-cards-wrap { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+
+.card-turno {
+  background: var(--surface);
+  border-radius: 10px;
+  border: 1px solid #c8d4e8;
+  border-bottom: 3px solid var(--navy);
+  padding: 10px 14px;
+  display: grid;
+  grid-template-columns: 72px 1fr auto;
+  gap: 0 12px;
+  align-items: center;
+}
+.card-turno.presente {
+  border-color: #b0d8b8;
+  border-bottom-color: #4a9e5c;
+  background: #f5fbf6;
+}
+.hora-big     { font-size: 20px; font-weight: 800; color: var(--navy); line-height: 1; }
+.hora-big.ok  { color: var(--success); }
+.hora-sub     { font-size: 9px; color: var(--text-3); font-weight: 600; letter-spacing: .05em; margin-top: 3px; }
+.card-nombre  { font-size: 14px; font-weight: 700; color: var(--text); }
+.card-nombre.ok { color: var(--success); }
+.card-estudio { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+.card-meta    { display: flex; gap: 8px; margin-top: 4px; align-items: center; flex-wrap: wrap; }
+.card-dni     { font-size: 11px; font-family: monospace; color: var(--text-3); }
+.card-obs     { font-size: 11px; color: var(--text-3); font-style: italic; }
+.card-right   { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+
+.btn-card-pres {
+  padding: 7px 16px; border-radius: 8px;
+  border: 1.5px solid var(--navy); background: transparent;
+  color: var(--navy); font-size: 12px; font-weight: 700; cursor: pointer;
+  transition: background .15s;
+}
+.btn-card-pres:hover { background: var(--navy); color: #fff; }
+.btn-card-done {
+  padding: 7px 16px; border-radius: 8px;
+  border: 1.5px solid var(--success); background: var(--success-bg);
+  color: var(--success); font-size: 12px; font-weight: 700;
+}
+.btn-card-anular {
+  padding: 4px 10px; border-radius: 6px;
+  border: 1px solid #e0b0b0; background: transparent;
+  color: #c08080; font-size: 10px; font-weight: 600; cursor: pointer;
+}
+.btn-card-anular:hover { background: var(--danger-bg); color: var(--danger); border-color: var(--danger); }
+.origen-tag-card {
+  font-size: 10px; font-weight: 700; padding: 2px 9px;
+  border-radius: 10px; border: 1px solid;
+}
+.origen-tag-card.int { background: #fff8e1; border-color: #c9a000; color: #7a4f00; }
+
+.row-ris {
+  display: grid;
+  grid-template-columns: 72px 1fr auto;
+  gap: 0 12px;
+  padding: 5px 14px;
+  border-left: 3px dashed #ccc;
+  border-radius: 6px;
+  background: #f4f4f4;
+  align-items: center;
+  margin-left: 4px;
+}
+.hora-ris    { font-size: 12px; font-weight: 600; color: #bbb; }
+.ris-body    { min-width: 0; }
+.ris-nombre  { font-size: 12px; color: #888; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ris-estudio { font-size: 11px; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ris-badge   {
+  font-size: 9px; font-weight: 700; letter-spacing: .05em;
+  background: #e0e0e0; color: #888;
+  padding: 2px 7px; border-radius: 8px; white-space: nowrap;
+}
+
+/* Ocultar tabla cuando el técnico usa tarjetas */
+.tecnico-cards #tabla-turnos { display: none; }
+.admin-tabla #lista-cards { display: none; }

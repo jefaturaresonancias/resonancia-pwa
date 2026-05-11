@@ -85,6 +85,111 @@ const ListaView = (() => {
 
     const esTecnico = Config.getRol() === "tecnico";
 
+    // Mostrar contenedor correcto
+    const listaContainer = document.getElementById("lista-container");
+    if (esTecnico) {
+      listaContainer.classList.add("tecnico-cards");
+      listaContainer.classList.remove("admin-tabla");
+    } else {
+      listaContainer.classList.add("admin-tabla");
+      listaContainer.classList.remove("tecnico-cards");
+    }
+
+    // Vista técnico: layout de tarjetas
+    if (esTecnico) {
+      const contenedor = document.getElementById("lista-cards");
+      const tablaWrap  = document.getElementById("lista-container");
+      if (contenedor) {
+        contenedor.innerHTML = filasFiltradas.map(fila => {
+          const { slot, turno, mins, esRIS } = fila;
+          if (!turno && !esRIS) return "";
+          const h = String(Math.floor(mins/60)).padStart(2,"0");
+          const m = String(mins%60).padStart(2,"0");
+          const hora = `${h}:${m}`;
+
+          if (esRIS) {
+            const r = fila.ris;
+            return `<div class="row-ris">
+              <div class="hora-ris">${hora}</div>
+              <div class="ris-body">
+                <div class="ris-nombre">${r.apellido_nombre}</div>
+                <div class="ris-estudio">${r.practica}</div>
+              </div>
+              <span class="ris-badge">RIS</span>
+            </div>`;
+          }
+
+          const pres    = turno.presente === "Presente";
+          const est     = _origen(turno.origen);
+          const origen  = turno.origen || "";
+          const origenUp = origen.toUpperCase();
+          const esInt   = origenUp.includes("INTERN");
+          const presBadge = pres
+            ? `<span class="btn-card-done">✓ Presente</span>`
+            : `<button class="btn-card-pres" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}">Presente</button>`;
+
+          return `<div class="card-turno ${pres?"presente":""}">
+            <div>
+              <div class="hora-big ${pres?"ok":""}">${hora}</div>
+              <div class="hora-sub">${origenUp}</div>
+            </div>
+            <div class="card-body">
+              <div class="card-nombre ${pres?"ok":""}">${turno.apellido}, ${turno.nombre}</div>
+              <div class="card-estudio">${turno.estudio}</div>
+              <div class="card-meta">
+                <span class="card-dni">${turno.dni}</span>
+                ${turno.observaciones ? `<span class="card-obs">${turno.observaciones}</span>` : ""}
+              </div>
+            </div>
+            <div class="card-right">
+              ${esInt ? `<span class="origen-tag-card int">Internación</span>` : ""}
+              ${presBadge}
+              <button class="btn-card-anular" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}">Anular</button>
+            </div>
+          </div>`;
+        }).join("");
+
+        // Bind botones
+        contenedor.querySelectorAll(".btn-card-pres").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const fila   = parseInt(btn.dataset.fila);
+            const nombre = btn.dataset.nombre;
+            if (!confirm(`¿Dar presente a ${nombre}?`)) return;
+            btn.disabled = true; btn.textContent = "Guardando…";
+            try {
+              await API.presente(fila);
+              App.toast(`Presente: ${nombre}`, "ok");
+              await cargar();
+            } catch(err) {
+              App.toast("Error: "+err.message, "error");
+              btn.disabled = false; btn.textContent = "Presente";
+            }
+          });
+        });
+
+        contenedor.querySelectorAll(".btn-card-anular").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const fila   = parseInt(btn.dataset.fila);
+            const nombre = btn.dataset.nombre;
+            if (!confirm(`¿Anular el turno de ${nombre}?
+
+Esta acción no se puede deshacer.`)) return;
+            btn.disabled = true;
+            try {
+              await API.anular(fila);
+              App.toast(`Turno anulado: ${nombre}`, "ok");
+              await cargar();
+            } catch(err) {
+              App.toast("Error: "+err.message, "error");
+              btn.disabled = false;
+            }
+          });
+        });
+      }
+      document.getElementById("lista-empty").classList.toggle("hidden", filasFiltradas.some(f=>f.turno||f.esRIS));
+      return;
+    }
+
     tbody.innerHTML = filasFiltradas.map((fila) => {
       const { slot, turno, mins, esRIS } = fila;
       const h = String(Math.floor(mins/60)).padStart(2,"0");
