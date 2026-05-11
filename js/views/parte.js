@@ -96,7 +96,39 @@ const ParteView = (() => {
     }
 
     if (!documento || !apellido) return null;
-    return { hora, documento, apellido_nombre: apellido, practica };
+    return { hora, documento, apellido_nombre: apellido, practica: _acortarPractica(practica) };
+  }
+
+  // ── Acortar práctica: quita prefijos largos y deja solo región + modalidad ──
+  function _acortarPractica(practica) {
+    if (!practica) return "";
+
+    // Separar por " - " para manejar múltiples estudios
+    const partes = practica.split(/\s*-\s*/);
+    const acortadas = partes.map(p => {
+      let s = p.trim().toUpperCase();
+
+      // Quitar prefijos comunes
+      const prefijos = [
+        "RESONANCIA MAGNETICA DE ",
+        "RESONANCIA MAGNETICA FUNCIONAL DE ",
+        "RESONANCIA MAGNETICA ",
+        "ANGIORRESONANCIA DE ",
+        "ANGIORRESONANCIA ",
+        "COLANGIORRESONANCIA DE ",
+        "COLANGIORRESONANCIA ",
+        "COLANGIO RESONANCIA DE ",
+        "COLANGIO-RESONANCIA DE ",
+      ];
+      for (const pref of prefijos) {
+        if (s.startsWith(pref)) { s = s.slice(pref.length); break; }
+      }
+
+      // Capitalizar primera letra de cada palabra clave
+      return s.charAt(0) + s.slice(1).toLowerCase();
+    });
+
+    return acortadas.join(" · ");
   }
 
   function _parsearTexto(texto) {
