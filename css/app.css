@@ -484,3 +484,71 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 .cal-barra-ris-wrap { margin-top: 3px; }
 .cal-barra-ris { background: #ccc; height: 3px; border-radius: 2px; }
 .cal-pie-ris { color: #888; font-weight: 600; }
+
+/* ── MEJORAS VISUALES VISTA TÉCNICO ─────────────────────────*/
+
+/* Filas de turno propio — más altura y jerarquía clara */
+#tabla-turnos tbody tr:not(.fila-ris-row):not(.fila-libre) {
+  border-left: 4px solid #1a3a5c;
+  border-bottom: 1px solid var(--border);
+}
+#tabla-turnos tbody tr:not(.fila-ris-row):not(.fila-libre) td {
+  padding: 10px 12px;
+}
+#tabla-turnos .td-hora {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--navy);
+  white-space: nowrap;
+  letter-spacing: -.3px;
+}
+#tabla-turnos .td-nombre { font-size: 14px; font-weight: 700; }
+
+/* Fila RIS — discreta, borde punteado */
+.fila-ris-row {
+  background: #f7f7f7;
+  border-left: 3px dashed #ccc !important;
+  border-bottom: 1px solid #eeeeee !important;
+}
+.fila-ris-row td { padding: 5px 12px !important; }
+.ris-nombre { font-size: 12px; color: #888; font-style: italic; }
+.ris-dni    { font-size: 11px; color: #aaa; font-family: monospace; }
+.ris-estudio{ font-size: 11px; color: #999; }
+.ris-badge  {
+  font-size: 9px; font-weight: 700; letter-spacing: .05em;
+  background: #e8e8e8; color: #888;
+  padding: 2px 7px; border-radius: 8px;
+  text-transform: uppercase;
+}
+
+/* Presente ya marcado — fila verde suave */
+#tabla-turnos tbody tr.presente-row {
+  background: #f0faf0 !important;
+  border-left: 4px solid #4a9e5c !important;
+}
+#tabla-turnos tbody tr.presente-row .td-hora { color: #2e7d32; }
+
+/* Botón presente más grande y visible */
+.btn-presente {
+  padding: 7px 18px !important;
+  font-size: 12px !important;
+  border-radius: var(--radius) !important;
+  font-weight: 700 !important;
+}
+
+/* Stats bar más informativa */
+#lista-stats {
+  font-size: 13px;
+  font-weight: 600;
+  padding: .6rem 1.25rem;
+  background: var(--navy);
+  color: rgba(255,255,255,.85);
+  border-bottom: none;
+}
+
+/* Header de la tabla sticky más visible */
+#tabla-turnos thead th {
+  font-size: 10px !important;
+  letter-spacing: .08em !important;
+  padding: 10px 12px !important;
+}

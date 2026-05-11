@@ -96,14 +96,22 @@ const ListaView = (() => {
 
       // ── FILA RIS ──
       if (esRIS) {
-        const r = fila.ris;
-        return `<tr style="background:#f5f5f5;border-left:3px solid #bbb">
-          <td class="td-hora" style="color:#999">${hora}</td>
-          <td style="color:#888;font-style:italic">${r.apellido_nombre}</td>
-          <td colspan="2" style="color:#aaa;font-size:11px;font-style:italic">${r.documento}</td>
-          <td colspan="2" style="color:#aaa;font-size:11px">${r.practica}</td>
+        const r    = fila.ris;
+        // Separar "APELLIDO, NOMBRE" en partes
+        const partes   = (r.apellido_nombre || "").split(",");
+        const apellido = (partes[0] || "").trim();
+        const nombre   = (partes[1] || "").trim();
+        // Extraer solo el número del documento
+        const dniNum   = String(r.documento || "").replace(/^(DNI|CIBO|RP)\s*/i,"").trim();
+        return `<tr class="fila-ris-row">
+          <td class="td-hora" style="color:#999;font-size:13px">${hora}</td>
+          <td class="ris-nombre">${nombre}</td>
+          <td class="ris-nombre">${apellido}</td>
+          <td class="ris-dni">${dniNum}</td>
+          <td class="ris-estudio">${r.practica}</td>
+          <td><span class="ris-badge">RIS</span></td>
           <td></td>
-          <td><span style="font-size:10px;background:#eee;color:#888;padding:2px 8px;border-radius:10px;font-weight:600">RIS</span></td>
+          <td></td>
           <td></td>
         </tr>`;
       }
