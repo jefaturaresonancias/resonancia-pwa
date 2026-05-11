@@ -49,10 +49,16 @@ const ListaView = (() => {
       }
     }
 
-    // Agregar filas RIS intercaladas
+    // Agregar filas RIS intercaladas — excluir duplicados con agenda propia
+    const dnisPropios = new Set(
+      turnos.map(t => String(t.dni).trim())
+    );
     for (const r of risDelDia) {
       const mins = _parseMins(r.hora);
       if (mins < MIN_I || mins >= MIN_F) continue;
+      // Extraer número del documento RIS (ej: "DNI 12345678" → "12345678")
+      const dniRIS = String(r.documento || "").replace(/^(DNI|CIBO|RP)\s*/i, "").trim();
+      if (dnisPropios.has(dniRIS)) continue; // ya está en agenda propia
       filas.push({ slot: { tipo: "ris" }, turno: null, mins, esRIS: true, ris: r });
     }
     filas.sort((a, b) => a.mins - b.mins);

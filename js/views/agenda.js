@@ -70,13 +70,22 @@ const AgendaView = (() => {
       html += "</tr>";
 
       // ── Filas RIS intercaladas ──
-      // Usar r.mins (ya viene calculado del servidor) para comparar con el slot actual
-      const risXDia = datos.map(dia =>
-        (risMap[dia.fecha] || []).filter(r => {
+      // Excluir RIS cuyo documento ya aparece en la agenda propia del día
+      const risXDia = datos.map(dia => {
+        // Construir set de documentos ya en agenda propia (turnos)
+        const docsEnAgenda = new Set(
+          (dia.slots || [])
+            .filter(s => s.tipo === "turno" && s.dni)
+            .map(s => String(s.dni).trim())
+        );
+        return (risMap[dia.fecha] || []).filter(r => {
           const rm = typeof r.mins === "number" ? r.mins : parsearMinsJS(r.hora);
-          return rm >= mins && rm < mins + _paso;
-        })
-      );
+          if (rm < mins || rm >= mins + _paso) return false;
+          // Extraer número de DNI del documento RIS (ej: "DNI 12345678" → "12345678")
+          const dniRIS = String(r.documento || "").replace(/^(DNI|CIBO|RP)\s*/i, "").trim();
+          return !docsEnAgenda.has(dniRIS);
+        });
+      });
       const maxRIS = Math.max(...risXDia.map(d => d.length), 0);
       for (let ri = 0; ri < maxRIS; ri++) {
         const risHora = risXDia.find(d => d[ri])?.[ri]?.hora || "";
