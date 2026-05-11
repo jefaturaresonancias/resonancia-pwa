@@ -217,10 +217,23 @@ const AgendaView = (() => {
 
       let contenido = "";
       if (!res) {
-        contenido = `<div class="cal-num">${dia}</div>`;
+        const DIAS_C2 = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+        contenido = `
+          <div class="cal-d-head">
+            <span class="cal-d-num">${dia}</span>
+            <span class="cal-d-name">${DIAS_C2[fechaDate.getDay()]}</span>
+          </div>`;
       } else if (res.esFeriado) {
         cls += " cal-dia-feriado";
-        contenido = `<div class="cal-num">${dia}</div><div class="cal-feriado-label">🚫 ${res.feriado||"Feriado"}</div>`;
+        const DIAS_C = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+        contenido = `
+          <div class="cal-d-head cal-d-head-fer">
+            <span class="cal-d-num">${dia}</span>
+            <span class="cal-d-name" style="color:#c05050">${DIAS_C[fechaDate.getDay()]}</span>
+          </div>
+          <div class="cal-d-body">
+            <div class="cal-feriado-label">🚫 ${res.feriado||"Feriado"}</div>
+          </div>`;
       } else {
         const total = res.libres + res.ocupados;
         const pct   = total > 0 ? res.libres/total : 0;
@@ -230,18 +243,25 @@ const AgendaView = (() => {
         const barOcup = total>0 ? Math.round((res.ocupados/total)*100) : 0;
 
         const risDelDia = (risMes[fechaStr] || []).length;
+        const DIAS_CORTO = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+        const nomDia = DIAS_CORTO[fechaDate.getDay()];
         contenido = `
-          <div class="cal-num">${dia}</div>
-          <div class="cal-contadores">
-            <span class="cal-lib-badge" title="Slots libres">▲ ${res.libres}</span>
-            <span class="cal-ocu-badge" title="Turnos asignados">● ${res.ocupados}</span>
-            ${risDelDia > 0 ? `<span class="cal-ris-badge" title="Turnos RIS">📋 ${risDelDia}</span>` : ""}
+          <div class="cal-d-head">
+            <span class="cal-d-num">${dia}</span>
+            <span class="cal-d-name">${nomDia}</span>
           </div>
-          <div class="cal-barra">
-            <div class="cal-barra-ocu" style="width:${barOcup}%"></div>
-            <div class="cal-barra-lib" style="width:${100-barOcup}%"></div>
-          </div>
-          ${risDelDia > 0 ? `<div class="cal-barra cal-barra-ris-wrap"><div class="cal-barra-ris" style="width:100%"></div></div>` : ""}`;
+          <div class="cal-d-body">
+            <div class="cal-barra">
+              <div class="cal-barra-ocu" style="width:${barOcup}%"></div>
+              <div class="cal-barra-lib" style="width:${100-barOcup}%"></div>
+            </div>
+            ${risDelDia > 0 ? `<div class="cal-barra-ris-wrap"><div class="cal-barra-ris"></div></div>` : ""}
+            <div class="cal-contadores">
+              <span class="cal-ocu-badge">● ${res.ocupados}</span>
+              <span class="cal-lib-badge">▲ ${res.libres}</span>
+              ${risDelDia > 0 ? `<span class="cal-ris-badge">📋 ${risDelDia}</span>` : ""}
+            </div>
+          </div>`;
       }
 
       html += `<td class="${cls}" data-fecha="${fechaStr}" title="Clic para ver semana">${contenido}</td>`;
