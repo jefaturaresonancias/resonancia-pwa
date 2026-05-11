@@ -68,37 +68,33 @@ const AgendaView = (() => {
         html += s ? _renderSlot(s, dia.fecha, mins) : "<td></td>";
       }
       html += "</tr>";
-      // Filas RIS para este slot
-      const risEnSlot = [];
-      for (const dia of datos) {
-        const ris = (risMap[dia.fecha] || []).filter(r => {
-          const rm = parsearMinsJS(r.hora);
+
+      // ── Filas RIS intercaladas ──
+      // Usar r.mins (ya viene calculado del servidor) para comparar con el slot actual
+      const risXDia = datos.map(dia =>
+        (risMap[dia.fecha] || []).filter(r => {
+          const rm = typeof r.mins === "number" ? r.mins : parsearMinsJS(r.hora);
           return rm >= mins && rm < mins + _paso;
-        });
-        risEnSlot.push({ fecha: dia.fecha, ris });
-      }
-      const hayRIS = risEnSlot.some(d => d.ris.length > 0);
-      if (hayRIS) {
-        for (const risEntry of risEnSlot[0]?.ris?.length ? [0] : []) { break; }
-        // Una fila RIS por cada turno RIS en cualquier día del slot
-        const maxRIS = Math.max(...risEnSlot.map(d => d.ris.length), 0);
-        for (let ri = 0; ri < maxRIS; ri++) {
-          html += `<tr>`;
-          html += `<td class="col-hora" style="font-size:9px;color:#aaa;background:#f4f4f4">RIS</td>`;
-          for (const d of risEnSlot) {
-            const r = d.ris[ri];
-            if (r) {
-              html += `<td class="slot-ris" title="${r.apellido_nombre} — ${r.practica}">
-                <div class="slot-content">
-                  <span class="slot-nombre" style="color:#888">${r.apellido_nombre}</span>
-                  <span class="slot-estudio" style="color:#aaa">${r.practica}</span>
-                </div></td>`;
-            } else {
-              html += `<td class="slot-ris-vacio"></td>`;
-            }
+        })
+      );
+      const maxRIS = Math.max(...risXDia.map(d => d.length), 0);
+      for (let ri = 0; ri < maxRIS; ri++) {
+        html += `<tr>`;
+        html += `<td class="col-hora" style="font-size:9px;color:#aaa;background:#f0f0f0;font-weight:600">RIS</td>`;
+        for (let di = 0; di < datos.length; di++) {
+          const r = risXDia[di][ri];
+          if (r) {
+            html += `<td class="slot-ris" style="background:#f4f4f4;border-left:2px dashed #bbb"
+              title="${r.apellido_nombre} — ${r.practica}">
+              <div class="slot-content">
+                <span class="slot-nombre" style="color:#888;font-style:italic">${r.apellido_nombre}</span>
+                <span class="slot-estudio" style="color:#aaa;font-size:10px">${r.practica} <span style="background:#e0e0e0;color:#777;border-radius:4px;padding:0 4px;font-size:9px;font-weight:700">RIS</span></span>
+              </div></td>`;
+          } else {
+            html += `<td style="background:#fafafa;border:1px solid #f0f0f0"></td>`;
           }
-          html += `</tr>`;
         }
+        html += `</tr>`;
       }
     }
     html += "</tbody></table>";
