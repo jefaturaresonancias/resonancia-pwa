@@ -257,6 +257,15 @@ const App = (() => {
     });
   }
 
+  // Abrir formulario con aviso de RIS en ese horario
+  function abrirTurnoConRIS(fecha, hora, risNombre, risPractica) {
+    showView("turno");
+    TurnoView.cargarEstudios().then(() => {
+      TurnoView.prefill(fecha, hora);
+      TurnoView.mostrarAvisoRIS(risNombre, risPractica);
+    });
+  }
+
   function irAListaDia(fechaStr) {
     ListaView.setFecha(fechaStr);
     showView("lista");
@@ -269,7 +278,7 @@ const App = (() => {
     });
   }
 
-  return { init, toast, showView, abrirTurnoConFechaHora, abrirTurnoConCondicion, mostrarOpcionesTurno, refrescarAgenda, irAListaDia };
+  return { init, toast, showView, abrirTurnoConFechaHora, abrirTurnoConCondicion, abrirTurnoConRIS, mostrarOpcionesTurno, refrescarAgenda, irAListaDia };
 })();
 
 // Arrancar cuando el DOM esté listo

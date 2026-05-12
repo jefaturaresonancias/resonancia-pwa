@@ -264,7 +264,26 @@ const TurnoView = (() => {
     document.getElementById("form-turno").addEventListener("submit", _confirmar);
   }
 
-  return { init, prefill, cargarEstudios };
+  function mostrarAvisoRIS(nombre, practica) {
+    // Eliminar aviso anterior
+    const prev = document.getElementById("turno-ris-aviso");
+    if (prev) prev.remove();
+
+    const aviso = document.createElement("div");
+    aviso.id = "turno-ris-aviso";
+    aviso.style.cssText = "background:#f0f0f0;border-left:4px dashed #bbb;padding:10px 14px;border-radius:6px;font-size:12px;color:#555;margin-bottom:1rem";
+    aviso.innerHTML = `
+      <div style="font-weight:700;color:#888;margin-bottom:4px">⚠️ Sobreturno — hay un paciente RIS en este horario</div>
+      <div style="font-style:italic">${nombre}</div>
+      <div style="font-size:11px;color:#aaa">${practica}</div>
+      <div style="margin-top:6px;font-size:11px;color:#c07000;font-weight:600">
+        Verificá la demora antes de confirmar. El sobreturno se agrega después del paciente RIS.
+      </div>`;
+    const form = document.querySelector(".turno-form");
+    form.insertBefore(aviso, form.firstChild);
+  }
+
+  return { init, prefill, cargarEstudios, mostrarAvisoRIS };
 })();
 
 

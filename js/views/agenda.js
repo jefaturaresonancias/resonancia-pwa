@@ -119,6 +119,52 @@ const AgendaView = (() => {
     _bindSlotClicks(container);
   }
 
+  // ── Celda combinada: turno propio + RIS en la misma fila ──
+  function _renderCeldaCombinada(slot, risSlot, fecha, mins) {
+    const tipo    = slot ? slot.tipo || "libre" : "libre";
+    const tieneRIS = risSlot && risSlot.length > 0;
+    const ris      = tieneRIS ? risSlot[0] : null; // mostrar el primero si hay varios
+
+    // Si hay turno propio + RIS → celda dividida side by side
+    if (tipo === "turno" && tieneRIS) {
+      const col = _coloresOrigen(slot.origen);
+      const pres = slot.presente === "Presente" ? "✅" : "";
+      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}`;
+      return `<td style="padding:0;border:1px solid #e4e8ee;height:36px">
+        <div style="display:flex;height:100%;gap:1px">
+          <div class="slot-turno slot-content" style="flex:1;background:${slot.color||"#a8d5a2"};border-left:3px solid ${col.border};cursor:pointer;overflow:hidden"
+            data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}">
+            <span class="slot-nombre" style="color:${col.text}">${slot.apellido}, ${slot.nombre} ${pres}</span>
+            <span class="slot-estudio" style="color:${col.text}">${slot.estudio}</span>
+          </div>
+          <div class="slot-ris-side slot-content" style="flex:1;background:#f0f0f0;border-left:2px dashed #bbb;cursor:pointer;overflow:hidden"
+            data-fecha="${fecha}" data-mins="${mins}" data-ris-nombre="${encodeURIComponent(ris.apellido_nombre)}" data-ris-practica="${encodeURIComponent(ris.practica)}"
+            title="RIS: ${ris.apellido_nombre} — ${ris.practica}\nClic para asignar sobreturno">
+            <span class="slot-nombre" style="color:#888;font-style:italic;font-size:10px">${ris.apellido_nombre}</span>
+            <span class="slot-estudio" style="color:#aaa;font-size:9px">${ris.practica} <span style="background:#ddd;color:#777;border-radius:3px;padding:0 3px;font-size:8px">RIS</span></span>
+          </div>
+        </div>
+      </td>`;
+    }
+
+    // Si hay solo RIS (slot libre o bloqueo) → celda RIS clickeable
+    if (tieneRIS && (tipo === "libre" || tipo === "continuacion")) {
+      return `<td class="slot-ris-clickable" style="background:#f4f4f4;border-left:2px dashed #bbb;border:1px solid #e4e8ee;cursor:pointer"
+        data-fecha="${fecha}" data-mins="${mins}"
+        data-ris-nombre="${encodeURIComponent(ris.apellido_nombre)}" data-ris-practica="${encodeURIComponent(ris.practica)}"
+        title="RIS: ${ris.apellido_nombre}\nClic para asignar sobreturno aquí">
+        <div class="slot-content">
+          <span class="slot-nombre" style="color:#888;font-style:italic">${ris.apellido_nombre}</span>
+          <span class="slot-estudio" style="color:#aaa;font-size:10px">${ris.practica} <span style="background:#ddd;color:#777;border-radius:3px;padding:0 3px;font-size:9px">RIS</span></span>
+        </div>
+      </td>`;
+    }
+
+    // Default: render normal
+    if (!slot) return "<td></td>";
+    return _renderSlot(slot, fecha, mins);
+  }
+
   function _renderSlot(slot, fecha, mins) {
     const tipo = slot.tipo || "libre";
     const bg   = slot.color || "#fff";

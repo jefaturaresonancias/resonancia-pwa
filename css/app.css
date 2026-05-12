@@ -789,3 +789,13 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
   padding: 6px 12px; border-radius: var(--radius);
   font-size: 13px; color: var(--navy);
 }
+
+/* ── CELDA COMBINADA TURNO + RIS SIDE BY SIDE ────────────────*/
+.slot-ris-side {
+  transition: filter .1s;
+}
+.slot-ris-side:hover { filter: brightness(.92); }
+.slot-ris-clickable {
+  transition: background .1s;
+}
+.slot-ris-clickable:hover { background: #ebebeb !important; }
