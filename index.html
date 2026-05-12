@@ -226,91 +226,10 @@
           </div>
         </div>
 
-        <!-- ── VISTA: NUEVO TURNO ─── -->
+        <!-- ── VISTA: NUEVO TURNO — usa panel flotante ─── -->
         <div id="view-turno" class="view hidden">
-          <div class="view-header">
-            <h2>Asignar nuevo turno</h2>
-            <button id="btn-turno-volver" class="btn-ghost" style="background:transparent;border:1px solid var(--border);color:var(--text-2);padding:5px 14px;border-radius:var(--radius);font-size:12px;font-weight:600">← Volver</button>
-          </div>
-          <div class="turno-form-container">
-            <form id="form-turno" class="turno-form" autocomplete="off">
-
-              <div class="form-row">
-                <div class="form-group">
-                  <label>Nombre *</label>
-                  <input type="text" id="t-nombre" required placeholder="Nombre del paciente">
-                </div>
-                <div class="form-group">
-                  <label>Apellido *</label>
-                  <input type="text" id="t-apellido" required placeholder="Apellido">
-                </div>
-                <div class="form-group">
-                  <label>DNI *</label>
-                  <input type="number" id="t-dni" required placeholder="Sin puntos ni guiones" min="1000000" max="99999999">
-                </div>
-              </div>
-
-              <!-- Estudios múltiples -->
-              <div class="form-row" style="flex-direction:column;gap:6px">
-                <div class="form-group">
-                  <label>Estudios *</label>
-                  <div style="display:flex;gap:6px;align-items:center">
-                    <input type="text" id="t-estudio-buscar" placeholder="Buscar estudio…" style="width:200px;font-size:12px">
-                    <select id="t-estudio-sel" style="flex:1;font-size:12px">
-                      <option value="">— Seleccionar —</option>
-                    </select>
-                    <button type="button" id="btn-agregar-estudio" class="btn-primary" style="padding:7px 14px;font-size:12px;white-space:nowrap">+ Agregar</button>
-                  </div>
-                </div>
-                <div id="t-estudios-chips" class="estudios-chips-wrap">
-                  <span style="color:var(--text-3);font-size:12px;font-style:italic">Ningún estudio seleccionado</span>
-                </div>
-                <div id="t-tiempo-total" class="tiempo-total hidden"></div>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group">
-                  <label>Origen *</label>
-                  <select id="t-origen">
-                    <option value="AMBULATORIO">AMBULATORIO</option>
-                    <option value="INTERNACIÓN">INTERNACIÓN</option>
-                    <option value="GUARDIA">GUARDIA</option>
-                    <option value="DIRECCIÓN">DIRECCIÓN</option>
-                    <option value="TRASLADO">TRASLADO</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group">
-                  <label>Fecha *</label>
-                  <input type="date" id="t-fecha" required>
-                </div>
-                <div class="form-group form-wide">
-                  <label>Observaciones / Iniciales</label>
-                  <input type="text" id="t-obs" placeholder="Notas o iniciales del operador">
-                </div>
-              </div>
-
-              <div class="form-row">
-                <button type="button" id="btn-ver-slots" class="btn-primary">
-                  🔎 Ver horarios disponibles
-                </button>
-              </div>
-
-              <div id="slots-container" class="slots-container hidden">
-                <h3>Horarios disponibles</h3>
-                <p id="slots-loading" class="hidden" style="color:#666;font-size:.85rem">Buscando disponibilidad…</p>
-                <div id="slots-grid"></div>
-                <div id="slot-seleccionado" class="slot-seleccionado hidden">
-                  <span id="slot-hora-label"></span>
-                  <button type="submit" id="btn-confirmar" class="btn-success">✓ Confirmar turno</button>
-                </div>
-              </div>
-
-              <div id="turno-result" class="turno-result hidden"></div>
-
-            </form>
+          <div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-3);font-size:.9rem">
+            Usá el panel lateral para asignar turnos
           </div>
         </div>
 
