@@ -698,3 +698,94 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
   padding: 6px 12px; border-radius: var(--radius);
   font-size: 13px; color: var(--navy);
 }
+
+/* ── CALENDARIO MENSUAL — TARJETAS CON PROFUNDIDAD ───────────*/
+.cal-mes-wrap {
+  display: flex !important; flex-direction: column !important;
+  height: 100% !important; padding: .5rem .75rem .75rem !important;
+}
+.cal-mes-table {
+  width: 100% !important; border-collapse: separate !important;
+  border-spacing: 4px !important; table-layout: fixed !important; flex: 1 !important;
+}
+.cal-mes-table thead th {
+  background: var(--navy) !important; color: #fff !important;
+  padding: 8px 4px !important; font-size: 11px !important; font-weight: 700 !important;
+  text-align: center !important; border-radius: 6px !important;
+}
+.cal-dia {
+  border: 1px solid var(--border) !important;
+  border-bottom: 3px solid #c8d4e8 !important;
+  border-radius: 10px !important; padding: 0 !important;
+  cursor: pointer !important; background: var(--surface) !important;
+  height: calc((100vh - 195px) / 6) !important;
+  min-height: 88px !important; overflow: hidden !important;
+  transition: border-bottom-color .12s !important;
+  vertical-align: top !important;
+}
+.cal-dia:hover { border-bottom-color: var(--navy) !important; }
+.cal-dia-vacio { background: var(--bg) !important; border-color: transparent !important; border-bottom-color: transparent !important; cursor: default !important; }
+.cal-dia-vacio:hover { border-bottom-color: transparent !important; }
+.cal-dia-hoy { border-color: var(--navy) !important; border-bottom: 3px solid var(--navy) !important; background: #f4f8ff !important; }
+.cal-dia-feriado { background: #fff5f5 !important; border-color: #f0c0c0 !important; border-bottom: 3px solid #e06666 !important; }
+.cal-dia-lleno { border-bottom: 3px solid #e05555 !important; }
+.cal-dia-casi-lleno { border-bottom: 3px solid #f0c040 !important; }
+
+.cal-d-head {
+  display: flex; align-items: center; gap: 5px;
+  padding: 6px 8px 5px;
+  background: #f4f7fb;
+  border-bottom: 1px solid #e2e8f0;
+}
+.cal-dia-hoy .cal-d-head        { background: #e8f0fb; border-bottom-color: #b0c8e8; }
+.cal-dia-feriado .cal-d-head    { background: #fff0f0; border-bottom-color: #f0c0c0; }
+.cal-dia-lleno .cal-d-head      { background: #fff0f0; border-bottom-color: #f0c0c0; }
+.cal-dia-casi-lleno .cal-d-head { background: #fffbf0; border-bottom-color: #e8d580; }
+
+.cal-d-num  { font-size: 14px; font-weight: 800; color: var(--navy); line-height: 1; }
+.cal-d-name { font-size: 9px; font-weight: 700; color: #aaa; letter-spacing: .05em; text-transform: uppercase; }
+.cal-dia-hoy .cal-d-num {
+  background: var(--navy); color: #fff;
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-size: 11px;
+}
+.cal-dia-hoy .cal-d-name { color: var(--navy); }
+
+.cal-d-body { padding: 6px 8px 5px; }
+.cal-barra {
+  display: flex; height: 8px !important; border-radius: 4px; overflow: hidden;
+  background: var(--border); margin-bottom: 3px;
+}
+.cal-barra-ocu { background: #e05555; }
+.cal-barra-lib { background: #4a9e5c; }
+.cal-barra-ris-wrap { margin-bottom: 3px; }
+.cal-barra-ris      { height: 5px; border-radius: 3px; background: #bbb; }
+.cal-contadores {
+  display: flex; gap: 6px; font-size: 10px; font-weight: 700; flex-wrap: wrap;
+}
+.cal-ocu-badge { color: #c62828; }
+.cal-lib-badge { color: #2e7d32; }
+.cal-ris-badge { color: #888; }
+.cal-feriado-label { font-size: 10px; color: #c05050; font-weight: 600; padding: 4px 0; }
+
+/* ── SELECTOR MÚLTIPLES ESTUDIOS ────────────────────────────*/
+.estudios-chips-wrap {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  min-height: 32px; padding: 4px 0;
+}
+.estudio-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--accent-lt); color: var(--navy);
+  border: 1px solid var(--accent); border-radius: 20px;
+  padding: 4px 10px 4px 12px; font-size: 12px; font-weight: 600;
+}
+.chip-remove {
+  background: none; border: none; cursor: pointer;
+  color: var(--navy); font-size: 14px; line-height: 1; padding: 0 2px; opacity: .6;
+}
+.chip-remove:hover { opacity: 1; }
+.tiempo-total {
+  background: #e8f4ff; border-left: 3px solid var(--accent);
+  padding: 6px 12px; border-radius: var(--radius);
+  font-size: 13px; color: var(--navy);
+}
