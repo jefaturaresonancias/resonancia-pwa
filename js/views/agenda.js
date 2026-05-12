@@ -167,8 +167,17 @@ const AgendaView = (() => {
         App.abrirTurnoConRIS(td.dataset.fecha, hora, nombre, practica);
       });
     });
-  }
-  
+
+    container.querySelectorAll(".slot-ris-side").forEach(div => {
+      div.addEventListener("click", () => {
+        const mins     = parseInt(div.dataset.mins);
+        const nombre   = decodeURIComponent(div.dataset.risNombre || "");
+        const practica = decodeURIComponent(div.dataset.risPractica || "");
+        const hora     = String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0");
+        App.abrirTurnoConRIS(div.dataset.fecha, hora, nombre, practica);
+      });
+    });
+
     let tip = null;
     container.querySelectorAll("[data-tooltip]").forEach(td => {
       td.addEventListener("mouseenter", e => {
@@ -183,6 +192,7 @@ const AgendaView = (() => {
       td.addEventListener("click", () => { if(td.dataset.fila) App.mostrarOpcionesTurno(td.dataset.fila); });
     });
   }
+
   function _posTip(e, el) {
     el.style.left = Math.min(e.clientX+12, window.innerWidth -el.offsetWidth -8)+"px";
     el.style.top  = Math.min(e.clientY+12, window.innerHeight-el.offsetHeight-8)+"px";
