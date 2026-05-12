@@ -157,6 +157,18 @@ const AgendaView = (() => {
           String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0"));
       });
     });
+
+    container.querySelectorAll(".slot-ris-clickable").forEach(td => {
+      td.addEventListener("click", () => {
+        const mins     = parseInt(td.dataset.mins);
+        const nombre   = decodeURIComponent(td.dataset.risNombre || "");
+        const practica = decodeURIComponent(td.dataset.risPractica || "");
+        const hora     = String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0");
+        App.abrirTurnoConRIS(td.dataset.fecha, hora, nombre, practica);
+      });
+    });
+  }
+  
     let tip = null;
     container.querySelectorAll("[data-tooltip]").forEach(td => {
       td.addEventListener("mouseenter", e => {
