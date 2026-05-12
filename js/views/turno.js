@@ -285,11 +285,10 @@ const TurnoView = (() => {
 
   // ── Panel flotante ───────────────────────────────────────
   function abrirPanel(fecha, hora, condicion, ris) {
-    const panel = document.getElementById("turno-panel");
-    panel.classList.remove("panel-hidden");
-    panel.classList.add("panel-visible");
-    document.getElementById("panel-overlay").classList.remove("hidden");
-
+    const panel   = document.getElementById("turno-panel");
+    const overlay = document.getElementById("panel-overlay");
+    panel.style.display   = "flex";
+    overlay.style.display = "block";
     cargarEstudios().then(() => {
       prefill(fecha, hora, condicion);
       if (ris) mostrarAvisoRIS(ris.nombre, ris.practica);
@@ -297,10 +296,8 @@ const TurnoView = (() => {
   }
 
   function cerrarPanel() {
-    const panel = document.getElementById("turno-panel");
-    panel.classList.remove("panel-visible");
-    panel.classList.add("panel-hidden");
-    document.getElementById("panel-overlay").classList.add("hidden");
+    document.getElementById("turno-panel").style.display   = "none";
+    document.getElementById("panel-overlay").style.display = "none";
     _resetForm();
   }
 
