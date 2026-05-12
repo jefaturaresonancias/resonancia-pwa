@@ -63,56 +63,24 @@ const AgendaView = (() => {
       const h = String(Math.floor(mins/60)).padStart(2,"0");
       const m = String(mins%60).padStart(2,"0");
       html += `<tr><td class="col-hora">${h}:${m}</td>`;
+
       for (const dia of datos) {
-        const s = dia.slots.find(s => s.mins === mins);
-        html += s ? _renderSlot(s, dia.fecha, mins) : "<td></td>";
+        const s = dia.slots.find(sl => sl.mins === mins);
+
+        // RIS filtrado sin duplicados
+        const dniAgenda   = new Set((dia.slots||[]).filter(sl=>sl.dni).map(sl=>String(sl.dni).trim().replace(/^0+/,"")));
+        const apellAgenda = new Set((dia.slots||[]).filter(sl=>sl.apellido).map(sl=>sl.apellido.trim().toUpperCase()));
+        const risSlot = (risMap[dia.fecha]||[]).filter(r => {
+          const rm = typeof r.mins==="number" ? r.mins : parsearMinsJS(r.hora);
+          if (rm < mins || rm >= mins + _paso) return false;
+          const dniRIS   = String(r.documento||"").replace(/^(DNI|CIBO|RP)\s*/i,"").trim().replace(/^0+/,"");
+          const apellRIS = String(r.apellido_nombre||"").split(",")[0].trim().toUpperCase();
+          return !dniAgenda.has(dniRIS) && !apellAgenda.has(apellRIS);
+        });
+
+        html += _renderCeldaCombinada(s, risSlot, dia.fecha, mins);
       }
       html += "</tr>";
-
-      // ── Filas RIS intercaladas ──
-      // Excluir RIS cuyo documento ya aparece en la agenda propia del día
-      const risXDia = datos.map(dia => {
-        // Construir sets de DNI y apellido desde todos los slots con datos
-        const dniAgenda = new Set();
-        const apellAgenda = new Set();
-        for (const s of (dia.slots || [])) {
-          if (s.dni) dniAgenda.add(String(s.dni).trim().replace(/^0+/, ""));
-          if (s.apellido) apellAgenda.add(s.apellido.trim().toUpperCase());
-        }
-        return (risMap[dia.fecha] || []).filter(r => {
-          const rm = typeof r.mins === "number" ? r.mins : parsearMinsJS(r.hora);
-          if (rm < mins || rm >= mins + _paso) return false;
-          // Extraer DNI del documento RIS
-          const dniRIS = String(r.documento || "")
-            .replace(/^(DNI|CIBO|RP)\s*/i, "").trim().replace(/^0+/, "");
-          if (dniAgenda.has(dniRIS)) return false;
-          // Extraer apellido del campo apellido_nombre ("APELLIDO, NOMBRE")
-          const apellRIS = String(r.apellido_nombre || "").split(",")[0].trim().toUpperCase();
-          if (apellAgenda.has(apellRIS)) return false;
-          return true;
-        });
-      });
-      const maxRIS = Math.max(...risXDia.map(d => d.length), 0);
-      for (let ri = 0; ri < maxRIS; ri++) {
-        const risHora = risXDia.find(d => d[ri])?.[ri]?.hora || "";
-        const risH = risHora ? risHora : "";
-        html += `<tr>`;
-        html += `<td class="col-hora" style="font-size:10px;color:#999;background:#f0f0f0;font-weight:700">${risH}</td>`;
-        for (let di = 0; di < datos.length; di++) {
-          const r = risXDia[di][ri];
-          if (r) {
-            html += `<td class="slot-ris" style="background:#f4f4f4;border-left:2px dashed #bbb"
-              title="${r.apellido_nombre} — ${r.practica}">
-              <div class="slot-content">
-                <span class="slot-nombre" style="color:#888;font-style:italic">${r.apellido_nombre}</span>
-                <span class="slot-estudio" style="color:#aaa;font-size:10px">${r.practica} <span style="background:#e0e0e0;color:#777;border-radius:4px;padding:0 4px;font-size:9px;font-weight:700">RIS</span></span>
-              </div></td>`;
-          } else {
-            html += `<td style="background:#fafafa;border:1px solid #f0f0f0"></td>`;
-          }
-        }
-        html += `</tr>`;
-      }
     }
     html += "</tbody></table>";
     container.innerHTML = html;
