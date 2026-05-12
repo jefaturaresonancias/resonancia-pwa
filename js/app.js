@@ -54,7 +54,7 @@ const App = (() => {
     badge.textContent = rol === "tecnico" ? "Técnico" : "Administrativo";
 
     // Vista default según rol
-    const defaultView = rol === "tecnico" ? "lista" : rol === "jefatura" ? "stats" : "agenda";
+    const defaultView = rol === "jefatura" ? "stats" : "agenda";
 
     // Mostrar/ocultar items según rol
     document.querySelectorAll(".admin-only").forEach(el => {

@@ -95,58 +95,106 @@ const ListaView = (() => {
       listaContainer.classList.remove("tecnico-cards");
     }
 
-    // Vista técnico: layout de tarjetas
+    // Vista técnico: layout de tarjetas agrupado por horario
     if (esTecnico) {
       const contenedor = document.getElementById("lista-cards");
-      const tablaWrap  = document.getElementById("lista-container");
       if (contenedor) {
-        contenedor.innerHTML = filasFiltradas.map(fila => {
-          const { slot, turno, mins, esRIS } = fila;
-          if (!turno && !esRIS) return "";
-          const h = String(Math.floor(mins/60)).padStart(2,"0");
-          const m = String(mins%60).padStart(2,"0");
+        // Agrupar filas por minutos
+        const grupos = {};
+        for (const fila of filasFiltradas) {
+          if (!fila.turno && !fila.esRIS) continue;
+          const key = fila.mins;
+          if (!grupos[key]) grupos[key] = { mins: fila.mins, turnos: [], ris: [] };
+          if (fila.esRIS)   grupos[key].ris.push(fila.ris);
+          else if (fila.turno) grupos[key].turnos.push(fila.turno);
+        }
+
+        const minsOrdenados = Object.keys(grupos).map(Number).sort((a,b)=>a-b);
+
+        contenedor.innerHTML = minsOrdenados.map(mins => {
+          const g   = grupos[mins];
+          const h   = String(Math.floor(mins/60)).padStart(2,"0");
+          const m   = String(mins%60).padStart(2,"0");
           const hora = `${h}:${m}`;
 
-          if (esRIS) {
-            const r = fila.ris;
-            return `<div class="row-ris">
-              <div class="hora-ris">${hora}</div>
-              <div class="ris-body">
-                <div class="ris-nombre">${r.apellido_nombre}</div>
-                <div class="ris-estudio">${r.practica}</div>
-              </div>
-              <span class="ris-badge">RIS</span>
-            </div>`;
+          // Determinar cuántas columnas: max(turnos, ris) pero al menos 1
+          const maxCols = Math.max(g.turnos.length, g.ris.length);
+          const cards   = [];
+
+          for (let i = 0; i < maxCols; i++) {
+            const turno = g.turnos[i] || null;
+            const ris   = g.ris[i]   || null;
+
+            // Si hay turno + RIS → tarjeta dividida
+            if (turno && ris) {
+              const pres   = turno.presente === "Presente";
+              const origenUp = (turno.origen||"").toUpperCase();
+              const esInt  = origenUp.includes("INTERN");
+              const presBadge = pres
+                ? `<span class="btn-card-done">✓ Presente</span>`
+                : `<button class="btn-card-pres" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}">Presente</button>`;
+              cards.push(`<div class="card-turno card-split ${pres?"presente":""}">
+                <div>
+                  <div class="hora-big ${pres?"ok":""}">${hora}</div>
+                  <div class="hora-sub">${origenUp}</div>
+                </div>
+                <div style="flex:1;display:flex;gap:8px;min-width:0">
+                  <div class="card-body" style="flex:1;border-right:2px dashed #ddd;padding-right:8px">
+                    <div class="card-nombre ${pres?"ok":""}">${turno.apellido}, ${turno.nombre}</div>
+                    <div class="card-estudio">${turno.estudio}</div>
+                    <div class="card-meta"><span class="card-dni">${turno.dni}</span>${turno.observaciones?`<span class="card-obs">${turno.observaciones}</span>`:""}</div>
+                  </div>
+                  <div class="card-body" style="flex:1;opacity:.7">
+                    <div style="font-size:9px;font-weight:700;color:#aaa;margin-bottom:2px">RIS</div>
+                    <div class="card-nombre" style="font-size:12px;font-style:italic;color:#888">${ris.apellido_nombre}</div>
+                    <div class="card-estudio" style="color:#aaa">${ris.practica}</div>
+                  </div>
+                </div>
+                <div class="card-right">
+                  ${esInt?`<span class="origen-tag-card int">Internación</span>`:""}
+                  ${presBadge}
+                  <button class="btn-card-anular" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}">Anular</button>
+                </div>
+              </div>`);
+            }
+            // Solo turno
+            else if (turno) {
+              const pres   = turno.presente === "Presente";
+              const origenUp = (turno.origen||"").toUpperCase();
+              const esInt  = origenUp.includes("INTERN");
+              const presBadge = pres
+                ? `<span class="btn-card-done">✓ Presente</span>`
+                : `<button class="btn-card-pres" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}">Presente</button>`;
+              cards.push(`<div class="card-turno ${pres?"presente":""}">
+                <div>
+                  <div class="hora-big ${pres?"ok":""}">${hora}</div>
+                  <div class="hora-sub">${origenUp}</div>
+                </div>
+                <div class="card-body">
+                  <div class="card-nombre ${pres?"ok":""}">${turno.apellido}, ${turno.nombre}</div>
+                  <div class="card-estudio">${turno.estudio}</div>
+                  <div class="card-meta"><span class="card-dni">${turno.dni}</span>${turno.observaciones?`<span class="card-obs">${turno.observaciones}</span>`:""}</div>
+                </div>
+                <div class="card-right">
+                  ${esInt?`<span class="origen-tag-card int">Internación</span>`:""}
+                  ${presBadge}
+                  <button class="btn-card-anular" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}">Anular</button>
+                </div>
+              </div>`);
+            }
+            // Solo RIS
+            else if (ris) {
+              cards.push(`<div class="row-ris">
+                <div class="hora-ris">${hora}</div>
+                <div class="ris-body">
+                  <div class="ris-nombre">${ris.apellido_nombre}</div>
+                  <div class="ris-estudio">${ris.practica}</div>
+                </div>
+                <span class="ris-badge">RIS</span>
+              </div>`);
+            }
           }
-
-          const pres    = turno.presente === "Presente";
-          const est     = _origen(turno.origen);
-          const origen  = turno.origen || "";
-          const origenUp = origen.toUpperCase();
-          const esInt   = origenUp.includes("INTERN");
-          const presBadge = pres
-            ? `<span class="btn-card-done">✓ Presente</span>`
-            : `<button class="btn-card-pres" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}">Presente</button>`;
-
-          return `<div class="card-turno ${pres?"presente":""}">
-            <div>
-              <div class="hora-big ${pres?"ok":""}">${hora}</div>
-              <div class="hora-sub">${origenUp}</div>
-            </div>
-            <div class="card-body">
-              <div class="card-nombre ${pres?"ok":""}">${turno.apellido}, ${turno.nombre}</div>
-              <div class="card-estudio">${turno.estudio}</div>
-              <div class="card-meta">
-                <span class="card-dni">${turno.dni}</span>
-                ${turno.observaciones ? `<span class="card-obs">${turno.observaciones}</span>` : ""}
-              </div>
-            </div>
-            <div class="card-right">
-              ${esInt ? `<span class="origen-tag-card int">Internación</span>` : ""}
-              ${presBadge}
-              <button class="btn-card-anular" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}">Anular</button>
-            </div>
-          </div>`;
+          return cards.join("");
         }).join("");
 
         // Bind botones
