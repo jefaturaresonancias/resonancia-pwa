@@ -283,7 +283,28 @@ const TurnoView = (() => {
     form.insertBefore(aviso, form.firstChild);
   }
 
-  return { init, prefill, cargarEstudios, mostrarAvisoRIS };
+  // ── Panel flotante ───────────────────────────────────────
+  function abrirPanel(fecha, hora, condicion, ris) {
+    const panel = document.getElementById("turno-panel");
+    panel.classList.remove("panel-hidden");
+    panel.classList.add("panel-visible");
+    document.getElementById("panel-overlay").classList.remove("hidden");
+
+    cargarEstudios().then(() => {
+      prefill(fecha, hora, condicion);
+      if (ris) mostrarAvisoRIS(ris.nombre, ris.practica);
+    });
+  }
+
+  function cerrarPanel() {
+    const panel = document.getElementById("turno-panel");
+    panel.classList.remove("panel-visible");
+    panel.classList.add("panel-hidden");
+    document.getElementById("panel-overlay").classList.add("hidden");
+    _resetForm();
+  }
+
+  return { init, prefill, cargarEstudios, mostrarAvisoRIS, abrirPanel, cerrarPanel };
 })();
 
 

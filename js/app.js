@@ -33,10 +33,7 @@ const App = (() => {
 
   // ── Abrir turno con fecha/hora prellenos (desde agenda) ───
   function abrirTurnoConFechaHora(fecha, hora) {
-    showView("turno");
-    TurnoView.cargarEstudios().then(() => {
-      TurnoView.prefill(fecha, hora);
-    });
+    TurnoView.abrirPanel(fecha, hora);
   }
 
   // ── Mostrar opciones de un turno (click en celda) ─────────
@@ -259,11 +256,7 @@ const App = (() => {
 
   // Abrir formulario con aviso de RIS en ese horario
   function abrirTurnoConRIS(fecha, hora, risNombre, risPractica) {
-    showView("turno");
-    TurnoView.cargarEstudios().then(() => {
-      TurnoView.prefill(fecha, hora);
-      TurnoView.mostrarAvisoRIS(risNombre, risPractica);
-    });
+    TurnoView.abrirPanel(fecha, hora, null, { nombre: risNombre, practica: risPractica });
   }
 
   function irAListaDia(fechaStr) {
@@ -272,10 +265,7 @@ const App = (() => {
   }
 
   function abrirTurnoConCondicion(fecha, hora, condicion) {
-    showView("turno");
-    TurnoView.cargarEstudios().then(() => {
-      TurnoView.prefill(fecha, hora, condicion);
-    });
+    TurnoView.abrirPanel(fecha, hora, condicion);
   }
 
   return { init, toast, showView, abrirTurnoConFechaHora, abrirTurnoConCondicion, abrirTurnoConRIS, mostrarOpcionesTurno, refrescarAgenda, irAListaDia };
