@@ -232,6 +232,7 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 .slot-feriado  { cursor: default; }
 .slot-franja   { cursor: default; }
 .slot-continua { cursor: default; }
+.slot-continua.slot-libre { cursor: pointer !important; }
 
 .slot-content {
   height: 100%; display: flex; flex-direction: column; justify-content: center;

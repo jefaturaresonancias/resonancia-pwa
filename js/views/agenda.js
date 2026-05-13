@@ -131,20 +131,22 @@ const AgendaView = (() => {
           // Continuación de turno propio — barra de color, clickeable
           const act = activosPorCol[di] ? activosPorCol[di].slot : null;
           const col = act ? _coloresOrigen(act.origen) : { bg:"#f0f0f0", border:"#ddd" };
-          html += `<td class="slot-continua slot-libre" style="background:${col.bg}22;border-left:3px solid ${col.bg}88;border-top:none;border-bottom:none;padding:1px 4px" data-fecha="${dia.fecha}" data-mins="${mins}" title="Continúa — clic para sobreturno">
-            <div style="height:100%;display:flex;align-items:center">
-              <div style="width:100%;height:2px;background:${col.border}55;border-radius:1px"></div>
+          html += `<td class="slot-continua slot-libre" style="background:${col.bg}22;border-left:3px solid ${col.bg}88;border-top:none;border-bottom:none;padding:2px 5px;cursor:pointer" data-fecha="${dia.fecha}" data-mins="${mins}" title="Continúa — clic para sobreturno">
+            <div style="height:100%;display:flex;align-items:center;justify-content:space-between">
+              <div style="height:1px;flex:1;background:${col.border}44;border-top:1px solid ${col.border}33"></div>
+              <span style="color:${col.border}88;font-size:9px;font-weight:600;padding:0 4px;flex-shrink:0">+</span>
             </div></td>`;
         } else if (risContinuacion) {
-          // Continuación de RIS — barra gris punteada, clickeable
+          // Continuación de RIS — clickeable para sobreturno
           const r = risActivo.ris;
-          html += `<td class="slot-ris-clickable" style="background:#f9f9f9;border-left:2px dashed #ddd;border:1px solid #eee;cursor:pointer;padding:1px 4px"
+          html += `<td class="slot-ris-clickable" style="background:#f4f4f4;border-left:2px dashed #ccc;border:1px solid #ebebeb;cursor:pointer;padding:2px 5px"
             data-fecha="${dia.fecha}" data-mins="${mins}"
             data-ris-nombre="${encodeURIComponent(r.apellido_nombre)}"
             data-ris-practica="${encodeURIComponent(r.practica)}"
-            title="${r.apellido_nombre} — clic para sobreturno">
-            <div style="height:100%;display:flex;align-items:center">
-              <div style="width:100%;height:2px;background:#ccc;border-radius:1px"></div>
+            title="${r.apellido_nombre} · ${r.practica} — clic para sobreturno">
+            <div style="height:100%;display:flex;align-items:center;justify-content:space-between">
+              <div style="height:1px;flex:1;background:#ccc;border-top:1px dashed #bbb"></div>
+              <span style="color:#bbb;font-size:9px;font-weight:600;padding:0 4px;flex-shrink:0">+</span>
             </div></td>`;
         } else {
           // Render normal — si hay RIS nuevo, marcarlo como mostrado
