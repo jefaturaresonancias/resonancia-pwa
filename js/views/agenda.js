@@ -77,9 +77,10 @@ const AgendaView = (() => {
     for (const d of datos) html += `<th class="${d.esFeriado?"feriado-col":""}">${d.label}${d.esFeriado?" 🚫":""}</th>`;
     html += "</tr></thead><tbody>";
 
-    // Rastrear turno activo Y ris activo por columna
-    const activosPorCol = new Array(datos.length).fill(null); // { slot, hasta }
-    const risPorCol     = new Array(datos.length).fill(null); // { ris, hasta }
+    // Rastrear turno activo Y último RIS mostrado por columna
+    const activosPorCol  = new Array(datos.length).fill(null); // { slot, hasta }
+    const risPorCol      = new Array(datos.length).fill(null); // { ris, hasta }
+    const ultimoRisNombre = new Array(datos.length).fill(null); // apellido_nombre del último RIS mostrado
 
     for (const mins of slots) {
       const h = String(Math.floor(mins/60)).padStart(2,"0");
@@ -112,7 +113,8 @@ const AgendaView = (() => {
         if (risDelSlot.length > 0) {
           risPorCol[di] = { ris: risDelSlot[0], hasta: mins + _paso };
         } else if (risPorCol[di] && mins >= risPorCol[di].hasta) {
-          risPorCol[di] = null;
+          risPorCol[di]      = null;
+          ultimoRisNombre[di] = null;
         }
 
         // ¿Es continuación de turno propio?
@@ -120,13 +122,13 @@ const AgendaView = (() => {
         const activoEnSlot   = !esContinuacion && activosPorCol[di] &&
                                (!s || s.tipo === "libre") && mins < activosPorCol[di].hasta;
 
-        // ¿Es continuación de RIS? (slot libre después del primero)
-        const risContinuacion = !esContinuacion && !activoEnSlot &&
-                                risPorCol[di] && mins > risPorCol[di].ris.mins &&
-                                (!s || s.tipo === "libre" || s.tipo === "continuacion");
+        // ¿Es continuación de RIS? mismo apellido_nombre ya mostrado antes en esta columna
+        const risActual      = risDelSlot[0] || null;
+        const risContinuacion = !esContinuacion && !activoEnSlot && risActual &&
+                                ultimoRisNombre[di] === risActual.apellido_nombre;
 
         if (esContinuacion || activoEnSlot) {
-          // Continuación de turno propio — barra de color
+          // Continuación de turno propio — barra de color, clickeable
           const act = activosPorCol[di]?.slot;
           const col = act ? _coloresOrigen(act.origen) : { bg:"#f0f0f0", border:"#ddd" };
           html += `<td class="slot-continua slot-libre" style="background:${col.bg}22;border-left:3px solid ${col.bg}88;border-top:none;border-bottom:none;padding:1px 4px" data-fecha="${dia.fecha}" data-mins="${mins}" title="Continúa: ${act?.apellido||""} — clic para sobreturno">
@@ -135,16 +137,22 @@ const AgendaView = (() => {
             </div></td>`;
         } else if (risContinuacion) {
           // Continuación de RIS — barra gris punteada, clickeable para sobreturno
-          const r = risPorCol[di].ris;
-          html += `<td class="slot-ris-clickable" style="background:#f8f8f8;border-left:2px dashed #ddd;border:1px solid #eee;cursor:pointer;padding:1px 4px"
+          const r = risActual;
+          html += `<td class="slot-ris-clickable" style="background:#f9f9f9;border-left:2px dashed #ddd;border:1px solid #eee;cursor:pointer;padding:1px 4px"
             data-fecha="${dia.fecha}" data-mins="${mins}"
             data-ris-nombre="${encodeURIComponent(r.apellido_nombre)}"
             data-ris-practica="${encodeURIComponent(r.practica)}"
-            title="RIS continúa: ${r.apellido_nombre} — clic para sobreturno">
+            title="${r.apellido_nombre} · ${r.practica} — clic para sobreturno">
             <div style="height:100%;display:flex;align-items:center">
-              <div style="width:100%;height:2px;background:#bbb;border-radius:1px;border-top:1px dashed #bbb"></div>
+              <div style="width:100%;height:2px;background:#ccc;border-radius:1px"></div>
             </div></td>`;
         } else {
+          // Primera aparición → mostrar normal y registrar nombre
+          if (risActual && (!s || s.tipo === "libre")) {
+            ultimoRisNombre[di] = risActual.apellido_nombre;
+          } else if (!risActual) {
+            ultimoRisNombre[di] = null;
+          }
           html += _renderCeldaCombinada(s, risDelSlot, dia.fecha, mins);
         }
       }
