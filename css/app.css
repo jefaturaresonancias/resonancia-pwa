@@ -803,3 +803,22 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 /* ── PANEL FLOTANTE NUEVO TURNO ──────────────────────────────*/
 .panel-hidden  { transform: translateX(100%); }
 .panel-visible { transform: translateX(0); }
+
+/* ── INTERNACIÓN — AMARILLO EN TODAS LAS VISTAS ─────────────*/
+/* Card técnico */
+.card-turno.card-int {
+  border-color: #e8d080 !important;
+  border-bottom-color: #c9a000 !important;
+  background: #fffbf0 !important;
+}
+.card-turno.card-int .hora-big { color: #7a4f00 !important; }
+.card-turno.card-int .hora-sub { color: #c9a000 !important; }
+.card-turno.card-int .card-nombre { color: #7a4f00 !important; }
+.card-turno.card-int .btn-card-pres {
+  border-color: #c9a000 !important;
+  color: #7a4f00 !important;
+}
+.card-turno.card-int .btn-card-pres:hover {
+  background: #c9a000 !important;
+  color: #fff !important;
+}

@@ -61,6 +61,13 @@ const ListaView = (() => {
       if (dnisPropios.has(dniRIS) || apellPropios.has(apellRIS)) continue;
       filas.push({ slot: { tipo: "ris" }, turno: null, mins, esRIS: true, ris: r });
     }
+    // Agregar turnos que no coinciden con ningún slot del grid
+    const minsEnFilas = new Set(filas.filter(f=>f.turno).map(f=>f.turno.fila));
+    for (const t of turnos) {
+      if (!minsEnFilas.has(t.fila)) {
+        filas.push({ slot: { tipo: "turno" }, turno: t, mins: t.mins, esRIS: false });
+      }
+    }
     filas.sort((a, b) => a.mins - b.mins);
 
     // Aplicar filtro
@@ -133,7 +140,7 @@ const ListaView = (() => {
               const presBadge = pres
                 ? `<span class="btn-card-done">✓ Presente</span>`
                 : `<button class="btn-card-pres" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}">Presente</button>`;
-              cards.push(`<div class="card-turno card-split ${pres?"presente":""}">
+              cards.push(`<div class="card-turno card-split ${pres?"presente":""} ${esInt?"card-int":""}">
                 <div>
                   <div class="hora-big ${pres?"ok":""}">${hora}</div>
                   <div class="hora-sub">${origenUp}</div>
@@ -165,7 +172,7 @@ const ListaView = (() => {
               const presBadge = pres
                 ? `<span class="btn-card-done">✓ Presente</span>`
                 : `<button class="btn-card-pres" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}">Presente</button>`;
-              cards.push(`<div class="card-turno ${pres?"presente":""}">
+              cards.push(`<div class="card-turno ${pres?"presente":""} ${esInt?"card-int":""}">
                 <div>
                   <div class="hora-big ${pres?"ok":""}">${hora}</div>
                   <div class="hora-sub">${origenUp}</div>
@@ -431,8 +438,15 @@ Esta acción no se puede deshacer.`)) return;
 
   function _parseMins(hora) {
     if (!hora) return 0;
-    const p = String(hora).replace(/a\.m\.|p\.m\./gi,"").trim().split(":");
-    return parseInt(p[0]||0)*60 + (parseInt(p[1]||0));
+    const s   = String(hora).trim();
+    const isPM = /p\.m\./i.test(s);
+    const isAM = /a\.m\./i.test(s);
+    const p   = s.replace(/a\.m\.|p\.m\./gi,"").trim().split(":");
+    let h = parseInt(p[0]||0);
+    const m = parseInt(p[1]||0);
+    if (isPM && h < 12) h += 12;
+    if (isAM && h === 12) h = 0;
+    return h*60 + m;
   }
 
   function _detectarOrigen(label) {
