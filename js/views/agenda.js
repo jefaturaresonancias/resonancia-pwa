@@ -53,7 +53,25 @@ const AgendaView = (() => {
     if (!datos || !datos.length) { container.innerHTML = '<div class="empty-state">Sin datos.</div>'; return; }
 
     const MIN_I = 0, MIN_F = 24*60;
-    const slots = datos[0].slots.filter(s => s.mins >= MIN_I && s.mins < MIN_F).map(s => s.mins);
+    const slotsBase = datos[0].slots.filter(s => s.mins >= MIN_I && s.mins < MIN_F).map(s => s.mins);
+    const slotsSet  = new Set(slotsBase);
+
+    // Agregar horarios de turnos que no caen en el paso del grid (ej: 21:30 con paso 40)
+    for (const dia of datos) {
+      for (const s of dia.slots) {
+        if (s.tipo === "turno" && s.mins >= MIN_I && s.mins < MIN_F && !slotsSet.has(s.mins)) {
+          slotsSet.add(s.mins);
+        }
+      }
+      // También RIS que no caen en el grid
+      for (const r of (risMap[dia.fecha] || [])) {
+        const rm = typeof r.mins === "number" ? r.mins : parsearMinsJS(r.hora);
+        if (rm >= MIN_I && rm < MIN_F && !slotsSet.has(rm)) {
+          slotsSet.add(rm);
+        }
+      }
+    }
+    const slots = Array.from(slotsSet).sort((a,b) => a-b);
 
     let html = '<table class="agenda-table"><thead><tr><th class="col-hora">Hora</th>';
     for (const d of datos) html += `<th class="${d.esFeriado?"feriado-col":""}">${d.label}${d.esFeriado?" 🚫":""}</th>`;
