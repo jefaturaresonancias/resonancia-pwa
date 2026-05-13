@@ -109,11 +109,13 @@ const AgendaView = (() => {
           return !dniAgenda.has(dniRIS) && !apellAgenda.has(apellRIS);
         });
 
-        // Si hay RIS nuevo en este slot → registrar como activo
+        // Si hay RIS nuevo en este slot → registrar como activo con su duración real
         if (risDelSlot.length > 0) {
-          risPorCol[di] = { ris: risDelSlot[0], hasta: mins + _paso };
+          const r0 = risDelSlot[0];
+          const dur = r0.duracion || _paso;
+          risPorCol[di] = { ris: r0, hasta: r0.mins + dur };
         } else if (risPorCol[di] && mins >= risPorCol[di].hasta) {
-          risPorCol[di]      = null;
+          risPorCol[di]       = null;
           ultimoRisNombre[di] = null;
         }
 
@@ -148,9 +150,7 @@ const AgendaView = (() => {
             </div></td>`;
         } else {
           // Primera aparición → mostrar normal y registrar nombre
-          if (risActual && (!s || s.tipo === "libre")) {
-            ultimoRisNombre[di] = risActual.apellido_nombre;
-          } else if (!risActual) {
+          if (!risActual) {
             ultimoRisNombre[di] = null;
           }
           html += _renderCeldaCombinada(s, risDelSlot, dia.fecha, mins);
