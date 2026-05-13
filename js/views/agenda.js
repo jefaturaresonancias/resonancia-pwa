@@ -77,13 +77,25 @@ const AgendaView = (() => {
     for (const d of datos) html += `<th class="${d.esFeriado?"feriado-col":""}">${d.label}${d.esFeriado?" 🚫":""}</th>`;
     html += "</tr></thead><tbody>";
 
+    // Rastrear el turno activo por columna para mostrar continuaciones
+    const activosPorCol = new Array(datos.length).fill(null);
+
     for (const mins of slots) {
       const h = String(Math.floor(mins/60)).padStart(2,"0");
       const m = String(mins%60).padStart(2,"0");
       html += `<tr><td class="col-hora">${h}:${m}</td>`;
 
-      for (const dia of datos) {
-        const s = dia.slots.find(sl => sl.mins === mins);
+      for (let di = 0; di < datos.length; di++) {
+        const dia = datos[di];
+        const s   = dia.slots.find(sl => sl.mins === mins);
+
+        // Actualizar turno activo
+        if (s && s.tipo === "turno") {
+          // Calcular duración del turno para saber hasta cuándo ocupa
+          activosPorCol[di] = { slot: s, hasta: mins + (s.duracion || _paso) };
+        } else if (activosPorCol[di] && mins >= activosPorCol[di].hasta) {
+          activosPorCol[di] = null;
+        }
 
         // RIS filtrado sin duplicados
         const dniAgenda   = new Set((dia.slots||[]).filter(sl=>sl.dni).map(sl=>String(sl.dni).trim().replace(/^0+/,"")));
@@ -96,7 +108,20 @@ const AgendaView = (() => {
           return !dniAgenda.has(dniRIS) && !apellAgenda.has(apellRIS);
         });
 
-        html += _renderCeldaCombinada(s, risSlot, dia.fecha, mins);
+        // Si es continuación de un turno activo → mostrar barra de continuación
+        const esContinuacion = s && s.tipo === "continuacion";
+        const activoEnSlot   = !esContinuacion && activosPorCol[di] && (!s || s.tipo === "libre") && mins < activosPorCol[di].hasta;
+
+        if (esContinuacion || activoEnSlot) {
+          const act = activosPorCol[di]?.slot;
+          const col = act ? _coloresOrigen(act.origen) : { bg:"#f0f0f0", border:"#ddd" };
+          html += `<td class="slot-continua" style="background:${col.bg}22;border-left:3px solid ${col.bg};border-top:none;border-bottom:none;padding:1px 4px">
+            <div style="height:100%;display:flex;align-items:center">
+              <div style="width:100%;height:2px;background:${col.border}44;border-radius:1px"></div>
+            </div></td>`;
+        } else {
+          html += _renderCeldaCombinada(s, risSlot, dia.fecha, mins);
+        }
       }
       html += "</tr>";
     }
