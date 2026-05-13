@@ -265,9 +265,11 @@ const TurnoView = (() => {
   }
 
   function mostrarAvisoRIS(nombre, practica) {
-    // Eliminar aviso anterior
     const prev = document.getElementById("turno-ris-aviso");
     if (prev) prev.remove();
+
+    const form = document.getElementById("form-turno");
+    if (!form) return;
 
     const aviso = document.createElement("div");
     aviso.id = "turno-ris-aviso";
@@ -279,7 +281,6 @@ const TurnoView = (() => {
       <div style="margin-top:6px;font-size:11px;color:#c07000;font-weight:600">
         Verificá la demora antes de confirmar. El sobreturno se agrega después del paciente RIS.
       </div>`;
-    const form = document.querySelector(".turno-form");
     form.insertBefore(aviso, form.firstChild);
   }
 

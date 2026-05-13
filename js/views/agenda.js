@@ -132,7 +132,7 @@ const AgendaView = (() => {
           const act = activosPorCol[di] ? activosPorCol[di].slot : null;
           const col = act ? _coloresOrigen(act.origen) : { bg:"#f0f0f0", border:"#ddd" };
           html += `<td class="slot-continua slot-libre" style="background:${col.bg}22;border-left:3px solid ${col.bg}88;border-top:none;border-bottom:none;padding:2px 5px;cursor:pointer" data-fecha="${dia.fecha}" data-mins="${mins}" title="Continúa — clic para sobreturno">
-            <div style="height:100%;display:flex;align-items:center;justify-content:space-between">
+            <div style="height:100%;display:flex;align-items:center;justify-content:space-between;pointer-events:none">
               <div style="height:1px;flex:1;background:${col.border}44;border-top:1px solid ${col.border}33"></div>
               <span style="color:${col.border}88;font-size:9px;font-weight:600;padding:0 4px;flex-shrink:0">+</span>
             </div></td>`;
@@ -144,7 +144,7 @@ const AgendaView = (() => {
             data-ris-nombre="${encodeURIComponent(r.apellido_nombre)}"
             data-ris-practica="${encodeURIComponent(r.practica)}"
             title="${r.apellido_nombre} · ${r.practica} — clic para sobreturno">
-            <div style="height:100%;display:flex;align-items:center;justify-content:space-between">
+            <div style="height:100%;display:flex;align-items:center;justify-content:space-between;pointer-events:none">
               <div style="height:1px;flex:1;background:#ccc;border-top:1px dashed #bbb"></div>
               <span style="color:#bbb;font-size:9px;font-weight:600;padding:0 4px;flex-shrink:0">+</span>
             </div></td>`;
