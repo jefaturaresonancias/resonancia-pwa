@@ -63,7 +63,6 @@ const AgendaView = (() => {
           slotsSet.add(s.mins);
         }
       }
-      // También RIS que no caen en el grid
       for (const r of (risMap[dia.fecha] || [])) {
         const rm = typeof r.mins === "number" ? r.mins : parsearMinsJS(r.hora);
         if (rm >= MIN_I && rm < MIN_F && !slotsSet.has(rm)) {
@@ -77,12 +76,13 @@ const AgendaView = (() => {
     for (const d of datos) html += `<th class="${d.esFeriado?"feriado-col":""}">${d.label}${d.esFeriado?" 🚫":""}</th>`;
     html += "</tr></thead><tbody>";
 
-    // Rastrear turno activo Y último RIS mostrado por columna
-    const activosPorCol  = new Array(datos.length).fill(null); // { slot, hasta }
-    const risPorCol      = new Array(datos.length).fill(null); // { ris, hasta }
-    const ultimoRisNombre = new Array(datos.length).fill(null); // apellido_nombre del último RIS mostrado
+    // Rastrear turno activo y RIS activo por columna
+    const activosPorCol = new Array(datos.length).fill(null); // { slot, hasta }
+    const risActivoCol  = new Array(datos.length).fill(null); // { ris, hasta, mostrado }
 
-    for (const mins of slots) {
+    for (let si = 0; si < slots.length; si++) {
+      const mins     = slots[si];
+      const nextMins = si + 1 < slots.length ? slots[si + 1] : mins + _paso;
       const h = String(Math.floor(mins/60)).padStart(2,"0");
       const m = String(mins%60).padStart(2,"0");
       html += `<tr><td class="col-hora">${h}:${m}</td>`;
@@ -98,25 +98,23 @@ const AgendaView = (() => {
           activosPorCol[di] = null;
         }
 
-        // RIS filtrado sin duplicados
+        // RIS: buscar el que empieza exactamente en este slot (rm >= mins && rm < nextMins)
         const dniAgenda   = new Set((dia.slots||[]).filter(sl=>sl.dni).map(sl=>String(sl.dni).trim().replace(/^0+/,"")));
         const apellAgenda = new Set((dia.slots||[]).filter(sl=>sl.apellido).map(sl=>sl.apellido.trim().toUpperCase()));
-        const risDelSlot = (risMap[dia.fecha]||[]).filter(r => {
+        const risNuevo = (risMap[dia.fecha]||[]).find(r => {
           const rm = typeof r.mins==="number" ? r.mins : parsearMinsJS(r.hora);
-          if (rm < mins || rm >= mins + _paso) return false;
-          const dniRIS   = String(r.documento||"").replace(/^(DNI|CIBO|RP)\s*/i,"").trim().replace(/^0+/,"");
+          if (rm < mins || rm >= nextMins) return false;
+          const dniRIS   = String(r.documento||"").replace(/[A-Za-z]+\s*/,"").trim().replace(/^0+/,"");
           const apellRIS = String(r.apellido_nombre||"").split(",")[0].trim().toUpperCase();
           return !dniAgenda.has(dniRIS) && !apellAgenda.has(apellRIS);
         });
 
-        // Si hay RIS nuevo en este slot → registrar como activo con su duración real
-        if (risDelSlot.length > 0) {
-          const r0 = risDelSlot[0];
-          const dur = r0.duracion || _paso;
-          risPorCol[di] = { ris: r0, hasta: r0.mins + dur };
-        } else if (risPorCol[di] && mins >= risPorCol[di].hasta) {
-          risPorCol[di]       = null;
-          ultimoRisNombre[di] = null;
+        // Si hay RIS nuevo → registrar activo, marcar como NO mostrado aún
+        if (risNuevo) {
+          const dur = (risNuevo.duracion && risNuevo.duracion > 0) ? risNuevo.duracion : _paso;
+          risActivoCol[di] = { ris: risNuevo, hasta: risNuevo.mins + dur, mostrado: false };
+        } else if (risActivoCol[di] && mins >= risActivoCol[di].hasta) {
+          risActivoCol[di] = null;
         }
 
         // ¿Es continuación de turno propio?
@@ -124,36 +122,34 @@ const AgendaView = (() => {
         const activoEnSlot   = !esContinuacion && activosPorCol[di] &&
                                (!s || s.tipo === "libre") && mins < activosPorCol[di].hasta;
 
-        // ¿Es continuación de RIS? mismo apellido_nombre ya mostrado antes en esta columna
-        const risActual      = risDelSlot[0] || null;
-        const risContinuacion = !esContinuacion && !activoEnSlot && risActual &&
-                                ultimoRisNombre[di] === risActual.apellido_nombre;
+        // ¿Es continuación de RIS? solo si ya se mostró la primera vez y no hay RIS nuevo
+        const risActivo       = risActivoCol[di];
+        const risContinuacion = !esContinuacion && !activoEnSlot && !risNuevo &&
+                                risActivo && risActivo.mostrado && mins < risActivo.hasta;
 
         if (esContinuacion || activoEnSlot) {
           // Continuación de turno propio — barra de color, clickeable
-          const act = activosPorCol[di]?.slot;
+          const act = activosPorCol[di] ? activosPorCol[di].slot : null;
           const col = act ? _coloresOrigen(act.origen) : { bg:"#f0f0f0", border:"#ddd" };
-          html += `<td class="slot-continua slot-libre" style="background:${col.bg}22;border-left:3px solid ${col.bg}88;border-top:none;border-bottom:none;padding:1px 4px" data-fecha="${dia.fecha}" data-mins="${mins}" title="Continúa: ${act?.apellido||""} — clic para sobreturno">
+          html += `<td class="slot-continua slot-libre" style="background:${col.bg}22;border-left:3px solid ${col.bg}88;border-top:none;border-bottom:none;padding:1px 4px" data-fecha="${dia.fecha}" data-mins="${mins}" title="Continúa — clic para sobreturno">
             <div style="height:100%;display:flex;align-items:center">
               <div style="width:100%;height:2px;background:${col.border}55;border-radius:1px"></div>
             </div></td>`;
         } else if (risContinuacion) {
-          // Continuación de RIS — barra gris punteada, clickeable para sobreturno
-          const r = risActual;
+          // Continuación de RIS — barra gris punteada, clickeable
+          const r = risActivo.ris;
           html += `<td class="slot-ris-clickable" style="background:#f9f9f9;border-left:2px dashed #ddd;border:1px solid #eee;cursor:pointer;padding:1px 4px"
             data-fecha="${dia.fecha}" data-mins="${mins}"
             data-ris-nombre="${encodeURIComponent(r.apellido_nombre)}"
             data-ris-practica="${encodeURIComponent(r.practica)}"
-            title="${r.apellido_nombre} · ${r.practica} — clic para sobreturno">
+            title="${r.apellido_nombre} — clic para sobreturno">
             <div style="height:100%;display:flex;align-items:center">
               <div style="width:100%;height:2px;background:#ccc;border-radius:1px"></div>
             </div></td>`;
         } else {
-          // Primera aparición → mostrar normal y registrar nombre
-          if (!risActual) {
-            ultimoRisNombre[di] = null;
-          }
-          html += _renderCeldaCombinada(s, risDelSlot, dia.fecha, mins);
+          // Render normal — si hay RIS nuevo, marcarlo como mostrado
+          if (risNuevo && risActivoCol[di]) risActivoCol[di].mostrado = true;
+          html += _renderCeldaCombinada(s, risNuevo ? [risNuevo] : [], dia.fecha, mins);
         }
       }
       html += "</tr>";
@@ -167,7 +163,7 @@ const AgendaView = (() => {
   function _renderCeldaCombinada(slot, risSlot, fecha, mins) {
     const tipo    = slot ? slot.tipo || "libre" : "libre";
     const tieneRIS = risSlot && risSlot.length > 0;
-    const ris      = tieneRIS ? risSlot[0] : null; // mostrar el primero si hay varios
+    const ris      = tieneRIS ? risSlot[0] : null;
 
     // Si hay turno propio + RIS → celda dividida side by side
     if (tipo === "turno" && tieneRIS) {
@@ -191,7 +187,7 @@ const AgendaView = (() => {
       </td>`;
     }
 
-    // Si hay solo RIS (slot libre o bloqueo) → celda RIS clickeable
+    // Si hay solo RIS → celda RIS clickeable
     if (tieneRIS && (tipo === "libre" || tipo === "continuacion")) {
       return `<td class="slot-ris-clickable" style="background:#f4f4f4;border-left:2px dashed #bbb;border:1px solid #e4e8ee;cursor:pointer"
         data-fecha="${fecha}" data-mins="${mins}"
@@ -300,16 +296,13 @@ const AgendaView = (() => {
     const hoyStr = _strFecha(new Date());
     const DIAS = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 
-    // Totales del mes para el pie
     let totalOcup = 0, totalLibres = 0;
     for (const v of Object.values(resumenMap)) {
       if (!v.esFeriado) { totalOcup += v.ocupados; totalLibres += v.libres; }
     }
-
     const totalRIS = Object.values(risMes).reduce((a,v) => a + v.length, 0);
 
-    let html = `<div class="cal-mes-wrap">
-      <table class="cal-mes-table"><thead><tr>`;
+    let html = `<div class="cal-mes-wrap"><table class="cal-mes-table"><thead><tr>`;
     for (const d of DIAS) html += `<th>${d}</th>`;
     html += `</tr></thead><tbody><tr>`;
 
@@ -330,37 +323,23 @@ const AgendaView = (() => {
       let contenido = "";
       if (!res) {
         const DIAS_C2 = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
-        contenido = `
-          <div class="cal-d-head">
-            <span class="cal-d-num">${dia}</span>
-            <span class="cal-d-name">${DIAS_C2[fechaDate.getDay()]}</span>
-          </div>`;
+        contenido = `<div class="cal-d-head"><span class="cal-d-num">${dia}</span><span class="cal-d-name">${DIAS_C2[fechaDate.getDay()]}</span></div>`;
       } else if (res.esFeriado) {
         cls += " cal-dia-feriado";
         const DIAS_C = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
-        contenido = `
-          <div class="cal-d-head cal-d-head-fer">
-            <span class="cal-d-num">${dia}</span>
-            <span class="cal-d-name" style="color:#c05050">${DIAS_C[fechaDate.getDay()]}</span>
-          </div>
-          <div class="cal-d-body">
-            <div class="cal-feriado-label">🚫 ${res.feriado||"Feriado"}</div>
-          </div>`;
+        contenido = `<div class="cal-d-head"><span class="cal-d-num">${dia}</span><span class="cal-d-name" style="color:#c05050">${DIAS_C[fechaDate.getDay()]}</span></div><div class="cal-d-body"><div class="cal-feriado-label">🚫 ${res.feriado||"Feriado"}</div></div>`;
       } else {
         const total = res.libres + res.ocupados;
         const pct   = total > 0 ? res.libres/total : 0;
-        if      (pct===0 && total>0)     cls += " cal-dia-lleno";
-        else if (pct>0 && pct<0.25)      cls += " cal-dia-casi-lleno";
-
-        const barOcup = total>0 ? Math.round((res.ocupados/total)*100) : 0;
-
+        if      (pct===0 && total>0) cls += " cal-dia-lleno";
+        else if (pct>0 && pct<0.25)  cls += " cal-dia-casi-lleno";
+        const barOcup  = total>0 ? Math.round((res.ocupados/total)*100) : 0;
         const risDelDia = (risMes[fechaStr] || []).length;
         const DIAS_CORTO = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
-        const nomDia = DIAS_CORTO[fechaDate.getDay()];
         contenido = `
           <div class="cal-d-head">
             <span class="cal-d-num">${dia}</span>
-            <span class="cal-d-name">${nomDia}</span>
+            <span class="cal-d-name">${DIAS_CORTO[fechaDate.getDay()]}</span>
           </div>
           <div class="cal-d-body">
             <div class="cal-barra">
@@ -393,15 +372,11 @@ const AgendaView = (() => {
     </div>`;
     container.innerHTML = html;
 
-    // Click en día → ir a Lista del día para esa fecha
     container.querySelectorAll(".cal-dia[data-fecha]").forEach(td => {
-      td.addEventListener("click", () => {
-        App.irAListaDia(td.dataset.fecha);
-      });
+      td.addEventListener("click", () => { App.irAListaDia(td.dataset.fecha); });
     });
   }
 
-  // ── TOGGLE MODO ───────────────────────────────────────────
   function _setModo(modo) {
     _modo = modo;
     document.getElementById("btn-modo-semana").classList.toggle("modo-activo", modo==="semana");
