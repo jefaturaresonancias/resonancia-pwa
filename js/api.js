@@ -28,15 +28,23 @@ const API = (() => {
   // ── fetch POST ───────────────────────────────────────────
   // Enviamos como text/plain para evitar preflight CORS
   async function post(body) {
-    const url  = Config.getUrl();
+    const url = Config.getUrl();
     if (!url) throw new Error("URL de API no configurada");
-    // Apps Script redirige POST → CORS falla. Workaround: enviar como GET con postBody
-    const qs   = new URLSearchParams({ postBody: JSON.stringify(body) }).toString();
-    const resp = await fetch(`${url}?${qs}`, { method: "GET" });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const json = await resp.json();
-    if (!json.ok) throw new Error(json.error || "Error desconocido del servidor");
-    return json.data;
+    // XHR maneja redirects de Apps Script correctamente (fetch falla por CORS en redirect)
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const qs  = new URLSearchParams({ postBody: JSON.stringify(body) }).toString();
+      xhr.open("GET", `${url}?${qs}`, true);
+      xhr.onload = () => {
+        try {
+          const json = JSON.parse(xhr.responseText);
+          if (json.ok) resolve(json.data);
+          else reject(new Error(json.error || "Error del servidor"));
+        } catch(e) { reject(new Error("Respuesta inválida del servidor")); }
+      };
+      xhr.onerror = () => reject(new Error("Error de red al conectar con el servidor"));
+      xhr.send();
+    });
   }
 
   // ── métodos públicos ─────────────────────────────────────
