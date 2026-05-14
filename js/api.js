@@ -30,12 +30,9 @@ const API = (() => {
   async function post(body) {
     const url  = Config.getUrl();
     if (!url) throw new Error("URL de API no configurada");
-    const resp = await fetch(url, {
-      method:   "POST",
-      redirect: "follow",
-      headers:  { "Content-Type": "text/plain;charset=utf-8" },
-      body:     JSON.stringify(body)
-    });
+    // Apps Script redirige POST → CORS falla. Workaround: enviar como GET con postBody
+    const qs   = new URLSearchParams({ postBody: JSON.stringify(body) }).toString();
+    const resp = await fetch(`${url}?${qs}`, { method: "GET" });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const json = await resp.json();
     if (!json.ok) throw new Error(json.error || "Error desconocido del servidor");
