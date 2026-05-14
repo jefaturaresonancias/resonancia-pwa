@@ -358,12 +358,16 @@ const ParteView = (() => {
         const nombre    = String(row[3]||"").trim();
         let   practica  = String(row[4]||"").trim();
 
+        const estado    = String(row[6]||"").trim().toUpperCase();
+        const cobertura = String(row[8]||"").trim();
+        const ambito    = String(row[9]||"").trim();
+
         if (!hora || !documento || !nombre) continue;
+        if (estado === "CA") continue; // Turno cancelado — no cargar
 
         // Agrupar prácticas del mismo paciente (mismo documento)
         const docKey = documento.replace(/^DNI\s*/i,"").trim();
         if (vistos.has(docKey)) {
-          // Agregar práctica al existente
           const existente = filas.find(f => f.documento.replace(/^DNI\s*/i,"").trim() === docKey);
           if (existente) {
             const practicaNorm = _acortarPractica(practica);
@@ -379,7 +383,9 @@ const ParteView = (() => {
           hora,
           documento,
           apellido_nombre: nombre,
-          practica: _acortarPractica(practica)
+          practica:   _acortarPractica(practica),
+          cobertura,
+          ambito
         });
       }
 
