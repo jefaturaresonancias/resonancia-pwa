@@ -365,7 +365,7 @@ const ParteView = (() => {
         if (!hora || !documento || !nombre) continue;
         if (estado === "CA") continue; // Turno cancelado — no cargar
         // Mapear códigos de estado a texto legible
-        const estadoMap = { "AS": "Asistido", "PR": "Presente", "AT": "Atendido", "AU": "Ausente", "SU": "Suspendido" };
+        const estadoMap = { "AS": "Asignado", "PR": "Presente", "CA": "Cancelado", "AT": "Atendido", "AU": "Ausente", "SU": "Suspendido" };
         const estadoTexto = estadoMap[estado] || estado;
 
         // Agrupar prácticas del mismo paciente (mismo documento)
@@ -462,7 +462,7 @@ const ParteView = (() => {
       }
       if (dataStart === -1) { App.toast("No se encontró la tabla de datos", "error"); return; }
 
-      const estadoMap = { "AS": "Asistido", "PR": "Presente", "AT": "Atendido", "AU": "Ausente", "SU": "Suspendido" };
+      const estadoMap = { "AS": "Asignado", "PR": "Presente", "AT": "Atendido", "CA": "Cancelado", "AU": "Ausente", "SU": "Suspendido" };
       const actualizaciones = [];
       const vistos = new Set();
 
