@@ -204,20 +204,23 @@ const AgendaView = (() => {
 
     // Si hay RIS en slot de franja o bloqueo → celda dividida: franja izq | RIS der
     if (tieneRIS && slot && (tipo === "franja" || tipo === "franja_origen" || tipo === "bloqueo_rec" || tipo === "bloqueo")) {
-      const bg    = slot.color || "#ccc";
-      const label = slot.label || tipo;
+      const bg      = slot.color || "#ccc";
+      const label   = slot.label || tipo;
+      // Color RIS = color de franja muy suave (22% opacidad) con borde del color
+      const risBg   = bg + "33"; // hex con alpha ~20%
+      const risBord = bg + "88"; // hex con alpha ~53%
       return `<td style="padding:0;border:1px solid #e4e8ee;height:36px">
         <div style="display:flex;height:100%;gap:1px">
           <div class="slot-content" style="flex:1;background:${bg};overflow:hidden">
             <span class="slot-label" style="font-size:10px;font-weight:600">${label}</span>
           </div>
-          <div class="slot-ris-side slot-content" style="flex:1;background:#f0f0f0;border-left:2px dashed #bbb;cursor:pointer;overflow:hidden"
+          <div class="slot-ris-side slot-content" style="flex:1;background:${risBg};border-left:2px dashed ${risBord};cursor:pointer;overflow:hidden"
             data-fecha="${fecha}" data-mins="${mins}"
             data-ris-nombre="${encodeURIComponent(ris.apellido_nombre)}"
             data-ris-practica="${encodeURIComponent(ris.practica)}"
             title="RIS: ${ris.apellido_nombre} — ${ris.practica}\nClic para sobreturno">
-            <span class="slot-nombre" style="color:#888;font-style:italic;font-size:10px">${ris.apellido_nombre}</span>
-            <span class="slot-estudio" style="color:#aaa;font-size:9px">${ris.practica} <span style="background:#ddd;color:#777;border-radius:3px;padding:0 3px;font-size:8px">RIS</span></span>
+            <span class="slot-nombre" style="color:#555;font-style:italic;font-size:10px">${ris.apellido_nombre}</span>
+            <span class="slot-estudio" style="color:#777;font-size:9px">${ris.practica} <span style="background:${risBord};color:#fff;border-radius:3px;padding:0 3px;font-size:8px">RIS</span></span>
           </div>
         </div>
       </td>`;
