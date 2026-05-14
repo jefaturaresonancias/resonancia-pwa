@@ -30,21 +30,17 @@ const API = (() => {
   async function post(body) {
     const url = Config.getUrl();
     if (!url) throw new Error("URL de API no configurada");
-    // XHR maneja redirects de Apps Script correctamente (fetch falla por CORS en redirect)
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      const qs  = new URLSearchParams({ postBody: JSON.stringify(body) }).toString();
-      xhr.open("GET", `${url}?${qs}`, true);
-      xhr.onload = () => {
-        try {
-          const json = JSON.parse(xhr.responseText);
-          if (json.ok) resolve(json.data);
-          else reject(new Error(json.error || "Error del servidor"));
-        } catch(e) { reject(new Error("Respuesta inválida del servidor")); }
-      };
-      xhr.onerror = () => reject(new Error("Error de red al conectar con el servidor"));
-      xhr.send();
-    });
+    // Enviar cada campo como parámetro GET individual — evita JSON parsing en Apps Script
+    const params = {};
+    for (const [k, v] of Object.entries(body)) {
+      params[k] = v !== null && v !== undefined ? String(v) : "";
+    }
+    const qs   = new URLSearchParams(params).toString();
+    const resp = await fetch(`${url}?${qs}`, { method: "GET" });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const json = await resp.json();
+    if (!json.ok) throw new Error(json.error || "Error desconocido del servidor");
+    return json.data;
   }
 
   // ── métodos públicos ─────────────────────────────────────
