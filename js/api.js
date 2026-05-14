@@ -31,9 +31,10 @@ const API = (() => {
     const url  = Config.getUrl();
     if (!url) throw new Error("URL de API no configurada");
     const resp = await fetch(url, {
-      method:  "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body:    JSON.stringify(body)
+      method:   "POST",
+      redirect: "follow",
+      headers:  { "Content-Type": "text/plain;charset=utf-8" },
+      body:     JSON.stringify(body)
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const json = await resp.json();
