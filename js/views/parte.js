@@ -286,6 +286,125 @@ const ParteView = (() => {
   }
 
   // ── Cargar a agenda RIS ──────────────────────────────────
+  // ── Parser Excel del parte estadístico ──────────────────
+  async function _parsearExcelRIS(file) {
+    const btn = document.getElementById("btn-parte-excel-ris");
+    btn.disabled = true; btn.textContent = "⏳ Procesando…";
+
+    try {
+      // Cargar SheetJS si no está disponible
+      if (!window.XLSX) {
+        await new Promise((res, rej) => {
+          const s = document.createElement("script");
+          s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+          s.onload = res; s.onerror = rej;
+          document.head.appendChild(s);
+        });
+      }
+
+      const data = await file.arrayBuffer();
+      const wb   = window.XLSX.read(data, { type: "array", cellDates: true });
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const rows = window.XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: "dd/mm/yyyy" });
+
+      // Buscar fecha en fila 3 (índice 2), columna F (índice 5)
+      let fechaStr = "";
+      for (let i = 0; i < Math.min(6, rows.length); i++) {
+        const row = rows[i];
+        for (let j = 0; j < row.length; j++) {
+          if (String(row[j]||"").trim() === "FECHA:" && row[j+1]) {
+            fechaStr = String(row[j+1]).trim();
+            break;
+          }
+        }
+        if (fechaStr) break;
+      }
+
+      if (!fechaStr) {
+        App.toast("No se encontró la fecha en el Excel", "error");
+        return;
+      }
+
+      // Normalizar fecha a dd/MM/yyyy
+      if (fechaStr.includes("-")) {
+        const p = fechaStr.split("-");
+        fechaStr = `${p[2]}/${p[1]}/${p[0]}`;
+      }
+
+      // Encontrar fila de headers (HORA, DOCUMENTO, etc.)
+      let dataStart = -1;
+      for (let i = 0; i < rows.length; i++) {
+        if (rows[i] && String(rows[i][0]||"").trim().toUpperCase() === "HORA") {
+          dataStart = i + 1;
+          break;
+        }
+      }
+
+      if (dataStart === -1) {
+        App.toast("No se encontró la tabla de datos en el Excel", "error");
+        return;
+      }
+
+      // Parsear filas de datos
+      // Cols: 0=HORA, 1=DOCUMENTO, 2=FEC_NAC, 3=APELLIDO Y NOMBRE, 4=PRÁCTICA, 5=TIPO_ATENCION, 6=ESTADO, 7=DOMICILIO, 8=COBERTURA, 9=AMBITO
+      const filas = [];
+      const vistos = new Set(); // dedup por documento
+
+      for (let i = dataStart; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || !row[0]) continue;
+        const hora      = String(row[0]||"").trim();
+        const documento = String(row[1]||"").trim();
+        const nombre    = String(row[3]||"").trim();
+        let   practica  = String(row[4]||"").trim();
+
+        if (!hora || !documento || !nombre) continue;
+
+        // Agrupar prácticas del mismo paciente (mismo documento)
+        const docKey = documento.replace(/^DNI\s*/i,"").trim();
+        if (vistos.has(docKey)) {
+          // Agregar práctica al existente
+          const existente = filas.find(f => f.documento.replace(/^DNI\s*/i,"").trim() === docKey);
+          if (existente) {
+            const practicaNorm = _acortarPractica(practica);
+            if (!existente.practica.includes(practicaNorm)) {
+              existente.practica += " · " + practicaNorm;
+            }
+          }
+          continue;
+        }
+
+        vistos.add(docKey);
+        filas.push({
+          hora,
+          documento,
+          apellido_nombre: nombre,
+          practica: _acortarPractica(practica)
+        });
+      }
+
+      if (filas.length === 0) {
+        App.toast("No se encontraron datos en el Excel", "error");
+        return;
+      }
+
+      // Confirmar y cargar
+      if (!confirm(`Excel del ${fechaStr}: ${filas.length} pacientes encontrados.
+
+¿Cargar a la agenda RIS?`)) return;
+
+      btn.textContent = "⏳ Cargando…";
+      const resultado = await API.escribirRIS(fechaStr, filas);
+      App.toast(`✅ ${resultado.mensaje}`, "ok");
+
+    } catch(err) {
+      App.toast("Error: " + err.message, "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "📊 Cargar Excel RIS";
+    }
+  }
+
   async function _cargarRIS() {
     if (!_filas.length || !_fecha) {
       App.toast("Primero cargá un PDF.", "error"); return;
@@ -374,6 +493,14 @@ const ParteView = (() => {
     document.getElementById("btn-parte-excel").addEventListener("click", _exportarExcel);
     document.getElementById("btn-parte-copiar").addEventListener("click", _copiar);
     document.getElementById("btn-parte-ris").addEventListener("click", _cargarRIS);
+    document.getElementById("btn-parte-excel-ris").addEventListener("click", () => {
+      document.getElementById("parte-input-excel-ris").click();
+    });
+    document.getElementById("parte-input-excel-ris").addEventListener("change", e => {
+      const file = e.target.files[0];
+      if (file) _parsearExcelRIS(file);
+      e.target.value = "";
+    });
 
     document.getElementById("parte-filtro").addEventListener("input", e => {
       _render(_filas, e.target.value.trim());
