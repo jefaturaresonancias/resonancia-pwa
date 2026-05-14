@@ -364,6 +364,9 @@ const ParteView = (() => {
 
         if (!hora || !documento || !nombre) continue;
         if (estado === "CA") continue; // Turno cancelado — no cargar
+        // Mapear códigos de estado a texto legible
+        const estadoMap = { "AS": "Asistido", "PR": "Presente", "AT": "Atendido", "AU": "Ausente", "SU": "Suspendido" };
+        const estadoTexto = estadoMap[estado] || estado;
 
         // Agrupar prácticas del mismo paciente (mismo documento)
         const docKey = documento.replace(/^DNI\s*/i,"").trim();
@@ -385,7 +388,8 @@ const ParteView = (() => {
           apellido_nombre: nombre,
           practica:   _acortarPractica(practica),
           cobertura,
-          ambito
+          ambito,
+          estado: estadoTexto
         });
       }
 
