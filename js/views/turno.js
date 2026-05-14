@@ -120,9 +120,42 @@ const TurnoView = (() => {
       aviso.id = "turno-condicion-aviso";
       aviso.style.cssText = "background:#fff8e1;border-left:4px solid #f0c040;padding:8px 14px;border-radius:4px;font-size:12px;font-weight:600;color:#7a4f00;margin-bottom:1rem";
       aviso.innerHTML = `⚠️ Franja con condición: <strong>${condicion.label}</strong>${condicion.filtro ? " — estudios filtrados" : ""}${condicion.origen ? " — origen pre-seleccionado" : ""}`;
-      const form = document.querySelector(".turno-form");
-      form.insertBefore(aviso, form.firstChild);
+      const form = document.getElementById("form-turno");
+      if (form) form.insertBefore(aviso, form.firstChild);
     }
+
+    // Si viene con hora prefijada → mostrar horario seleccionado directamente
+    if (hora) {
+      const slotsContainer = document.getElementById("slots-container");
+      const slotSel        = document.getElementById("slot-seleccionado");
+      const slotsGrid      = document.getElementById("slots-grid");
+
+      slotsContainer.classList.remove("hidden");
+      slotsGrid.innerHTML = "";
+
+      // Mostrar directamente el slot elegido sin buscar
+      _slotSeleccionado = { hora, mins: _horaAMins(hora) };
+      document.getElementById("slot-hora-label").textContent = `Horario seleccionado: ${hora} hs`;
+      slotSel.classList.remove("hidden");
+
+      // Agregar chip de hora con opción de cambiar
+      slotsGrid.innerHTML = `<div style="margin-bottom:.5rem;font-size:12px;color:var(--text-2)">
+        Horario pre-seleccionado desde la agenda. 
+        <button type="button" id="btn-cambiar-hora" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;text-decoration:underline;padding:0">Buscar otro horario</button>
+      </div>`;
+      document.getElementById("btn-cambiar-hora").addEventListener("click", () => {
+        _slotSeleccionado = null;
+        slotSel.classList.add("hidden");
+        slotsGrid.innerHTML = "";
+        slotsContainer.classList.add("hidden");
+      });
+    }
+  }
+
+  function _horaAMins(hora) {
+    if (!hora) return 0;
+    const p = hora.split(":");
+    return parseInt(p[0]||0)*60 + parseInt(p[1]||0);
   }
 
   function _filtrarEstudios(filtro) {
