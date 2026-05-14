@@ -602,9 +602,12 @@ Solo se modificará la columna ESTADO en BD_RIS.`)) return;
     document.getElementById("btn-actualizar-estados").addEventListener("click", () => {
       document.getElementById("parte-input-estados").click();
     });
-    document.getElementById("parte-input-estados").addEventListener("change", e => {
-      const file = e.target.files[0];
-      if (file) _actualizarEstados(file);
+    document.getElementById("parte-input-estados").addEventListener("change", async e => {
+      const files = Array.from(e.target.files);
+      if (!files.length) return;
+      for (const file of files) {
+        await _actualizarEstados(file);
+      }
       e.target.value = "";
     });
 
