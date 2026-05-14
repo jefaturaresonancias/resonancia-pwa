@@ -135,6 +135,18 @@ const API = (() => {
       return get({ action: "leerRISRango", desde, dias });
     },
 
+    /** Actualiza estados de turnos existentes en BD_RIS */
+    async actualizarEstadosRIS(fecha, items) {
+      const CHUNK = 10;
+      let actualizadas = 0;
+      for (let i = 0; i < items.length; i += CHUNK) {
+        const chunk = items.slice(i, i + CHUNK);
+        const res = await get({ action: "actualizarEstadosRIS", fecha, items: JSON.stringify(chunk) });
+        actualizadas += res.actualizadas || 0;
+      }
+      return { actualizadas, mensaje: `${actualizadas} estados actualizados` };
+    },
+
     /** Hashes existentes para una fecha (dedup). */
     verificarRIS(fecha) {
       return get({ action: "verificarRIS", fecha });
