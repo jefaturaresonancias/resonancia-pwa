@@ -146,7 +146,8 @@ const API = (() => {
      * @param {Array}  filas  [{ hora, documento, apellido_nombre, practica }]
      */
     escribirRIS(fecha, filas) {
-      return post({ action: "escribirRIS", fecha, filas });
+      // Datos complejos (array) — usar parámetro JSON especial
+      return get({ action: "escribirRIS", fecha, filas: JSON.stringify(filas) });
     }
   };
 })();
