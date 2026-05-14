@@ -145,9 +145,23 @@ const API = (() => {
      * @param {string} fecha  dd/MM/yyyy
      * @param {Array}  filas  [{ hora, documento, apellido_nombre, practica }]
      */
-    escribirRIS(fecha, filas) {
-      // Datos complejos (array) — usar parámetro JSON especial
-      return get({ action: "escribirRIS", fecha, filas: JSON.stringify(filas) });
+    async escribirRIS(fecha, filas) {
+      // Dividir en chunks de 10 para no superar el límite de URL
+      const CHUNK = 10;
+      let agregadas = 0, descartadas = 0;
+      for (let i = 0; i < filas.length; i += CHUNK) {
+        const chunk = filas.slice(i, i + CHUNK);
+        const res = await get({ action: "escribirRIS", fecha, filas: JSON.stringify(chunk) });
+        agregadas   += res.agregadas   || 0;
+        descartadas += res.descartadas || 0;
+      }
+      return {
+        agregadas,
+        descartadas,
+        mensaje: agregadas === 0
+          ? "Sin cambios — todos los registros ya existían"
+          : `${agregadas} registros nuevos agregados, ${descartadas} ya existían`
+      };
     }
   };
 })();
