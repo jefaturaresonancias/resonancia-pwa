@@ -591,9 +591,12 @@ Solo se modificará la columna ESTADO en BD_RIS.`)) return;
     document.getElementById("btn-parte-excel-ris").addEventListener("click", () => {
       document.getElementById("parte-input-excel-ris").click();
     });
-    document.getElementById("parte-input-excel-ris").addEventListener("change", e => {
-      const file = e.target.files[0];
-      if (file) _parsearExcelRIS(file);
+    document.getElementById("parte-input-excel-ris").addEventListener("change", async e => {
+      const files = Array.from(e.target.files);
+      if (!files.length) return;
+      for (const file of files) {
+        await _parsearExcelRIS(file);
+      }
       e.target.value = "";
     });
     document.getElementById("btn-actualizar-estados").addEventListener("click", () => {
