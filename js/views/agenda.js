@@ -49,7 +49,6 @@ const AgendaView = (() => {
   // ── VISTA SEMANA ──────────────────────────────────────────
   function _renderSemana(datos, risMap, cardioMap) {
     cardioMap = cardioMap || {};
-    window._cardioMostrado = new Set(); // reset por render
     risMap = risMap || {};
     const container = document.getElementById("agenda-container");
     if (!datos || !datos.length) { container.innerHTML = '<div class="empty-state">Sin datos.</div>'; return; }
@@ -152,68 +151,58 @@ const AgendaView = (() => {
               <span style="color:#bbb;font-size:9px;font-weight:600;padding:0 4px;flex-shrink:0">+</span>
             </div></td>`;
         } else {
-          // Buscar paciente cardiológico para este slot (miércoles, 08-14hs)
-        let cardioSlotArr = [];
-        if (dia.diaSemana === 3) { // miércoles
-          const cardioDia = (cardioMap[dia.fecha] || []);
-          const cp = cardioDia.find(c => {
-            return c.mins <= mins && mins < c.mins + (c.duracion || 60);
-          });
-          if (cp) {
-            // Verificar si está en agenda propia o RIS
-            const dniCP = String(cp.dni||"").trim().replace(/^0+/,"");
-            const enAgenda = (dia.slots||[]).some(sl => sl.dni && String(sl.dni).trim().replace(/^0+/,"") === dniCP);
-            const enRIS    = (risMap[dia.fecha]||[]).some(r => {
-              const dniR = String(r.documento||"").replace(/[A-Za-z\s]+/,"").trim().replace(/^0+/,"");
-              return dniR === dniCP;
-            });
-            // Solo mostrar si el slot es de franja cardiología (cualquier tipo de bloqueo/franja)
-            const labelSlot = (s && s.label || "").toLowerCase();
-            const esCardio  = labelSlot.includes("cardiol") || labelSlot.includes("cardiolog");
-            const esFranja  = s && (s.tipo === "franja" || s.tipo === "franja_origen" || s.tipo === "bloqueo_rec" || s.tipo === "bloqueo");
-            if (esFranja && esCardio) {
-              // Primera aparición del paciente en este slot
-              const cKey = dia.fecha + "_" + dniCP;
-              if (!window._cardioMostrado) window._cardioMostrado = new Set();
-              if (!window._cardioMostrado.has(cKey)) {
-                window._cardioMostrado.add(cKey);
-                cardioSlotArr = [{ ...cp, _cardio: true, _enAgenda: enAgenda, _enRIS: enRIS }];
+          // ── CARDIO: lógica unificada ──
+          const esFranjaCardioSlot = s &&
+            (s.tipo === "franja" || s.tipo === "franja_origen" || s.tipo === "bloqueo_rec") &&
+            (s.label||"").toLowerCase().includes("cardiol");
+
+          let cardioRender = [];
+          let skipRender   = false;
+
+          if (dia.diaSemana === 3 && esFranjaCardioSlot) {
+            const cardioDia = (cardioMap[dia.fecha] || []);
+            // Expirar activo si terminó
+            if (cardioActivoCol[di] && mins >= cardioActivoCol[di].hasta) {
+              cardioActivoCol[di] = null;
+            }
+            // Nuevo paciente que empieza en este slot
+            if (!cardioActivoCol[di]) {
+              const cpNuevo = cardioDia.find(c => c.mins >= mins && c.mins < nextMins);
+              if (cpNuevo) {
+                const dniCP    = String(cpNuevo.dni||"").trim().replace(/^0+/,"");
+                const enAgenda = (dia.slots||[]).some(sl => sl.dni && String(sl.dni).trim().replace(/^0+/,"") === dniCP);
+                const enRIS    = (risMap[dia.fecha]||[]).some(r => {
+                  const dniR = String(r.documento||"").replace(/[A-Za-z]+/,"").trim().replace(/^0+/,"");
+                  return dniR === dniCP;
+                });
+                cardioActivoCol[di] = {
+                  cp: { ...cpNuevo, _cardio: true, _enAgenda: enAgenda, _enRIS: enRIS },
+                  hasta: cpNuevo.mins + (cpNuevo.duracion || 60),
+                  mostrado: false
+                };
+              }
+            }
+            if (cardioActivoCol[di]) {
+              if (!cardioActivoCol[di].mostrado) {
+                cardioActivoCol[di].mostrado = true;
+                cardioRender = [cardioActivoCol[di].cp];
+              } else {
+                const bg = s.color || "#e8a0c0";
+                html += `<td style="background:${bg}22;border-left:3px solid ${bg}55;border:1px solid ${bg}33;padding:2px 5px">
+                  <div style="height:100%;display:flex;align-items:center;gap:4px;pointer-events:none">
+                    <div style="flex:1;height:1px;background:${bg}77"></div>
+                    <span style="color:${bg};font-size:8px;font-weight:600">cardio</span>
+                  </div></td>`;
+                skipRender = true;
               }
             }
           }
-        }
 
-        // Determinar si hay cardio para mostrar o es continuación
-        const cardioActivo = cardioActivoCol[di];
-        let cardioRender = [];
-        let skipRender = false;
-        if (cardioActivo) {
-          const esFranjaSlot = s && (s.tipo === "franja" || s.tipo === "franja_origen" || s.tipo === "bloqueo_rec") &&
-                               (s.label||"").toLowerCase().includes("cardiol");
-          if (esFranjaSlot) {
-            if (!cardioActivo.mostrado) {
-              // Primera vez → mostrar completo
-              cardioActivo.mostrado = true;
-              cardioRender = [cardioActivo.cp];
-            } else {
-              // Continuación → barra del color de la franja
-              const bg  = s.color || "#e8a0c0";
-              html += `<td class="slot-continua" style="background:${bg}22;border-left:3px solid ${bg}88;border-top:none;border-bottom:none;padding:2px 5px;pointer-events:none">
-                <div style="height:100%;display:flex;align-items:center;justify-content:space-between">
-                  <div style="height:1px;flex:1;background:${bg}55"></div>
-                  <span style="color:${bg}99;font-size:9px;padding:0 4px">cardio</span>
-                </div></td>`;
-              skipRender = true;
-            }
+          if (!skipRender) {
+            if (risNuevo && risActivoCol[di]) risActivoCol[di].mostrado = true;
+            const renderRIS = cardioRender.length > 0 ? cardioRender : (risNuevo ? [risNuevo] : []);
+            html += _renderCeldaCombinada(s, renderRIS, dia.fecha, mins);
           }
-        }
-
-        // Render normal — si hay RIS nuevo, marcarlo como mostrado
-        if (!skipRender) {
-          if (risNuevo && risActivoCol[di]) risActivoCol[di].mostrado = true;
-          const renderRIS = cardioRender.length > 0 ? cardioRender : (risNuevo ? [risNuevo] : []);
-          html += _renderCeldaCombinada(s, renderRIS, dia.fecha, mins);
-        }
         }
       }
       html += "</tr>";
