@@ -348,8 +348,17 @@ const AgendaView = (() => {
   }
 
   function _bindSlotClicks(container) {
+    function _esPasado(fecha) {
+      const p = fecha.split("/");
+      const f = new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0]));
+      f.setHours(0,0,0,0);
+      const hoy = new Date(); hoy.setHours(0,0,0,0);
+      return f < hoy;
+    }
+
     container.querySelectorAll(".slot-libre").forEach(td => {
       td.addEventListener("click", () => {
+        if (_esPasado(td.dataset.fecha)) { App.toast("No se puede asignar en fechas pasadas", "error"); return; }
         const mins = parseInt(td.dataset.mins);
         App.abrirTurnoConFechaHora(td.dataset.fecha,
           String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0"));
@@ -362,6 +371,7 @@ const AgendaView = (() => {
         const nombre   = decodeURIComponent(td.dataset.risNombre || "");
         const practica = decodeURIComponent(td.dataset.risPractica || "");
         const hora     = String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0");
+        if (_esPasado(td.dataset.fecha)) { App.toast("No se puede asignar en fechas pasadas", "error"); return; }
         App.abrirTurnoConRIS(td.dataset.fecha, hora, nombre, practica);
       });
     });
