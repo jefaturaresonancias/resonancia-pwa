@@ -250,6 +250,14 @@ const TurnoView = (() => {
     document.getElementById("turno-result").classList.add("hidden");
 
     try {
+      const filaOriginal = parseInt(document.getElementById("form-turno").dataset.filaOriginal || "0");
+      if (filaOriginal) {
+        const tooltipOrig = document.getElementById("form-turno").dataset.tooltipOriginal || "";
+        const confirmar = confirm(`¿Modificar turno?\n\nDE: ${tooltipOrig}\n\nA: ${apellido}, ${nombre} — ${fecha} ${_slotSeleccionado.hora} hs\n¿Confirmás?`);
+        if (!confirmar) { btn.disabled = false; btn.textContent = "✓ Confirmar turno"; return; }
+        await API.anular(filaOriginal);
+        document.getElementById("form-turno").dataset.filaOriginal = "";
+      }
       await API.asignar({ nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs });
       const result = document.getElementById("turno-result");
       result.className = "turno-result ok";
@@ -335,7 +343,61 @@ const TurnoView = (() => {
     _resetForm();
   }
 
-  return { init, prefill, cargarEstudios, mostrarAvisoRIS, abrirPanel, cerrarPanel };
+  async function abrirPanelModificar(fila, tooltipTexto) {
+    // Buscar datos del turno por fila
+    let turno = null;
+    try {
+      const lineas = tooltipTexto.split("\n");
+      // tooltip: "APELLIDO, NOMBRE\nDNI: 12345\nEstudio\nOrigen\n📝 obs"
+      const nombreCompleto = lineas[0] || "";
+      const partes = nombreCompleto.split(",");
+      const apellido = partes[0]?.trim() || "";
+      const nombre   = partes[1]?.trim() || "";
+      const dniLine  = lineas.find(l => l.startsWith("DNI:")) || "";
+      const dni      = dniLine.replace("DNI:","").trim();
+      const estudio  = lineas[2] || "";
+      const origen   = lineas[3] || "";
+      const obsLine  = lineas.find(l => l.startsWith("📝")) || "";
+      const obs      = obsLine.replace("📝","").trim();
+      turno = { fila, apellido, nombre, dni, estudio, origen, observaciones: obs };
+    } catch(e) { App.toast("Error leyendo datos del turno", "error"); return; }
+
+    await cargarEstudios();
+    abrirPanel();
+
+    // Precargar datos del paciente
+    document.getElementById("t-nombre").value   = turno.nombre;
+    document.getElementById("t-apellido").value = turno.apellido;
+    document.getElementById("t-dni").value      = turno.dni;
+    document.getElementById("t-obs").value      = turno.observaciones;
+
+    // Precargar origen
+    const selOrigen = document.getElementById("t-origen");
+    for (const opt of selOrigen.options) {
+      if (opt.value.toUpperCase() === turno.origen.toUpperCase()) { selOrigen.value = opt.value; break; }
+    }
+
+    // Precargar estudios como chips
+    _estudiosElegidos = turno.estudio.split(",").map(s => s.trim()).filter(Boolean);
+    _renderChips();
+    _actualizarTiempo();
+    _poblarSelect();
+
+    // Aviso de modificación
+    const prev = document.getElementById("turno-ris-aviso");
+    if (prev) prev.remove();
+    const aviso = document.createElement("div");
+    aviso.id = "turno-ris-aviso";
+    aviso.style.cssText = "background:#fff8e1;border-left:4px solid #f0c040;padding:10px 14px;border-radius:6px;font-size:12px;color:#7a4f00;margin-bottom:1rem;font-weight:600";
+    aviso.innerHTML = `✏️ Modificando turno de <strong>${turno.apellido}, ${turno.nombre}</strong><br><span style="font-weight:400;color:#888">Seleccioná nueva fecha y horario. Al confirmar se anula el turno original.</span>`;
+    document.getElementById("form-turno").insertBefore(aviso, document.getElementById("form-turno").firstChild);
+
+    // Guardar fila original para anular al confirmar
+    document.getElementById("form-turno").dataset.filaOriginal = fila;
+    document.getElementById("form-turno").dataset.tooltipOriginal = tooltipTexto;
+  }
+
+  return { init, prefill, cargarEstudios, mostrarAvisoRIS, abrirPanel, cerrarPanel, abrirPanelModificar };
 })();
 
 
