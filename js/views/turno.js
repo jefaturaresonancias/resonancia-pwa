@@ -349,10 +349,11 @@ const TurnoView = (() => {
     try {
       const lineas = tooltipTexto.split("\n");
       // tooltip: "APELLIDO, NOMBRE\nDNI: 12345\nEstudio\nOrigen\n📝 obs"
+      const lineas = tooltipTexto.split("\\n");
       const nombreCompleto = lineas[0] || "";
-      const partes = nombreCompleto.split(",");
-      const apellido = partes[0]?.trim() || "";
-      const nombre   = partes[1]?.trim() || "";
+      const coma    = nombreCompleto.indexOf(",");
+      const apellido = coma >= 0 ? nombreCompleto.substring(0, coma).trim() : nombreCompleto.trim();
+      const nombre   = coma >= 0 ? nombreCompleto.substring(coma+1).trim() : "";
       const dniLine  = lineas.find(l => l.startsWith("DNI:")) || "";
       const dni      = dniLine.replace("DNI:","").trim();
       const estudio  = lineas[2] || "";
