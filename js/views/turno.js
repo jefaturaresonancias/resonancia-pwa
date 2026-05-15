@@ -347,9 +347,9 @@ const TurnoView = (() => {
     // Buscar datos del turno por fila
     let turno = null;
     try {
-      const lineas = tooltipTexto.split("\\n");
+      const lineas = tooltipTexto.split("\n");
       // tooltip: "APELLIDO, NOMBRE\nDNI: 12345\nEstudio\nOrigen\n📝 obs"
-      const nombreCompleto = (tooltipTexto.split("\\n")[0]) || "";
+      const nombreCompleto = lineas[0] || "";
       const coma    = nombreCompleto.indexOf(",");
       const apellido = coma >= 0 ? nombreCompleto.substring(0, coma).trim() : nombreCompleto.trim();
       const nombre   = coma >= 0 ? nombreCompleto.substring(coma+1).trim() : "";
