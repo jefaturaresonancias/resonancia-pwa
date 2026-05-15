@@ -186,6 +186,7 @@ const AgendaView = (() => {
         // Determinar si hay cardio para mostrar o es continuación
         const cardioActivo = cardioActivoCol[di];
         let cardioRender = [];
+        let skipRender = false;
         if (cardioActivo) {
           const esFranjaSlot = s && (s.tipo === "franja" || s.tipo === "franja_origen" || s.tipo === "bloqueo_rec") &&
                                (s.label||"").toLowerCase().includes("cardiol");
@@ -197,22 +198,22 @@ const AgendaView = (() => {
             } else {
               // Continuación → barra del color de la franja
               const bg  = s.color || "#e8a0c0";
-              html += `<td class="slot-continua" style="background:${bg}22;border-left:3px solid ${bg}88;border-top:none;border-bottom:none;padding:2px 5px">
-                <div style="height:100%;display:flex;align-items:center;justify-content:space-between;pointer-events:none">
+              html += `<td class="slot-continua" style="background:${bg}22;border-left:3px solid ${bg}88;border-top:none;border-bottom:none;padding:2px 5px;pointer-events:none">
+                <div style="height:100%;display:flex;align-items:center;justify-content:space-between">
                   <div style="height:1px;flex:1;background:${bg}55"></div>
                   <span style="color:${bg}99;font-size:9px;padding:0 4px">cardio</span>
                 </div></td>`;
-              html += "</tr>" === "" ? "" : ""; // placeholder para no duplicar html +=
-              // Saltar al siguiente
-              continue;
+              skipRender = true;
             }
           }
         }
 
         // Render normal — si hay RIS nuevo, marcarlo como mostrado
-        if (risNuevo && risActivoCol[di]) risActivoCol[di].mostrado = true;
-        const renderRIS = cardioRender.length > 0 ? cardioRender : (risNuevo ? [risNuevo] : []);
-        html += _renderCeldaCombinada(s, renderRIS, dia.fecha, mins);
+        if (!skipRender) {
+          if (risNuevo && risActivoCol[di]) risActivoCol[di].mostrado = true;
+          const renderRIS = cardioRender.length > 0 ? cardioRender : (risNuevo ? [risNuevo] : []);
+          html += _renderCeldaCombinada(s, renderRIS, dia.fecha, mins);
+        }
         }
       }
       html += "</tr>";
