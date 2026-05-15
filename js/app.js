@@ -62,8 +62,10 @@ const App = (() => {
     });
 
     document.getElementById("btn-op-modificar").addEventListener("click", () => {
+      const filaGuardada = _turnoSeleccionado.fila;
+      const tipGuardado  = tip;
       cerrarOpcionesTurno();
-      TurnoView.abrirPanelModificar(_turnoSeleccionado.fila, tip);
+      TurnoView.abrirPanelModificar(filaGuardada, tipGuardado);
     });
 
     document.getElementById("panel-opciones-turno").style.display = "flex";
