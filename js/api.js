@@ -125,6 +125,11 @@ const API = (() => {
 
     // ── RIS ────────────────────────────────────────────────
 
+    /** Pacientes de agenda cardiología para un rango de fechas */
+    leerCardiologia(desde, dias = 7) {
+      return get({ action: "leerCardiologia", desde, dias });
+    },
+
     /** Turnos RIS de una fecha. */
     leerRIS(fecha) {
       return get({ action: "leerRIS", fecha });

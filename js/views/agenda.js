@@ -47,7 +47,9 @@ const AgendaView = (() => {
   }
 
   // ── VISTA SEMANA ──────────────────────────────────────────
-  function _renderSemana(datos, risMap) {
+  function _renderSemana(datos, risMap, cardioMap) {
+    cardioMap = cardioMap || {};
+    window._cardioMostrado = new Set(); // reset por render
     risMap = risMap || {};
     const container = document.getElementById("agenda-container");
     if (!datos || !datos.length) { container.innerHTML = '<div class="empty-state">Sin datos.</div>'; return; }
@@ -149,9 +151,39 @@ const AgendaView = (() => {
               <span style="color:#bbb;font-size:9px;font-weight:600;padding:0 4px;flex-shrink:0">+</span>
             </div></td>`;
         } else {
-          // Render normal — si hay RIS nuevo, marcarlo como mostrado
-          if (risNuevo && risActivoCol[di]) risActivoCol[di].mostrado = true;
-          html += _renderCeldaCombinada(s, risNuevo ? [risNuevo] : [], dia.fecha, mins);
+          // Buscar paciente cardiológico para este slot (miércoles, 08-14hs)
+        let cardioSlotArr = [];
+        if (dia.diaSemana === 3) { // miércoles
+          const cardioDia = (cardioMap[dia.fecha] || []);
+          const cp = cardioDia.find(c => {
+            return c.mins <= mins && mins < c.mins + (c.duracion || 60);
+          });
+          if (cp) {
+            // Verificar si está en agenda propia o RIS
+            const dniCP = String(cp.dni||"").trim().replace(/^0+/,"");
+            const enAgenda = (dia.slots||[]).some(sl => sl.dni && String(sl.dni).trim().replace(/^0+/,"") === dniCP);
+            const enRIS    = (risMap[dia.fecha]||[]).some(r => {
+              const dniR = String(r.documento||"").replace(/[A-Za-z\s]+/,"").trim().replace(/^0+/,"");
+              return dniR === dniCP;
+            });
+            // Solo mostrar si el slot es de franja cardiología
+            if (s && (s.tipo === "franja" || s.tipo === "franja_origen") &&
+                (s.label||"").toLowerCase().includes("cardio")) {
+              // Primera aparición del paciente en este slot
+              const cKey = dia.fecha + "_" + dniCP;
+              if (!window._cardioMostrado) window._cardioMostrado = new Set();
+              if (!window._cardioMostrado.has(cKey)) {
+                window._cardioMostrado.add(cKey);
+                cardioSlotArr = [{ ...cp, _cardio: true, _enAgenda: enAgenda, _enRIS: enRIS }];
+              }
+            }
+          }
+        }
+
+        // Render normal — si hay RIS nuevo, marcarlo como mostrado
+        if (risNuevo && risActivoCol[di]) risActivoCol[di].mostrado = true;
+        const renderRIS = cardioSlotArr.length > 0 ? cardioSlotArr : (risNuevo ? [risNuevo] : []);
+        html += _renderCeldaCombinada(s, renderRIS, dia.fecha, mins);
         }
       }
       html += "</tr>";
@@ -202,8 +234,12 @@ const AgendaView = (() => {
       </td>`;
     }
 
+    // Si hay paciente cardíaco en slot de franja cardiología → mostrar paciente
+    // (cardioSlot se inyecta desde el loop principal via risSlot con flag especial)
+    const cardioSlot = tieneRIS && risSlot[0]?._cardio ? risSlot[0] : null;
+
     // Si hay RIS en slot de franja o bloqueo → celda dividida: franja izq | RIS der
-    if (tieneRIS && slot && (tipo === "franja" || tipo === "franja_origen" || tipo === "bloqueo_rec" || tipo === "bloqueo")) {
+    if (tieneRIS && !cardioSlot && slot && (tipo === "franja" || tipo === "franja_origen" || tipo === "bloqueo_rec" || tipo === "bloqueo")) {
       const bg      = slot.color || "#ccc";
       const label   = slot.label || tipo;
       // Color RIS = color de franja muy suave (22% opacidad) con borde del color
@@ -222,6 +258,27 @@ const AgendaView = (() => {
             <span class="slot-nombre" style="color:#555;font-style:italic;font-size:10px">${ris.apellido_nombre}</span>
             <span class="slot-estudio" style="color:#777;font-size:9px">${ris.practica} <span style="background:${risBord};color:#fff;border-radius:3px;padding:0 3px;font-size:8px">RIS</span></span>
           </div>
+        </div>
+      </td>`;
+    }
+
+    // Si hay paciente cardíaco en slot de franja → mostrar con color de franja
+    if (cardioSlot && slot) {
+      const bg  = slot.color || "#e8a0c0";
+      const c   = cardioSlot;
+      const badges = [];
+      if (c._enAgenda) badges.push(`<span style="background:#4a9e5c;color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">AGENDA</span>`);
+      if (c._enRIS)    badges.push(`<span style="background:#888;color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">RIS</span>`);
+      badges.push(`<span style="background:#c9506a;color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">CARDIO</span>`);
+      return `<td style="background:${bg}22;border-left:3px solid ${bg};border:1px solid ${bg}55;padding:3px 5px;cursor:pointer;height:36px"
+        data-fecha="${fecha}" data-mins="${mins}"
+        data-ris-nombre="${encodeURIComponent(c.apellido_nombre)}"
+        data-ris-practica="${encodeURIComponent(c.diagnostico)}"
+        title="Cardiología: ${c.apellido_nombre}\nDNI: ${c.dni}\n${c.diagnostico}\nEstado: ${c.estado}">
+        <div class="slot-content">
+          <div style="display:flex;align-items:center;gap:3px;margin-bottom:1px">${badges.join("")}</div>
+          <span class="slot-nombre" style="color:#555;font-weight:600">${c.apellido_nombre}</span>
+          <span class="slot-estudio" style="color:#777;font-size:10px">${c.diagnostico}</span>
         </div>
       </td>`;
     }
@@ -417,11 +474,13 @@ const AgendaView = (() => {
     document.getElementById("agenda-rango-label").textContent = _labelRango();
     loading.classList.remove("hidden");
     try {
-      const [datos, risMap] = await Promise.all([
-        API.agenda(_strFecha(_fechaDesde), 7, _paso),
-        API.leerRISRango(_strFecha(_fechaDesde), 7).catch(() => ({}))
+      const desde = _strFecha(_fechaDesde);
+      const [datos, risMap, cardioMap] = await Promise.all([
+        API.agenda(desde, 7, _paso),
+        API.leerRISRango(desde, 7).catch(() => ({})),
+        API.leerCardiologia(desde, 7).catch(() => ({}))
       ]);
-      _renderSemana(datos, risMap);
+      _renderSemana(datos, risMap, cardioMap);
     }
     catch (err) { App.toast("Error: "+err.message,"error"); }
     finally     { loading.classList.add("hidden"); }
