@@ -369,7 +369,7 @@ const AgendaView = (() => {
                       : "";
       const badgeRIS  = risMatch ? `<span style="background:#888;color:#fff;border-radius:3px;padding:0 2px;font-size:8px;font-weight:700;margin-left:2px">RIS</span>` : "";
 
-      return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border}" data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}"><div class="slot-content"><span class="slot-nombre" style="color:${col.text}">${iconRIS}${slot.apellido}, ${slot.nombre} ${pres}${badgeRIS}</span><span class="slot-estudio" style="color:${col.text}">${slot.estudio}</span></div></td>`;
+      return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border}" data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}"><div class="slot-content"><span class="slot-nombre" style="color:${col.text}">${iconRIS}${slot.apellido}, ${slot.nombre} ${pres}</span><span class="slot-estudio" style="color:${col.text}">${slot.estudio}${badgeRIS}</span></div></td>`;
     }
     if (tipo === "continuacion") return `<td class="slot-continua" style="background:${bg}"><div class="slot-content"></div></td>`;
     return `<td class="slot-bloqueo" style="background:${bg}"><div class="slot-content"><span class="slot-label">${slot.label||""}</span></div></td>`;
