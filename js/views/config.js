@@ -71,7 +71,7 @@ const ConfigView = (() => {
       <span class="cfg-nombre" style="font-size:13px;cursor:pointer" title="Clic para editar">${e.nombre}</span>
       <span class="cfg-estadistica" style="font-size:12px;color:var(--text-2);cursor:pointer">${e.estadistica||"—"}</span>
       <span style="font-size:12px;text-align:center">${e.restriccion ? `<span style="background:var(--bg);border:0.5px solid var(--border);border-radius:4px;padding:1px 6px">${e.restriccion}</span>` : "—"}</span>
-      <span style="font-size:13px;text-align:center">${e.duracion}</span>
+      <span class="cfg-duracion" data-idx="${i}" style="font-size:13px;text-align:center;cursor:pointer;text-decoration:underline dotted" title="Clic para editar duración">${e.duracion}</span>
       <button class="cfg-btn-del-estudio" data-idx="${i}" style="background:transparent;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:0" aria-label="Eliminar">×</button>
     </div>`;
   }
@@ -140,13 +140,19 @@ const ConfigView = (() => {
       const dias = [r.dia1, r.func1, r.dia2, r.func2, r.dia3].filter(Boolean).join(" ");
       const cod  = r.codigo || r.origen;
       return `<div style="padding:8px;border-radius:8px;background:var(--bg)">
-        <div style="font-size:12px;color:var(--text-2);margin-bottom:2px">Código: ${cod}</div>
+        <div style="font-size:12px;color:var(--text-2);margin-bottom:2px">${r.codigo ? "Código" : "Origen"}: ${cod}</div>
         <div style="font-size:13px;font-weight:500">${r.leyenda||"—"}</div>
         <div style="font-size:11px;color:var(--text-2)">${dias} · ${r.horaD}–${r.horaH}</div>
       </div>`;
     }).join("");
     return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem">
-      <div style="font-weight:500;font-size:15px;margin-bottom:12px">🔐 Restricciones por código y origen</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-weight:500;font-size:15px">🔐 Restricciones por código y origen</span>
+        <div style="display:flex;gap:6px">
+          <button id="cfg-btn-nueva-rest-cod" style="font-size:12px">+ Por código</button>
+          <button id="cfg-btn-nueva-rest-orig" style="font-size:12px">+ Por origen</button>
+        </div>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${items||"Sin restricciones"}</div>
     </div>`;
   }
@@ -161,6 +167,17 @@ const ConfigView = (() => {
       container.querySelectorAll(".cfg-fila-estudio").forEach(row => {
         const nombre = row.querySelector(".cfg-nombre").textContent.toLowerCase();
         row.style.display = nombre.includes(q) ? "" : "none";
+      });
+    });
+
+    // Editar duración al hacer clic
+    container.querySelectorAll(".cfg-duracion").forEach(el => {
+      el.addEventListener("click", () => {
+        const i = parseInt(el.dataset.idx);
+        const nueva = parseInt(prompt("Duración en minutos:", _datos.estudios[i].duracion));
+        if (isNaN(nueva)) return;
+        _datos.estudios[i].duracion = nueva;
+        _guardarEstudios();
       });
     });
 
@@ -227,6 +244,39 @@ const ConfigView = (() => {
       if (!concepto) return;
       _datos.bloqueos.push({ fecha, horaD, horaH, concepto });
       _guardarBloqueos();
+    });
+
+    // Nueva restricción por código
+    document.getElementById("cfg-btn-nueva-rest-cod").addEventListener("click", () => {
+      const codigo   = prompt("Código (ej: MM, CAR):");
+      if (!codigo) return;
+      const dia1     = prompt("Día desde (ej: LUNES):");
+      const func1    = prompt("Función (hasta / y / vacío):");
+      const dia2     = prompt("Día hasta (opcional):");
+      const horaD    = prompt("Hora desde (HH:MM):");
+      const horaH    = prompt("Hora hasta (HH:MM):");
+      const leyenda  = prompt("Leyenda:");
+      const color    = prompt("Color hex (ej: #e06666):", "#e06666");
+      _datos.restricciones.push({ codigo, dia1, func1: func1||"", dia2: dia2||"", func2:"", dia3:"", horaD, horaH, leyenda, color });
+      App.toast("Restricción agregada — guardá desde el sheet Config para hacerla permanente", "ok");
+      _render();
+    });
+
+    // Nueva restricción por origen
+    document.getElementById("cfg-btn-nueva-rest-orig").addEventListener("click", () => {
+      const origen   = prompt("Origen (ej: INTERNACIÓN):");
+      if (!origen) return;
+      const dia1     = prompt("Día desde (ej: LUNES):");
+      const func1    = prompt("Función (hasta / y / vacío):");
+      const dia2     = prompt("Día hasta (opcional):");
+      const horaD    = prompt("Hora desde (HH:MM):");
+      const horaH    = prompt("Hora hasta (HH:MM):");
+      const leyenda  = prompt("Leyenda:");
+      const color    = prompt("Color hex (ej: #ffd966):", "#ffd966");
+      if (!_datos.restriccionesOrigen) _datos.restriccionesOrigen = [];
+      _datos.restriccionesOrigen.push({ origen, dia1, func1: func1||"", dia2: dia2||"", func2:"", dia3:"", horaD, horaH, leyenda, color });
+      App.toast("Restricción agregada — guardá desde el sheet Config para hacerla permanente", "ok");
+      _render();
     });
   }
 
