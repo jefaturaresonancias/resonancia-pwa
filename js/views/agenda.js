@@ -328,10 +328,11 @@ const AgendaView = (() => {
 
     // Default: render normal
     if (!slot) return "<td></td>";
-    return _renderSlot(slot, fecha, mins);
+    return _renderSlot(slot, fecha, mins, risSlot);
   }
 
-  function _renderSlot(slot, fecha, mins) {
+  function _renderSlot(slot, fecha, mins, risDelDia) {
+    slot._risDelDia = risDelDia || [];
     const tipo = slot.tipo || "libre";
     const bg   = slot.color || "#fff";
     if (tipo === "libre") {
@@ -348,7 +349,26 @@ const AgendaView = (() => {
       const col  = _coloresOrigen(slot.origen);
       const pres = slot.presente === "Presente" ? "✅" : "";
       const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${pres?"\n✅ Presente":""}`;
-      return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border}" data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}"><div class="slot-content"><span class="slot-nombre" style="color:${col.text}">${slot.apellido}, ${slot.nombre} ${pres}</span><span class="slot-estudio" style="color:${col.text}">${slot.estudio}</span></div></td>`;
+
+      // Buscar en RIS por DNI para mostrar estado y badge
+      const dniLimpio = String(slot.dni||"").trim().replace(/^0+/,"");
+      const risMatch  = (slot._risDelDia||[]).find(r => {
+        const dniR = String(r.documento||"").replace(/[A-Za-z]+/,"").trim().replace(/^0+/,"");
+        return dniR === dniLimpio;
+      });
+      const estRIS    = risMatch ? (risMatch.estado||"") : "";
+      const hoy       = new Date(); hoy.setHours(0,0,0,0);
+      const fp        = fecha.split("/");
+      const fDate     = new Date(parseInt(fp[2]), parseInt(fp[1])-1, parseInt(fp[0]));
+      const pasado    = fDate < hoy;
+      const atendido  = estRIS === "Atendido" || estRIS === "Presente";
+      const ausente   = estRIS === "Asignado" && pasado;
+      const iconRIS   = atendido ? `<span style="color:#2e7d32;font-weight:700;margin-right:2px">✓</span>`
+                      : ausente  ? `<span style="color:#c62828;font-weight:700;margin-right:2px">✗</span>`
+                      : "";
+      const badgeRIS  = risMatch ? `<span style="background:#888;color:#fff;border-radius:3px;padding:0 2px;font-size:8px;font-weight:700;margin-left:2px">RIS</span>` : "";
+
+      return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border}" data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}"><div class="slot-content"><span class="slot-nombre" style="color:${col.text}">${iconRIS}${slot.apellido}, ${slot.nombre} ${pres}${badgeRIS}</span><span class="slot-estudio" style="color:${col.text}">${slot.estudio}</span></div></td>`;
     }
     if (tipo === "continuacion") return `<td class="slot-continua" style="background:${bg}"><div class="slot-content"></div></td>`;
     return `<td class="slot-bloqueo" style="background:${bg}"><div class="slot-content"><span class="slot-label">${slot.label||""}</span></div></td>`;
