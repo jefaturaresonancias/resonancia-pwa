@@ -87,20 +87,26 @@ const App = (() => {
   function _actualizarRolUI() {
     const rol = Config.getRol();
     const badge = document.getElementById("topbar-rol-label");
-    badge.textContent = rol === "tecnico" ? "Técnico" : "Administrativo";
+    badge.textContent = rol === "tecnico" ? "Técnico"
+                      : rol === "jefatura" ? "Jefatura"
+                      : rol === "admin"    ? "Admin"
+                      : "Administrativo";
 
     // Vista default según rol
     const defaultView = rol === "jefatura" ? "stats" : "agenda";
 
     // Mostrar/ocultar items según rol
     document.querySelectorAll(".admin-only").forEach(el => {
-      el.style.display = (rol === "administrativo" || rol === "jefatura") ? "" : "none";
+      el.style.display = (rol === "administrativo" || rol === "jefatura" || rol === "admin") ? "" : "none";
     });
     document.querySelectorAll(".tecnico-only").forEach(el => {
       el.style.display = rol === "tecnico" ? "" : "none";
     });
     document.querySelectorAll(".jefatura-only").forEach(el => {
       el.style.display = rol === "jefatura" ? "" : "none";
+    });
+    document.querySelectorAll(".admin-jefatura-only").forEach(el => {
+      el.style.display = (rol === "admin" || rol === "jefatura") ? "" : "none";
     });
 
     // Reordenar nav: técnico ve Lista primero
@@ -118,13 +124,25 @@ const App = (() => {
   }
 
   // ── PIN de jefatura ──────────────────────────────────────
-  const PIN_CORRECTO = "1234"; // ← CAMBIÁ ESTE PIN
   let _pinActual = "";
+  let _pinRolObjetivo = "jefatura"; // qué rol se está desbloqueando
 
   function _initPin() {
     document.getElementById("btn-jefatura-acceso").addEventListener("click", () => {
+      _pinRolObjetivo = "jefatura";
       _pinActual = "";
       _actualizarPuntos();
+      document.getElementById("pin-titulo").textContent = "Acceso Jefatura";
+      document.getElementById("screen-rol").classList.add("hidden");
+      document.getElementById("screen-pin").classList.remove("hidden");
+      document.getElementById("pin-error").textContent = "";
+    });
+
+    document.getElementById("btn-admin-acceso").addEventListener("click", () => {
+      _pinRolObjetivo = "admin";
+      _pinActual = "";
+      _actualizarPuntos();
+      document.getElementById("pin-titulo").textContent = "Acceso Admin";
       document.getElementById("screen-rol").classList.add("hidden");
       document.getElementById("screen-pin").classList.remove("hidden");
       document.getElementById("pin-error").textContent = "";
@@ -136,8 +154,11 @@ const App = (() => {
         _pinActual += btn.dataset.n;
         _actualizarPuntos();
         if (_pinActual.length === 4) {
-          if (_pinActual === PIN_CORRECTO) {
-            Config.setRol("jefatura");
+          const pinCorrecto = _pinRolObjetivo === "admin"
+            ? Config.getPinAdmin()
+            : Config.getPinJefatura();
+          if (_pinActual === pinCorrecto) {
+            Config.setRol(_pinRolObjetivo);
             document.getElementById("screen-pin").classList.add("hidden");
             document.getElementById("app").classList.remove("hidden");
             _actualizarRolUI();
@@ -226,6 +247,19 @@ const App = (() => {
   function _initNav() {
     document.querySelectorAll(".nav-btn[data-view]").forEach(btn => {
       btn.addEventListener("click", () => showView(btn.dataset.view));
+    });
+
+    document.getElementById("nav-cambiar-pin").addEventListener("click", () => {
+      const rol = Config.getRol();
+      const pinActual = rol === "admin" ? Config.getPinAdmin() : Config.getPinJefatura();
+      const nuevo = prompt(`PIN actual confirmado.\nIngresá el nuevo PIN de ${rol === "admin" ? "Admin" : "Jefatura"} (4 dígitos):`);
+      if (!nuevo) return;
+      if (!/^\d{4}$/.test(nuevo)) { toast("El PIN debe tener exactamente 4 dígitos", "error"); return; }
+      const confirmar = prompt("Repetí el nuevo PIN:");
+      if (nuevo !== confirmar) { toast("Los PINs no coinciden", "error"); return; }
+      if (rol === "admin") Config.setPinAdmin(nuevo);
+      else Config.setPinJefatura(nuevo);
+      toast("PIN actualizado correctamente", "ok");
     });
 
     document.getElementById("btn-cambiar-rol").addEventListener("click", () => {

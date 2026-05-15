@@ -57,6 +57,7 @@
       </div>
     </div>
     <button id="btn-jefatura-acceso" style="position:absolute;bottom:1rem;right:1rem;font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:inherit">Jefatura</button>
+    <button id="btn-admin-acceso" style="position:absolute;bottom:1rem;right:7rem;font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:inherit">Admin</button>
   </div>
 
   <!-- ══════════════════════════════════════════════
@@ -65,7 +66,7 @@
   <div id="screen-pin" class="screen hidden" style="position:relative">
     <div class="setup-card" style="width:320px">
       <div class="logo">🔐</div>
-      <h1 style="font-size:1.2rem">Acceso Jefatura</h1>
+      <h1 style="font-size:1.2rem" id="pin-titulo">Acceso Jefatura</h1>
       <p>Ingresá el PIN de acceso</p>
       <div style="display:flex;gap:8px;justify-content:center;margin:1.5rem 0" id="pin-dots">
         <div class="pin-dot" id="pin-d1"></div>
@@ -152,6 +153,10 @@
         <button class="nav-btn admin-only" data-view="parte" id="nav-parte">
           <span class="nav-icon">📄</span>
           <span class="nav-label">Parte diario</span>
+        </button>
+        <button class="nav-btn admin-jefatura-only" id="nav-cambiar-pin" style="margin-top:auto">
+          <span class="nav-icon">🔑</span>
+          <span class="nav-label">Cambiar PIN</span>
         </button>
       </nav>
 
