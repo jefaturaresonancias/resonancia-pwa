@@ -298,6 +298,7 @@ const App = (() => {
     BuscarView.init();
     ParteView.init();
     StatsView.init();
+    ConfigView.init();
     _initPin();
 
     // Si ya tiene URL guardada, saltar el setup
