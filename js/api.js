@@ -157,11 +157,6 @@ const API = (() => {
       return get({ action: "verificarRIS", fecha });
     },
 
-    /**
-     * Escribe filas RIS. Solo agrega las nuevas (por hash).
-     * @param {string} fecha  dd/MM/yyyy
-     * @param {Array}  filas  [{ hora, documento, apellido_nombre, practica }]
-     */
     /** Lee secciones del Config */
     leerConfig(seccion) {
       return get({ action: "leerConfig", seccion: seccion || "all" });
