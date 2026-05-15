@@ -29,6 +29,7 @@ const App = (() => {
     if (id === "lista")  ListaView.cargar();
     if (id === "turno")  { TurnoView.abrirPanel(); return; }
     if (id === "stats")  StatsView.cargar();
+    if (id === "pami")   PamiView.cargar();
     if (id === "config") ConfigView.cargar();
   }
 
@@ -298,6 +299,7 @@ const App = (() => {
     BuscarView.init();
     ParteView.init();
     StatsView.init();
+    PamiView.init();
     ConfigView.init();
     _initPin();
 
