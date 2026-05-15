@@ -225,12 +225,21 @@ const AgendaView = (() => {
 
     // Si hay solo RIS en slot libre → celda RIS clickeable
     if (tieneRIS && (tipo === "libre" || tipo === "continuacion")) {
+      const hoy  = new Date(); hoy.setHours(0,0,0,0);
+      const fParts = fecha.split("/");
+      const fDate  = new Date(parseInt(fParts[2]), parseInt(fParts[1])-1, parseInt(fParts[0]));
+      const pasado = fDate < hoy;
+      const est    = ris.estado || "";
+      const atendido = est === "Atendido" || est === "Presente";
+      const asignado = est === "Asignado" && pasado;
+      const estadoIcon = atendido ? "✓" : asignado ? "✗" : "";
+      const estadoColor = atendido ? "#2e7d32" : "#c62828";
       return `<td class="slot-ris-clickable" style="background:#f4f4f4;border-left:2px dashed #bbb;border:1px solid #e4e8ee;cursor:pointer"
         data-fecha="${fecha}" data-mins="${mins}"
         data-ris-nombre="${encodeURIComponent(ris.apellido_nombre)}" data-ris-practica="${encodeURIComponent(ris.practica)}"
-        title="RIS: ${ris.apellido_nombre}\nClic para asignar sobreturno aquí">
+        title="RIS: ${ris.apellido_nombre}\nEstado: ${est}\nClic para asignar sobreturno aquí">
         <div class="slot-content">
-          <span class="slot-nombre" style="color:#888;font-style:italic">${ris.apellido_nombre}</span>
+          <span class="slot-nombre" style="color:#888;font-style:italic">${estadoIcon ? `<span style="color:${estadoColor};font-weight:700;margin-right:2px">${estadoIcon}</span>` : ""}${ris.apellido_nombre}</span>
           <span class="slot-estudio" style="color:#aaa;font-size:10px">${ris.practica} <span style="background:#ddd;color:#777;border-radius:3px;padding:0 3px;font-size:9px">RIS</span></span>
         </div>
       </td>`;
@@ -244,9 +253,13 @@ const AgendaView = (() => {
     if (tieneRIS && !cardioSlot && slot && (tipo === "franja" || tipo === "franja_origen" || tipo === "bloqueo_rec" || tipo === "bloqueo")) {
       const bg      = slot.color || "#ccc";
       const label   = slot.label || tipo;
-      // Color RIS = color de franja muy suave (22% opacidad) con borde del color
-      const risBg   = bg + "33"; // hex con alpha ~20%
-      const risBord = bg + "88"; // hex con alpha ~53%
+      const risBg   = bg + "33";
+      const risBord = bg + "88";
+      // Badge de estado RIS
+      const estadoRIS = ris.estado || "";
+      const estadoBadge = estadoRIS
+        ? `<span style="background:${risBord};color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">${estadoRIS}</span>`
+        : "";
       return `<td style="padding:0;border:1px solid #e4e8ee;height:36px">
         <div style="display:flex;height:100%;gap:1px">
           <div class="slot-content" style="flex:1;background:${bg};overflow:hidden">
@@ -257,8 +270,9 @@ const AgendaView = (() => {
             data-ris-nombre="${encodeURIComponent(ris.apellido_nombre)}"
             data-ris-practica="${encodeURIComponent(ris.practica)}"
             title="RIS: ${ris.apellido_nombre} — ${ris.practica}\nClic para sobreturno">
+            <div style="display:flex;gap:2px;align-items:center">${estadoBadge}<span style="background:#888;color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">RIS</span></div>
             <span class="slot-nombre" style="color:#555;font-style:italic;font-size:10px">${ris.apellido_nombre}</span>
-            <span class="slot-estudio" style="color:#777;font-size:9px">${ris.practica} <span style="background:${risBord};color:#fff;border-radius:3px;padding:0 3px;font-size:8px">RIS</span></span>
+            <span class="slot-estudio" style="color:#777;font-size:9px">${ris.practica}</span>
           </div>
         </div>
       </td>`;
