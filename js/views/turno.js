@@ -365,11 +365,34 @@ const TurnoView = (() => {
     await cargarEstudios();
     abrirPanel();
 
-    // Precargar datos del paciente
+    // Precargar datos del paciente — bloqueados por defecto
     document.getElementById("t-nombre").value   = turno.nombre;
     document.getElementById("t-apellido").value = turno.apellido;
     document.getElementById("t-dni").value      = turno.dni;
     document.getElementById("t-obs").value      = turno.observaciones;
+
+    const camposPaciente = ["t-nombre","t-apellido","t-dni","t-origen","t-obs"];
+    camposPaciente.forEach(id => {
+      const el = document.getElementById(id);
+      el.disabled = true;
+      el.style.background = "#f0f0f0";
+      el.style.color = "#888";
+    });
+
+    const btnCambiar = document.createElement("button");
+    btnCambiar.type = "button";
+    btnCambiar.textContent = "✏️ Cambiar datos del paciente";
+    btnCambiar.style.cssText = "background:none;border:1px solid #aaa;color:#666;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;margin-bottom:.5rem";
+    btnCambiar.addEventListener("click", () => {
+      camposPaciente.forEach(id => {
+        const el = document.getElementById(id);
+        el.disabled = false;
+        el.style.background = "";
+        el.style.color = "";
+      });
+      btnCambiar.remove();
+    });
+    document.getElementById("form-turno").insertBefore(btnCambiar, document.getElementById("form-turno").querySelector(".form-group"));
 
     // Precargar origen
     const selOrigen = document.getElementById("t-origen");
