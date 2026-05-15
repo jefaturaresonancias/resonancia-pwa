@@ -29,6 +29,7 @@ const App = (() => {
     if (id === "lista")  ListaView.cargar();
     if (id === "turno")  { TurnoView.abrirPanel(); return; }
     if (id === "stats")  StatsView.cargar();
+    if (id === "config") ConfigView.cargar();
   }
 
   // ── Abrir turno con fecha/hora prellenos (desde agenda) ───
