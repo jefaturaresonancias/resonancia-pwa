@@ -78,9 +78,10 @@ const AgendaView = (() => {
     for (const d of datos) html += `<th class="${d.esFeriado?"feriado-col":""}">${d.label}${d.esFeriado?" 🚫":""}</th>`;
     html += "</tr></thead><tbody>";
 
-    // Rastrear turno activo y RIS activo por columna
-    const activosPorCol = new Array(datos.length).fill(null); // { slot, hasta }
-    const risActivoCol  = new Array(datos.length).fill(null); // { ris, hasta, mostrado }
+    // Rastrear turno activo, RIS activo y cardio activo por columna
+    const activosPorCol  = new Array(datos.length).fill(null); // { slot, hasta }
+    const risActivoCol   = new Array(datos.length).fill(null); // { ris, hasta, mostrado }
+    const cardioActivoCol = new Array(datos.length).fill(null); // { cp, hasta, mostrado }
 
     for (let si = 0; si < slots.length; si++) {
       const mins     = slots[si];
@@ -182,9 +183,35 @@ const AgendaView = (() => {
           }
         }
 
+        // Determinar si hay cardio para mostrar o es continuación
+        const cardioActivo = cardioActivoCol[di];
+        let cardioRender = [];
+        if (cardioActivo) {
+          const esFranjaSlot = s && (s.tipo === "franja" || s.tipo === "franja_origen" || s.tipo === "bloqueo_rec") &&
+                               (s.label||"").toLowerCase().includes("cardiol");
+          if (esFranjaSlot) {
+            if (!cardioActivo.mostrado) {
+              // Primera vez → mostrar completo
+              cardioActivo.mostrado = true;
+              cardioRender = [cardioActivo.cp];
+            } else {
+              // Continuación → barra del color de la franja
+              const bg  = s.color || "#e8a0c0";
+              html += `<td class="slot-continua" style="background:${bg}22;border-left:3px solid ${bg}88;border-top:none;border-bottom:none;padding:2px 5px">
+                <div style="height:100%;display:flex;align-items:center;justify-content:space-between;pointer-events:none">
+                  <div style="height:1px;flex:1;background:${bg}55"></div>
+                  <span style="color:${bg}99;font-size:9px;padding:0 4px">cardio</span>
+                </div></td>`;
+              html += "</tr>" === "" ? "" : ""; // placeholder para no duplicar html +=
+              // Saltar al siguiente
+              continue;
+            }
+          }
+        }
+
         // Render normal — si hay RIS nuevo, marcarlo como mostrado
         if (risNuevo && risActivoCol[di]) risActivoCol[di].mostrado = true;
-        const renderRIS = cardioSlotArr.length > 0 ? cardioSlotArr : (risNuevo ? [risNuevo] : []);
+        const renderRIS = cardioRender.length > 0 ? cardioRender : (risNuevo ? [risNuevo] : []);
         html += _renderCeldaCombinada(s, renderRIS, dia.fecha, mins);
         }
       }
