@@ -472,7 +472,7 @@ const ParteView = (() => {
         const hora      = String(row[0]||"").trim();
         const documento = String(row[1]||"").trim();
         const estado    = String(row[6]||"").trim().toUpperCase();
-        if (!hora || !documento || estado === "CA") continue;
+        if (!hora || !documento) continue;
 
         const docKey = documento.replace(/^DNI\s*/i,"").trim();
         if (vistos.has(docKey)) continue;
@@ -481,7 +481,8 @@ const ParteView = (() => {
         actualizaciones.push({
           hora,
           documento,
-          estado: estadoMap[estado] || estado
+          estado: estadoMap[estado] || estado,
+          cancelado: estado === "CA"
         });
       }
 
