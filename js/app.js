@@ -93,7 +93,7 @@ const App = (() => {
                       : "Administrativo";
 
     // Vista default según rol
-    const defaultView = rol === "jefatura" ? "stats" : "agenda";
+    const defaultView = "agenda";
 
     // Mostrar/ocultar items según rol
     document.querySelectorAll(".admin-only").forEach(el => {
