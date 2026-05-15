@@ -166,9 +166,11 @@ const AgendaView = (() => {
               const dniR = String(r.documento||"").replace(/[A-Za-z\s]+/,"").trim().replace(/^0+/,"");
               return dniR === dniCP;
             });
-            // Solo mostrar si el slot es de franja cardiología
-            if (s && (s.tipo === "franja" || s.tipo === "franja_origen") &&
-                (s.label||"").toLowerCase().includes("cardio")) {
+            // Solo mostrar si el slot es de franja cardiología (cualquier tipo de bloqueo/franja)
+            const labelSlot = (s && s.label || "").toLowerCase();
+            const esCardio  = labelSlot.includes("cardiol") || labelSlot.includes("cardiolog");
+            const esFranja  = s && (s.tipo === "franja" || s.tipo === "franja_origen" || s.tipo === "bloqueo_rec" || s.tipo === "bloqueo");
+            if (esFranja && esCardio) {
               // Primera aparición del paciente en este slot
               const cKey = dia.fecha + "_" + dniCP;
               if (!window._cardioMostrado) window._cardioMostrado = new Set();
