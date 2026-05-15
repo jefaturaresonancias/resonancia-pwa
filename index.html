@@ -451,6 +451,16 @@
     </div>
   </div>
 
+  <!-- PANEL OPCIONES TURNO ───────────────────── -->
+  <div id="panel-overlay-turno" onclick="App.cerrarOpcionesTurno()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:200"></div>
+  <div id="panel-opciones-turno" style="display:none;position:fixed;top:52px;right:0;bottom:0;width:480px;max-width:95vw;background:var(--surface);z-index:201;flex-direction:column;box-shadow:-4px 0 24px rgba(0,0,0,.18);overflow:hidden">
+    <div class="view-header" style="flex-shrink:0;background:var(--navy);color:#fff">
+      <h2 style="color:#fff" id="panel-opciones-titulo">Opciones del turno</h2>
+      <button onclick="App.cerrarOpcionesTurno()" style="background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;padding:5px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">← Cerrar</button>
+    </div>
+    <div id="panel-opciones-body" style="flex:1;overflow-y:auto;padding:1.5rem;display:flex;flex-direction:column;gap:1rem"></div>
+  </div>
+
   <!-- TOAST ──────────────────────────────────── -->
   <div id="toast" class="toast hidden"></div>
 
