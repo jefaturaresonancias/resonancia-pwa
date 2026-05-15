@@ -103,12 +103,16 @@ const AgendaView = (() => {
         // RIS: buscar el que empieza exactamente en este slot (rm >= mins && rm < nextMins)
         const dniAgenda   = new Set((dia.slots||[]).filter(sl=>sl.dni).map(sl=>String(sl.dni).trim().replace(/^0+/,"")));
         const apellAgenda = new Set((dia.slots||[]).filter(sl=>sl.apellido).map(sl=>sl.apellido.trim().toUpperCase()));
+        // Excluir RIS que ya están en la agenda cardiológica del día
+        const dniCardio = new Set((cardioMap[dia.fecha]||[]).map(c => String(c.dni||"").trim().replace(/^0+/,"")));
         const risNuevo = (risMap[dia.fecha]||[]).find(r => {
           const rm = typeof r.mins==="number" ? r.mins : parsearMinsJS(r.hora);
           if (rm < mins || rm >= nextMins) return false;
           const dniRIS   = String(r.documento||"").replace(/[A-Za-z]+\s*/,"").trim().replace(/^0+/,"");
           const apellRIS = String(r.apellido_nombre||"").split(",")[0].trim().toUpperCase();
-          return !dniAgenda.has(dniRIS) && !apellAgenda.has(apellRIS);
+          if (dniAgenda.has(dniRIS) || apellAgenda.has(apellRIS)) return false;
+          if (dniCardio.has(dniRIS)) return false; // ya aparece en franja cardio
+          return true;
         });
 
         // Si hay RIS nuevo → registrar activo, marcar como NO mostrado aún
