@@ -37,9 +37,43 @@ const App = (() => {
   }
 
   // ── Mostrar opciones de un turno (click en celda) ─────────
-  function mostrarOpcionesTurno(fila) {
-    // Por ahora sólo avisa; en el futuro se puede abrir un modal de anular/modificar
-    // toast(`Turno seleccionado (fila ${fila}). Usá Buscar para modificarlo.`);
+  let _turnoSeleccionado = null;
+
+  function mostrarOpcionesTurno(fila, tooltipEncoded) {
+    if (!fila) return;
+    const tip = tooltipEncoded ? decodeURIComponent(tooltipEncoded) : "";
+    _turnoSeleccionado = { fila: parseInt(fila), tooltip: tip };
+
+    const body = document.getElementById("panel-opciones-body");
+    body.innerHTML = `
+      <div style="background:var(--bg);border-radius:8px;padding:1rem;font-size:13px;white-space:pre-line;color:var(--text-2)">${tip}</div>
+      <button id="btn-op-modificar" class="btn-primary" style="padding:12px;font-size:14px">✏️ Modificar turno</button>
+      <button id="btn-op-anular" style="padding:12px;font-size:14px;border-radius:6px;border:2px solid var(--danger);background:transparent;color:var(--danger);font-weight:700;cursor:pointer">🗑 Anular turno</button>
+    `;
+
+    document.getElementById("btn-op-anular").addEventListener("click", async () => {
+      if (!confirm(`¿Anular este turno?\n\n${tip}\n\nEsta acción no se puede deshacer.`)) return;
+      try {
+        await API.anular(_turnoSeleccionado.fila);
+        toast("Turno anulado", "ok");
+        cerrarOpcionesTurno();
+        refrescarAgenda();
+      } catch(e) { toast("Error: "+e.message, "error"); }
+    });
+
+    document.getElementById("btn-op-modificar").addEventListener("click", () => {
+      cerrarOpcionesTurno();
+      TurnoView.abrirPanelModificar(_turnoSeleccionado.fila, tip);
+    });
+
+    document.getElementById("panel-opciones-turno").style.display = "flex";
+    document.getElementById("panel-overlay-turno").style.display = "block";
+  }
+
+  function cerrarOpcionesTurno() {
+    document.getElementById("panel-opciones-turno").style.display = "none";
+    document.getElementById("panel-overlay-turno").style.display = "none";
+    _turnoSeleccionado = null;
   }
 
   // ── Refrescar agenda tras asignar turno ───────────────────
@@ -268,7 +302,7 @@ const App = (() => {
     TurnoView.abrirPanel(fecha, hora, condicion);
   }
 
-  return { init, toast, showView, abrirTurnoConFechaHora, abrirTurnoConCondicion, abrirTurnoConRIS, mostrarOpcionesTurno, refrescarAgenda, irAListaDia };
+  return { init, toast, showView, abrirTurnoConFechaHora, abrirTurnoConCondicion, abrirTurnoConRIS, mostrarOpcionesTurno, cerrarOpcionesTurno, refrescarAgenda, irAListaDia };
 })();
 
 // Arrancar cuando el DOM esté listo

@@ -404,7 +404,7 @@ const AgendaView = (() => {
       });
       td.addEventListener("mousemove", e => { if(tip) _posTip(e,tip); });
       td.addEventListener("mouseleave", () => { if(tip){tip.remove();tip=null;} });
-      td.addEventListener("click", () => { if(td.dataset.fila) App.mostrarOpcionesTurno(td.dataset.fila); });
+      td.addEventListener("click", () => { if(td.dataset.fila) App.mostrarOpcionesTurno(td.dataset.fila, td.dataset.tooltip); });
     });
   }
 
