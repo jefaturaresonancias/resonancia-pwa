@@ -335,7 +335,14 @@ const AgendaView = (() => {
     const tipo = slot.tipo || "libre";
     const bg   = slot.color || "#fff";
     if (tipo === "libre") {
-      return `<td class="slot-libre" style="background:${bg}" data-fecha="${fecha}" data-mins="${mins}" title="Libre — clic para asignar"><div class="slot-content"><span class="slot-label" style="color:#ccc">+</span></div></td>`;
+      const p = fecha.split("/");
+      const f = new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0]));
+      f.setHours(0,0,0,0);
+      const hoy = new Date(); hoy.setHours(0,0,0,0);
+      const pasado = f < hoy;
+      return pasado
+        ? `<td class="slot-pasado" style="background:#fce8e8;cursor:default" title="Fecha pasada"><div class="slot-content"><span class="slot-label" style="color:#e0b0b0;font-size:9px">—</span></div></td>`
+        : `<td class="slot-libre" style="background:${bg}" data-fecha="${fecha}" data-mins="${mins}" title="Libre — clic para asignar"><div class="slot-content"><span class="slot-label" style="color:#ccc">+</span></div></td>`;
     }
     if (tipo === "turno") {
       const col  = _coloresOrigen(slot.origen);
