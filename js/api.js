@@ -162,6 +162,16 @@ const API = (() => {
      * @param {string} fecha  dd/MM/yyyy
      * @param {Array}  filas  [{ hora, documento, apellido_nombre, practica }]
      */
+    /** Lee secciones del Config */
+    leerConfig(seccion) {
+      return get({ action: "leerConfig", seccion: seccion || "all" });
+    },
+
+    /** Escribe una sección del Config */
+    async escribirConfig(seccion, datos) {
+      return get({ action: "escribirConfig", seccion, datos: JSON.stringify(datos) });
+    },
+
     async escribirRIS(fecha, filas) {
       // Dividir en chunks de 10 para no superar el límite de URL
       const CHUNK = 10;
