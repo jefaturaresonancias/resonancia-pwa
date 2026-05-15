@@ -165,9 +165,9 @@ const AgendaView = (() => {
             if (cardioActivoCol[di] && mins >= cardioActivoCol[di].hasta) {
               cardioActivoCol[di] = null;
             }
-            // Nuevo paciente que empieza en este slot
+            // Nuevo paciente que empieza en este slot O cuyo horario queda en este rango
             if (!cardioActivoCol[di]) {
-              const cpNuevo = cardioDia.find(c => c.mins >= mins && c.mins < nextMins);
+              const cpNuevo = cardioDia.find(c => c.mins < nextMins && (c.mins + (c.duracion||60)) > mins);
               if (cpNuevo) {
                 const dniCP    = String(cpNuevo.dni||"").trim().replace(/^0+/,"");
                 const enAgenda = (dia.slots||[]).some(sl => sl.dni && String(sl.dni).trim().replace(/^0+/,"") === dniCP);
@@ -185,7 +185,9 @@ const AgendaView = (() => {
             if (cardioActivoCol[di]) {
               if (!cardioActivoCol[di].mostrado) {
                 cardioActivoCol[di].mostrado = true;
-                cardioRender = [cardioActivoCol[di].cp];
+                // Estado de cardio agenda tiene prioridad
+                const cpConEstado = { ...cardioActivoCol[di].cp };
+                cardioRender = [cpConEstado];
               } else {
                 const bg = s.color || "#e8a0c0";
                 html += `<td style="background:${bg}22;border-left:3px solid ${bg}55;border:1px solid ${bg}33;padding:2px 5px">
@@ -303,6 +305,10 @@ const AgendaView = (() => {
       if (c._enAgenda) badges.push(`<span style="background:#4a9e5c;color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">AGENDA</span>`);
       if (c._enRIS)    badges.push(`<span style="background:#888;color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">RIS</span>`);
       badges.push(`<span style="background:#c9506a;color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">CARDIO</span>`);
+      // Estado de cardio agenda tiene prioridad — mapear a ícono
+      const estCardio = (c.estado||"").toUpperCase();
+      const atendidoC = estCardio === "REALIZADO" || estCardio === "CONFIRMADO" || estCardio === "PRESENTE";
+      const estadoIconC = atendidoC ? `<span style="color:#2e7d32;font-weight:700;margin-right:2px">✓</span>` : "";
       return `<td style="background:${bg}22;border-left:3px solid ${bg};border:1px solid ${bg}55;padding:3px 5px;cursor:pointer;height:36px"
         data-fecha="${fecha}" data-mins="${mins}"
         data-ris-nombre="${encodeURIComponent(c.apellido_nombre)}"
@@ -310,7 +316,7 @@ const AgendaView = (() => {
         title="Cardiología: ${c.apellido_nombre}\nDNI: ${c.dni}\n${c.diagnostico}\nEstado: ${c.estado}">
         <div class="slot-content">
           <div style="display:flex;align-items:center;gap:3px;margin-bottom:1px">${badges.join("")}</div>
-          <span class="slot-nombre" style="color:#555;font-weight:600">${c.apellido_nombre}</span>
+          <span class="slot-nombre" style="color:#555;font-weight:600">${estadoIconC}${c.apellido_nombre}</span>
           <span class="slot-estudio" style="color:#777;font-size:10px">${c.diagnostico}</span>
         </div>
       </td>`;
