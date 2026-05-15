@@ -119,6 +119,7 @@ const App = (() => {
       navAgenda.style.order = "1";
       navLista.style.order  = "2";
     }
+    document.getElementById("nav-cambiar-pin").style.order = "99";
 
     showView(defaultView);
   }
