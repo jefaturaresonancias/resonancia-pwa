@@ -50,6 +50,7 @@ const AgendaView = (() => {
   function _renderSemana(datos, risMap, cardioMap) {
     cardioMap = cardioMap || {};
     risMap = risMap || {};
+    const _risMapRef = risMap;
     const container = document.getElementById("agenda-container");
     if (!datos || !datos.length) { container.innerHTML = '<div class="empty-state">Sin datos.</div>'; return; }
 
@@ -207,7 +208,7 @@ const AgendaView = (() => {
           if (!skipRender) {
             if (risNuevo && risActivoCol[di]) risActivoCol[di].mostrado = true;
             const renderRIS = cardioRender.length > 0 ? cardioRender : (risNuevo ? [risNuevo] : []);
-            html += _renderCeldaCombinada(s, renderRIS, dia.fecha, mins);
+            html += _renderCeldaCombinada(s, renderRIS, dia.fecha, mins, risMap[dia.fecha] || []);
           }
         }
       }
@@ -219,7 +220,7 @@ const AgendaView = (() => {
   }
 
   // ── Celda combinada: turno propio + RIS en la misma fila ──
-  function _renderCeldaCombinada(slot, risSlot, fecha, mins) {
+  function _renderCeldaCombinada(slot, risSlot, fecha, mins, risDelDia) {
     const tipo    = slot ? slot.tipo || "libre" : "libre";
     const tieneRIS = risSlot && risSlot.length > 0;
     const ris      = tieneRIS ? risSlot[0] : null;
@@ -328,7 +329,7 @@ const AgendaView = (() => {
 
     // Default: render normal
     if (!slot) return "<td></td>";
-    return _renderSlot(slot, fecha, mins, risSlot);
+    return _renderSlot(slot, fecha, mins, risDelDia || []);
   }
 
   function _renderSlot(slot, fecha, mins, risDelDia) {
