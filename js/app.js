@@ -106,7 +106,7 @@ const App = (() => {
       el.style.display = rol === "tecnico" ? "" : "none";
     });
     document.querySelectorAll(".jefatura-only").forEach(el => {
-      el.style.display = rol === "jefatura" ? "" : "none";
+      el.style.display = (rol === "jefatura" || rol === "admin") ? "" : "none";
     });
     document.querySelectorAll(".admin-jefatura-only").forEach(el => {
       el.style.display = (rol === "admin" || rol === "jefatura") ? "" : "none";
