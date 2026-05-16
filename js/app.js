@@ -31,6 +31,7 @@ const App = (() => {
     if (id === "stats")  StatsView.cargar();
     if (id === "pami")   PamiView.cargar();
     if (id === "config") ConfigView.cargar();
+    if (id === "bot")    BotView.cargar();
   }
 
   // ── Abrir turno con fecha/hora prellenos (desde agenda) ───
@@ -301,6 +302,7 @@ const App = (() => {
     StatsView.init();
     PamiView.init();
     ConfigView.init();
+    BotView.init();
     _initPin();
 
     // Si ya tiene URL guardada, saltar el setup

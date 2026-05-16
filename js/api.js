@@ -184,6 +184,12 @@ const API = (() => {
           ? "Sin cambios — todos los registros ya existían"
           : `${agregadas} registros nuevos agregados, ${descartadas} ya existían`
       };
+    },
+
+    /** Log del bot — últimas ejecuciones */
+    leerLog(limite = 20) {
+      return get({ action: 'leerLog', limite });
     }
+
   };
 })();
