@@ -61,6 +61,7 @@ const BotView = (() => {
               ">${f.status}</span>
             </div>
             <div style="font-size:.85rem;color:var(--text-2);word-break:break-word">${msg}</div>
+            ${f.maquina ? `<div style="margin-top:.25rem;font-size:.75rem;color:var(--text-3)">🖥️ ${f.maquina}</div>` : ''}
             ${f.filas > 0 ? `<div style="margin-top:.25rem;font-size:.8rem;font-weight:600;color:#1a3a5c">📥 ${f.filas} turnos nuevos</div>` : ''}
           </div>
         </div>`;
