@@ -143,10 +143,6 @@
           <span class="nav-icon">🚑</span>
           <span class="nav-label">Guardias</span>
         </button>
-        <button class="nav-btn jefatura-only" data-view="guardias" id="nav-stats">
-        <span class="nav-icon">📊</span>
-        <span class="nav-label">Estadísticas</span>
-        </button>
         <button class="nav-btn tecnico-only" data-view="protocolos" id="nav-protocolos">
           <span class="nav-icon">📖</span>
           <span class="nav-label">Protocolos</span>
@@ -534,6 +530,7 @@
   <script src="js/views/bot.js"></script>
   <script src="js/app.js"></script>
   <script>
+  /* POSTMESSAGE — acceso directo a pestaña de Guardias — reutilizar cuando se implemente
   document.getElementById('nav-stats').addEventListener('click', () => {
     const iframe = document.getElementById('iframe-guardias');
     const send = () => iframe.contentWindow?.postMessage(
@@ -545,6 +542,7 @@
       iframe.addEventListener('load', () => setTimeout(send, 300), { once: true });
     }
   });
+  */
 </script>
 </body>
 </html>
