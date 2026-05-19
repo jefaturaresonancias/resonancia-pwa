@@ -444,16 +444,26 @@ const AgendaView = (() => {
                      : ausente  ? `<span style="color:#c62828;font-weight:700;margin-right:2px">✗</span>` : "";
       const badgeRIS = risMatch ? `<span style="background:#888;color:#fff;border-radius:3px;padding:0 2px;font-size:8px;font-weight:700;margin-left:2px">RIS</span>` : "";
 
-      // Single-slot → nombre grande + estudio + duración prominente
+      const esSolo = durMin <= _paso;
+      if (esSolo) {
+        // Single-slot → todo en una celda
+        return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border};padding:3px 6px;vertical-align:middle"
+          data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}">
+          <div style="pointer-events:none">
+            <div style="font-size:11px;font-weight:700;color:${col.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${iconRIS}${pres}${slot.apellido}, ${slot.nombre}</div>
+            <div style="display:flex;align-items:center;gap:4px;margin-top:1px">
+              <span style="font-size:13px;font-weight:800;color:${col.border};white-space:nowrap">${durMin}<span style="font-size:9px;font-weight:600">min</span></span>
+              <span style="font-size:9px;color:${col.text};opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🔬 ${slot.estudio}${badgeRIS}</span>
+            </div>
+            <div style="font-size:8px;color:${col.text};opacity:.65">${horaI}→${horaF} · 📍 ${slot.origen}</div>
+          </div></td>`;
+      }
+      // Multi-slot → solo nombre + origen en el slot inicial
       return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border};padding:3px 6px;vertical-align:middle"
         data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}">
         <div style="pointer-events:none">
           <div style="font-size:11px;font-weight:700;color:${col.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${iconRIS}${pres}${slot.apellido}, ${slot.nombre}</div>
-          <div style="display:flex;align-items:center;gap:4px;margin-top:1px">
-            <span style="font-size:13px;font-weight:800;color:${col.border};white-space:nowrap">${durMin}<span style="font-size:9px;font-weight:600">min</span></span>
-            <span style="font-size:9px;color:${col.text};opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🔬 ${slot.estudio}${badgeRIS}</span>
-          </div>
-          <div style="font-size:8px;color:${col.text};opacity:.65">${horaI}→${horaF} · 📍 ${slot.origen}</div>
+          <div style="font-size:9px;color:${col.text};opacity:.75">📍 ${slot.origen}${badgeRIS}</div>
         </div></td>`;
     }
 
