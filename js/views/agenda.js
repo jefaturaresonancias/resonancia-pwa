@@ -555,12 +555,21 @@ const AgendaView = (() => {
     document.getElementById("agenda-rango-label").textContent = _labelRango();
     loading.classList.remove("hidden");
     try {
-      const desde = _strFecha(_fechaDesde);
-      const [datos, risMap, cardioMap] = await Promise.all([
-        API.agenda(desde, 7, _paso),
-        API.leerRISRango(desde, 7).catch(() => ({})),
-        API.leerCardiologia(desde, 7).catch(() => ({}))
-      ]);
+      const desde    = _strFecha(_fechaDesde);
+      const cacheKey = `agenda_sem_${desde}_${_paso}`;
+      const cached   = sessionStorage.getItem(cacheKey);
+
+      let datos, risMap, cardioMap;
+      if (cached) {
+        ({ datos, risMap, cardioMap } = JSON.parse(cached));
+      } else {
+        [datos, risMap, cardioMap] = await Promise.all([
+          API.agenda(desde, 7, _paso),
+          API.leerRISRango(desde, 7).catch(() => ({})),
+          API.leerCardiologia(desde, 7).catch(() => ({}))
+        ]);
+        try { sessionStorage.setItem(cacheKey, JSON.stringify({ datos, risMap, cardioMap })); } catch(_) {}
+      }
       _renderSemana(datos, risMap, cardioMap);
     }
     catch (err) { App.toast("Error: "+err.message,"error"); }
@@ -577,10 +586,20 @@ const AgendaView = (() => {
       const dow = p.getDay();
       const lunes = new Date(p);
       lunes.setDate(p.getDate()-(dow===0?6:dow-1));
-      const [datosMes, risMes] = await Promise.all([
-        API.agenda(_strFecha(lunes), 42, _paso),
-        API.leerRISRango(_strFecha(lunes), 42).catch(() => ({}))
-      ]);
+      const desde    = _strFecha(lunes);
+      const cacheKey = `agenda_mes_${desde}_${_paso}`;
+      const cached   = sessionStorage.getItem(cacheKey);
+
+      let datosMes, risMes;
+      if (cached) {
+        ({ datosMes, risMes } = JSON.parse(cached));
+      } else {
+        [datosMes, risMes] = await Promise.all([
+          API.agenda(desde, 42, _paso),
+          API.leerRISRango(desde, 42).catch(() => ({}))
+        ]);
+        try { sessionStorage.setItem(cacheKey, JSON.stringify({ datosMes, risMes })); } catch(_) {}
+      }
       _renderMes(datosMes, risMes);
     } catch(err) { App.toast("Error: "+err.message,"error"); }
     finally      { loading.classList.add("hidden"); }

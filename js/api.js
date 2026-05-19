@@ -104,6 +104,7 @@ const API = (() => {
      * @param {object} datos  { nombre, apellido, dni, estudio, origen, fecha, hora, observaciones }
      */
     asignar(datos) {
+      sessionStorage.clear();
       return post({ action: "asignar", ...datos });
     },
 
@@ -120,6 +121,7 @@ const API = (() => {
      * @param {number} fila  Número de fila en Base de datos
      */
     anular(fila) {
+      sessionStorage.clear();
       return post({ action: "anular", fila });
     },
 
