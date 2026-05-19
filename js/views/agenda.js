@@ -96,7 +96,7 @@ const AgendaView = (() => {
 
         // Actualizar turno activo
         if (s && s.tipo === "turno") {
-          activosPorCol[di] = { slot: s, hasta: mins + (s.duracion || _paso) };
+          activosPorCol[di] = { slot: s, hasta: mins + (s.duracion || _paso), mostroContinua: false };
         } else if (activosPorCol[di] && mins >= activosPorCol[di].hasta) {
           activosPorCol[di] = null;
         }
@@ -135,14 +135,65 @@ const AgendaView = (() => {
                                 risActivo && risActivo.mostrado && mins < risActivo.hasta;
 
         if (esContinuacion || activoEnSlot) {
-          // Continuación de turno propio — barra de color, clickeable
-          const act = activosPorCol[di] ? activosPorCol[di].slot : null;
-          const col = act ? _coloresOrigen(act.origen) : { bg:"#f0f0f0", border:"#ddd" };
-          html += `<td class="slot-continua slot-libre" style="background:${col.bg}22;border-left:3px solid ${col.bg}88;border-top:none;border-bottom:none;padding:2px 5px;cursor:pointer" data-fecha="${dia.fecha}" data-mins="${mins}" title="Continúa — clic para sobreturno">
-            <div style="height:100%;display:flex;align-items:center;justify-content:space-between;pointer-events:none">
-              <div style="height:1px;flex:1;background:${col.border}44;border-top:1px solid ${col.border}33"></div>
-              <span style="color:${col.border}88;font-size:9px;font-weight:600;padding:0 4px;flex-shrink:0">+</span>
-            </div></td>`;
+          const act    = activosPorCol[di] ? activosPorCol[di].slot : null;
+          const col    = act ? _coloresOrigen(act.origen) : { bg:"#f0f0f0", border:"#ddd", text:"#666" };
+          const hasta  = activosPorCol[di] ? activosPorCol[di].hasta : mins + _paso;
+          const horaF  = String(Math.floor(hasta/60)).padStart(2,"0")+":"+String(hasta%60).padStart(2,"0");
+          const esFirst = activosPorCol[di] && !activosPorCol[di].mostroContinua;
+          if (esFirst && activosPorCol[di]) activosPorCol[di].mostroContinua = true;
+
+          // ¿Hay RIS en este slot de continuación?
+          const risEnContinua = risNuevo || (risActivo && !risActivo.mostrado ? risActivo.ris : null);
+
+          if (esFirst && act && risEnContinua) {
+            // Primera continuación CON RIS → celda dividida: info turno izq | RIS der
+            const r      = risEnContinua;
+            const startM = act.mins !== undefined ? act.mins : mins;
+            const durMin = hasta - startM;
+            const horaI  = String(Math.floor(startM/60)).padStart(2,"0")+":"+String(startM%60).padStart(2,"0");
+            const pres   = act.presente === "Presente" ? "✅ " : "";
+            if (risNuevo && risActivoCol[di]) risActivoCol[di].mostrado = true;
+            html += `<td style="padding:0;border:1px solid #e4e8ee;cursor:pointer">
+              <div style="display:flex;height:100%;gap:1px">
+                <div class="slot-continua slot-libre" style="flex:1.2;background:${col.bg}18;border-left:3px solid ${col.bg};padding:3px 5px;vertical-align:top;overflow:hidden"
+                  data-fecha="${dia.fecha}" data-mins="${mins}">
+                  <div style="font-size:10px;font-weight:600;color:${col.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none">${pres}${act.apellido}, ${act.nombre}</div>
+                  <div style="font-size:9px;color:${col.text};opacity:.8;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🔬 ${act.estudio}</div>
+                  <div style="font-size:8px;color:${col.text};opacity:.65;pointer-events:none">⏱${durMin}min ${horaI}→${horaF}</div>
+                </div>
+                <div class="slot-ris-side slot-content" style="flex:1;background:#f4f4f4;border-left:2px dashed #bbb;cursor:pointer;overflow:hidden;padding:3px 4px"
+                  data-fecha="${dia.fecha}" data-mins="${mins}"
+                  data-ris-nombre="${encodeURIComponent(r.apellido_nombre)}"
+                  data-ris-practica="${encodeURIComponent(r.practica||r.diagnostico||"")}"
+                  title="RIS: ${r.apellido_nombre} — clic para sobreturno">
+                  <span style="background:#888;color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">RIS</span>
+                  <div style="font-size:10px;color:#666;font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none">${r.apellido_nombre}</div>
+                  <div style="font-size:9px;color:#aaa;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.practica||r.diagnostico||""}</div>
+                </div>
+              </div></td>`;
+          } else if (esFirst && act) {
+            // Primera continuación SIN RIS → card completa del turno
+            const startM = act.mins !== undefined ? act.mins : mins;
+            const durMin = hasta - startM;
+            const horaI  = String(Math.floor(startM/60)).padStart(2,"0")+":"+String(startM%60).padStart(2,"0");
+            const pres   = act.presente === "Presente" ? "✅ " : "";
+            html += `<td class="slot-continua slot-libre"
+              style="background:${col.bg}18;border-left:3px solid ${col.bg};border-top:none;border-bottom:none;padding:4px 6px;cursor:pointer;vertical-align:top;overflow:hidden"
+              data-fecha="${dia.fecha}" data-mins="${mins}" title="Clic para sobreturno">
+              <div style="pointer-events:none">
+                <div style="font-size:10px;font-weight:600;color:${col.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">👤 ${pres}${act.apellido}, ${act.nombre}</div>
+                <div style="font-size:9px;color:${col.text};opacity:.85;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🔬 ${act.estudio}</div>
+                <div style="font-size:9px;color:${col.text};opacity:.7;margin-top:1px">⏱ ${durMin}min · ${horaI}→${horaF} · 📍 ${act.origen}</div>
+              </div></td>`;
+          } else {
+            // Continuaciones siguientes → barra fina con hora fin
+            html += `<td class="slot-continua slot-libre"
+              style="background:${col.bg}0d;border-left:3px solid ${col.bg}44;border-top:none;border-bottom:none;padding:2px 6px;cursor:pointer"
+              data-fecha="${dia.fecha}" data-mins="${mins}" title="→${horaF} — clic para sobreturno">
+              <div style="height:100%;display:flex;align-items:center;justify-content:flex-end;pointer-events:none">
+                <span style="color:${col.border}66;font-size:8px;font-weight:600">→${horaF}</span>
+              </div></td>`;
+          }
         } else if (risContinuacion) {
           // Continuación de RIS — clickeable para sobreturno
           const r = risActivo.ris;
@@ -208,7 +259,7 @@ const AgendaView = (() => {
           if (!skipRender) {
             if (risNuevo && risActivoCol[di]) risActivoCol[di].mostrado = true;
             const renderRIS = cardioRender.length > 0 ? cardioRender : (risNuevo ? [risNuevo] : []);
-            html += _renderCeldaCombinada(s, renderRIS, dia.fecha, mins, risMap[dia.fecha] || []);
+            html += _renderCeldaCombinada(s, renderRIS, dia.fecha, mins, risMap[dia.fecha] || [], activosPorCol[di] ? activosPorCol[di].hasta : mins + _paso);
           }
         }
       }
@@ -220,7 +271,133 @@ const AgendaView = (() => {
   }
 
   // ── Celda combinada: turno propio + RIS en la misma fila ──
-  function _renderCeldaCombinada(slot, risSlot, fecha, mins, risDelDia) {
+  function _renderCeldaCombinada(slot, risSlot, fecha, mins, risDelDia, hasta) {
+    const tipo     = slot ? slot.tipo || "libre" : "libre";
+    const tieneRIS = risSlot && risSlot.length > 0;
+    const ris      = tieneRIS ? risSlot[0] : null;
+    const durMin   = hasta ? hasta - mins : _paso;
+    const horaF    = hasta ? String(Math.floor(hasta/60)).padStart(2,"0")+":"+String(hasta%60).padStart(2,"0") : "";
+
+    // ── Turno propio + RIS → celda dividida ──
+    if (tipo === "turno" && tieneRIS) {
+      const col  = _coloresOrigen(slot.origen);
+      const pres = slot.presente === "Presente" ? "✅ " : "";
+      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}`;
+      const est  = ris.estado || "";
+      const estadoBadgeRIS = est ? `<span style="background:#666;color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">${est}</span>` : "";
+      return `<td style="padding:0;border:1px solid #e4e8ee">
+        <div style="display:flex;height:100%;gap:1px">
+          <div class="slot-turno slot-content" style="flex:1.2;background:${slot.color||col.bg};border-left:3px solid ${col.border};cursor:pointer;overflow:hidden;padding:3px 5px"
+            data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}">
+            <span class="slot-nombre" style="color:${col.text};pointer-events:none">${pres}${slot.apellido}, ${slot.nombre}</span>
+            <span class="slot-estudio" style="color:${col.text};pointer-events:none">${slot.estudio}</span>
+            <span style="font-size:8px;color:${col.text};opacity:.7;pointer-events:none">⏱${durMin}min${horaF?" →"+horaF:""}</span>
+          </div>
+          <div class="slot-ris-side slot-content" style="flex:1;background:#f0f0f0;border-left:2px dashed #bbb;cursor:pointer;overflow:hidden;padding:3px 4px"
+            data-fecha="${fecha}" data-mins="${mins}"
+            data-ris-nombre="${encodeURIComponent(ris.apellido_nombre)}"
+            data-ris-practica="${encodeURIComponent(ris.practica||"")}"
+            title="RIS: ${ris.apellido_nombre} — clic para sobreturno">
+            <div style="display:flex;gap:2px;align-items:center;pointer-events:none">
+              ${estadoBadgeRIS}
+              <span style="background:#888;color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">RIS</span>
+            </div>
+            <span class="slot-nombre" style="color:#777;font-style:italic;font-size:10px;pointer-events:none">${ris.apellido_nombre}</span>
+            <span class="slot-estudio" style="color:#aaa;font-size:9px;pointer-events:none">${ris.practica||""}</span>
+          </div>
+        </div>
+      </td>`;
+    }
+
+    // ── Solo RIS en slot libre ──
+    if (tieneRIS && (tipo === "libre" || tipo === "continuacion")) {
+      const hoy    = new Date(); hoy.setHours(0,0,0,0);
+      const fParts = fecha.split("/");
+      const fDate  = new Date(parseInt(fParts[2]), parseInt(fParts[1])-1, parseInt(fParts[0]));
+      const pasado = fDate < hoy;
+      const est    = ris.estado || "";
+      const atendido = est === "Atendido" || est === "Presente";
+      const ausente  = est === "Asignado" && pasado;
+      const iconEst  = atendido ? `<span style="color:#2e7d32;font-weight:700">✓ </span>`
+                     : ausente  ? `<span style="color:#c62828;font-weight:700">✗ </span>` : "";
+      const badgeEst = est ? `<span style="background:${atendido?"#4a9e5c":ausente?"#c62828":"#888"};color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">${est}</span>` : "";
+      return `<td class="slot-ris-clickable" style="background:#f4f4f4;border-left:2px dashed #bbb;border:1px solid #e4e8ee;cursor:pointer;padding:3px 5px"
+        data-fecha="${fecha}" data-mins="${mins}"
+        data-ris-nombre="${encodeURIComponent(ris.apellido_nombre)}"
+        data-ris-practica="${encodeURIComponent(ris.practica||"")}"
+        title="RIS: ${ris.apellido_nombre}\nEstado: ${est}\nClic para sobreturno">
+        <div class="slot-content">
+          <div style="display:flex;gap:2px;align-items:center;margin-bottom:1px">
+            ${badgeEst}
+            <span style="background:#888;color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">RIS</span>
+          </div>
+          <span class="slot-nombre" style="color:#666;font-style:italic">${iconEst}${ris.apellido_nombre}</span>
+          <span class="slot-estudio" style="color:#999;font-size:9px">${ris.practica||""}</span>
+        </div>
+      </td>`;
+    }
+
+    const cardioSlot = tieneRIS && risSlot[0]?._cardio ? risSlot[0] : null;
+
+    // ── Franja + RIS → dividida con RIS más legible ──
+    if (tieneRIS && !cardioSlot && slot &&
+        (tipo === "franja" || tipo === "franja_origen" || tipo === "bloqueo_rec" || tipo === "bloqueo")) {
+      const bg      = slot.color || "#ccc";
+      const label   = slot.label || tipo;
+      const est     = ris.estado || "";
+      const atendido = est === "Atendido" || est === "Presente";
+      const badgeEst = est
+        ? `<span style="background:${atendido?"#4a9e5c":"#888"};color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">${est}</span>`
+        : "";
+      return `<td style="padding:0;border:1px solid #e4e8ee">
+        <div style="display:flex;height:100%;gap:1px">
+          <div class="slot-content" style="flex:.8;background:${bg};overflow:hidden;padding:3px 5px">
+            <span class="slot-label" style="font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label}</span>
+          </div>
+          <div class="slot-ris-side slot-content" style="flex:1.2;background:${bg}22;border-left:2px dashed ${bg}88;cursor:pointer;overflow:hidden;padding:3px 5px"
+            data-fecha="${fecha}" data-mins="${mins}"
+            data-ris-nombre="${encodeURIComponent(ris.apellido_nombre)}"
+            data-ris-practica="${encodeURIComponent(ris.practica||"")}"
+            title="RIS: ${ris.apellido_nombre} — clic para sobreturno">
+            <div style="display:flex;gap:2px;align-items:center;margin-bottom:1px;pointer-events:none">
+              ${badgeEst}
+              <span style="background:#888;color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">RIS</span>
+            </div>
+            <span class="slot-nombre" style="color:#555;font-weight:600;font-size:10px;pointer-events:none">${ris.apellido_nombre}</span>
+            <span class="slot-estudio" style="color:#777;font-size:9px;pointer-events:none">${ris.practica||""}</span>
+          </div>
+        </div>
+      </td>`;
+    }
+
+    // ── Cardio en franja ──
+    if (cardioSlot && slot) {
+      const bg  = slot.color || "#e8a0c0";
+      const c   = cardioSlot;
+      const badges = [];
+      if (c._enAgenda) badges.push(`<span style="background:#4a9e5c;color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">AGENDA</span>`);
+      if (c._enRIS)    badges.push(`<span style="background:#888;color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">RIS</span>`);
+      badges.push(`<span style="background:#c9506a;color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">CARDIO</span>`);
+      const estCardio  = (c.estado||"").toUpperCase();
+      const atendidoC  = estCardio === "REALIZADO" || estCardio === "CONFIRMADO" || estCardio === "PRESENTE";
+      const estadoIconC = atendidoC ? `<span style="color:#2e7d32;font-weight:700;margin-right:2px">✓</span>` : "";
+      return `<td style="background:${bg}22;border-left:3px solid ${bg};border:1px solid ${bg}55;padding:3px 5px;cursor:pointer"
+        data-fecha="${fecha}" data-mins="${mins}"
+        data-ris-nombre="${encodeURIComponent(c.apellido_nombre)}"
+        data-ris-practica="${encodeURIComponent(c.diagnostico)}"
+        title="Cardiología: ${c.apellido_nombre}\nDNI: ${c.dni}\n${c.diagnostico}\nEstado: ${c.estado}">
+        <div class="slot-content">
+          <div style="display:flex;align-items:center;gap:3px;margin-bottom:1px">${badges.join("")}</div>
+          <span class="slot-nombre" style="color:#555;font-weight:600">${estadoIconC}${c.apellido_nombre}</span>
+          <span class="slot-estudio" style="color:#777;font-size:10px">${c.diagnostico}</span>
+        </div>
+      </td>`;
+    }
+
+    // ── Default ──
+    if (!slot) return "<td></td>";
+    return _renderSlot(slot, fecha, mins, risDelDia || [], hasta);
+  }
     const tipo    = slot ? slot.tipo || "libre" : "libre";
     const tieneRIS = risSlot && risSlot.length > 0;
     const ris      = tieneRIS ? risSlot[0] : null;
@@ -332,7 +509,66 @@ const AgendaView = (() => {
     return _renderSlot(slot, fecha, mins, risDelDia || []);
   }
 
-  function _renderSlot(slot, fecha, mins, risDelDia) {
+  function _renderSlot(slot, fecha, mins, risDelDia, hasta) {
+    slot._risDelDia = risDelDia || [];
+    const tipo   = slot.tipo || "libre";
+    const bg     = slot.color || "#fff";
+    const durMin = hasta ? hasta - mins : _paso;
+    const horaF  = hasta ? String(Math.floor(hasta/60)).padStart(2,"0")+":"+String(hasta%60).padStart(2,"0") : "";
+    const horaI  = String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0");
+
+    if (tipo === "libre") {
+      const p = fecha.split("/");
+      const f = new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0]));
+      f.setHours(0,0,0,0);
+      const hoy = new Date(); hoy.setHours(0,0,0,0);
+      const pasado = f < hoy;
+      return pasado
+        ? `<td class="slot-pasado" style="background:#fce8e8;cursor:default"><div class="slot-content"><span class="slot-label" style="color:#e0b0b0;font-size:9px">—</span></div></td>`
+        : `<td class="slot-libre" style="background:${bg}" data-fecha="${fecha}" data-mins="${mins}" title="Libre — clic para asignar"><div class="slot-content"><span class="slot-label" style="color:#ccc">+</span></div></td>`;
+    }
+
+    if (tipo === "turno") {
+      const col    = _coloresOrigen(slot.origen);
+      const pres   = slot.presente === "Presente" ? "✅ " : "";
+      const tip    = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${pres?"✅ Presente":""}`;
+      const dniLimpio = String(slot.dni||"").trim().replace(/^0+/,"");
+      const risMatch  = (slot._risDelDia||[]).find(r => {
+        const dniR = String(r.documento||"").replace(/[A-Za-z]+/,"").trim().replace(/^0+/,"");
+        return dniR === dniLimpio;
+      });
+      const estRIS   = risMatch ? (risMatch.estado||"") : "";
+      const hoy      = new Date(); hoy.setHours(0,0,0,0);
+      const fp       = fecha.split("/");
+      const fDate    = new Date(parseInt(fp[2]), parseInt(fp[1])-1, parseInt(fp[0]));
+      const pasado   = fDate < hoy;
+      const atendido = estRIS === "Atendido" || estRIS === "Presente";
+      const ausente  = estRIS === "Asignado" && pasado;
+      const iconRIS  = atendido ? `<span style="color:#2e7d32;font-weight:700;margin-right:2px">✓</span>`
+                     : ausente  ? `<span style="color:#c62828;font-weight:700;margin-right:2px">✗</span>` : "";
+      const badgeRIS = risMatch ? `<span style="background:#888;color:#fff;border-radius:3px;padding:0 2px;font-size:8px;font-weight:700;margin-left:2px">RIS</span>` : "";
+      const esSolo   = durMin <= _paso;
+
+      if (esSolo) {
+        return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border};padding:3px 5px;vertical-align:top"
+          data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}">
+          <div style="pointer-events:none">
+            <div style="font-size:11px;font-weight:700;color:${col.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${iconRIS}${pres}${slot.apellido}, ${slot.nombre}</div>
+            <div style="font-size:10px;color:${col.text};opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🔬 ${slot.estudio}${badgeRIS}</div>
+            <div style="font-size:9px;color:${col.text};opacity:.7">⏱ ${durMin}min · ${horaI}→${horaF} · 📍 ${slot.origen}</div>
+          </div></td>`;
+      }
+      return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border};padding:3px 5px;vertical-align:top"
+        data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}">
+        <div class="slot-content" style="pointer-events:none">
+          <span class="slot-nombre" style="color:${col.text}">${iconRIS}${pres}${slot.apellido}, ${slot.nombre}</span>
+          <span class="slot-estudio" style="color:${col.text}">🔬 ${slot.estudio}${badgeRIS} <span style="font-size:9px;opacity:.7">⏱${durMin}min</span></span>
+        </div></td>`;
+    }
+
+    if (tipo === "continuacion") return `<td class="slot-continua" style="background:${bg}"><div class="slot-content"></div></td>`;
+    return `<td class="slot-bloqueo" style="background:${bg}"><div class="slot-content"><span class="slot-label">${slot.label||""}</span></div></td>`;
+  }
     slot._risDelDia = risDelDia || [];
     const tipo = slot.tipo || "libre";
     const bg   = slot.color || "#fff";
