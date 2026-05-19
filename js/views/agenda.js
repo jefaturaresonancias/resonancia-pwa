@@ -49,7 +49,7 @@ const AgendaView = (() => {
   // ── VISTA SEMANA ──────────────────────────────────────────
   function _renderSemana(datos, risMap, cardioMap) {
     cardioMap = cardioMap || {};
-    risMap = risMap || {};
+    risMap    = risMap    || {};
     const container = document.getElementById("agenda-container");
     if (!datos || !datos.length) { container.innerHTML = '<div class="empty-state">Sin datos.</div>'; return; }
 
@@ -59,9 +59,8 @@ const AgendaView = (() => {
 
     for (const dia of datos) {
       for (const s of dia.slots) {
-        if (s.tipo === "turno" && s.mins >= MIN_I && s.mins < MIN_F && !slotsSet.has(s.mins)) {
+        if (s.tipo === "turno" && s.mins >= MIN_I && s.mins < MIN_F && !slotsSet.has(s.mins))
           slotsSet.add(s.mins);
-        }
       }
       for (const r of (risMap[dia.fecha] || [])) {
         const rm = typeof r.mins === "number" ? r.mins : parsearMinsJS(r.hora);
@@ -70,11 +69,30 @@ const AgendaView = (() => {
     }
     const slots = Array.from(slotsSet).sort((a,b) => a-b);
 
+    // ── Pre-computar rowspans por columna ─────────────────
+    const rowspanInfo = datos.map(() => ({}));
+    for (let di = 0; di < datos.length; di++) {
+      const dia = datos[di];
+      for (let si = 0; si < slots.length; si++) {
+        if (rowspanInfo[di][si] && rowspanInfo[di][si].skip) continue;
+        const mins = slots[si];
+        const s    = dia.slots.find(sl => sl.mins === mins);
+        if (s && s.tipo === "turno") {
+          const hasta = mins + (s.duracion || _paso);
+          let span = 1;
+          for (let sj = si + 1; sj < slots.length; sj++) {
+            if (slots[sj] < hasta) { rowspanInfo[di][sj] = { skip: true }; span++; }
+            else break;
+          }
+          rowspanInfo[di][si] = { span, slot: s, hasta };
+        }
+      }
+    }
+
     let html = '<table class="agenda-table"><thead><tr><th class="col-hora">Hora</th>';
     for (const d of datos) html += `<th class="${d.esFeriado?"feriado-col":""}">${d.label}${d.esFeriado?" 🚫":""}</th>`;
     html += "</tr></thead><tbody>";
 
-    const activosPorCol   = new Array(datos.length).fill(null);
     const risActivoCol    = new Array(datos.length).fill(null);
     const cardioActivoCol = new Array(datos.length).fill(null);
 
@@ -88,18 +106,15 @@ const AgendaView = (() => {
       for (let di = 0; di < datos.length; di++) {
         const dia = datos[di];
         const s   = dia.slots.find(sl => sl.mins === mins);
+        const ri  = rowspanInfo[di][si];
 
-        // Actualizar turno activo
-        if (s && s.tipo === "turno") {
-          activosPorCol[di] = { slot: s, hasta: mins + (s.duracion || _paso), mostroContinua: false };
-        } else if (activosPorCol[di] && mins >= activosPorCol[di].hasta) {
-          activosPorCol[di] = null;
-        }
+        // Celda cubierta por rowspan → saltar
+        if (ri && ri.skip) continue;
 
-        // RIS
+        // ── RIS tracking ──────────────────────────────────
         const dniAgenda   = new Set((dia.slots||[]).filter(sl=>sl.dni).map(sl=>String(sl.dni).trim().replace(/^0+/,"")));
         const apellAgenda = new Set((dia.slots||[]).filter(sl=>sl.apellido).map(sl=>sl.apellido.trim().toUpperCase()));
-        const dniCardio   = new Set((cardioMap[dia.fecha]||[]).map(c => String(c.dni||"").trim().replace(/^0+/,"")));
+        const dniCardio   = new Set((cardioMap[dia.fecha]||[]).map(c=>String(c.dni||"").trim().replace(/^0+/,"")));
         const risNuevo = (risMap[dia.fecha]||[]).find(r => {
           const rm = typeof r.mins==="number" ? r.mins : parsearMinsJS(r.hora);
           if (rm < mins || rm >= nextMins) return false;
@@ -117,158 +132,143 @@ const AgendaView = (() => {
           risActivoCol[di] = null;
         }
 
-        const esContinuacion = s && s.tipo === "continuacion";
-        const activoEnSlot   = !esContinuacion && activosPorCol[di] &&
-                               (!s || s.tipo === "libre") && mins < activosPorCol[di].hasta;
-        const risActivo       = risActivoCol[di];
-        const risContinuacion = !esContinuacion && !activoEnSlot && !risNuevo &&
-                                risActivo && risActivo.mostrado && mins < risActivo.hasta;
-
-        if (esContinuacion || activoEnSlot) {
-          const act    = activosPorCol[di] ? activosPorCol[di].slot : null;
-          const col    = act ? _coloresOrigen(act.origen) : { bg:"#f0f0f0", border:"#ddd", text:"#666" };
-          const hasta  = activosPorCol[di] ? activosPorCol[di].hasta : mins + _paso;
+        // ── TURNO con rowspan ─────────────────────────────
+        if (ri && ri.span) {
+          const act    = ri.slot;
+          const hasta  = ri.hasta;
+          const span   = ri.span;
+          const col    = _coloresOrigen(act.origen);
+          const bg     = act.color || col.bg;
+          const pres   = act.presente === "Presente" ? "✅ " : "";
+          const durMin = hasta - mins;
+          const horaI  = String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0");
           const horaF  = String(Math.floor(hasta/60)).padStart(2,"0")+":"+String(hasta%60).padStart(2,"0");
-          const esFirst  = activosPorCol[di] && !activosPorCol[di].mostroContinua;
-          const esSecond = activosPorCol[di] && activosPorCol[di].mostroContinua && !activosPorCol[di].mostroEstudio;
-          if (esFirst  && activosPorCol[di]) { activosPorCol[di].mostroContinua = true; }
-          if (esSecond && activosPorCol[di]) { activosPorCol[di].mostroEstudio  = true; }
+          const tip    = `${act.apellido}, ${act.nombre}\nDNI: ${act.dni}\n${act.estudio}\n${act.origen}${act.observaciones?"\n📝 "+act.observaciones:""}${pres?"✅ Presente":""}`;
 
-          const risEnContinua = risNuevo || (risActivo && !risActivo.mostrado ? risActivo.ris : null);
+          const dniLimpio = String(act.dni||"").trim().replace(/^0+/,"");
+          const risMatch  = (risMap[dia.fecha]||[]).find(r => {
+            const dniR = String(r.documento||"").replace(/[A-Za-z]+/,"").trim().replace(/^0+/,"");
+            return dniR === dniLimpio;
+          });
+          const estRIS   = risMatch ? (risMatch.estado||"") : "";
+          const hoyD     = new Date(); hoyD.setHours(0,0,0,0);
+          const fp       = dia.fecha.split("/");
+          const fDate    = new Date(parseInt(fp[2]),parseInt(fp[1])-1,parseInt(fp[0]));
+          const pasado   = fDate < hoyD;
+          const atendido = estRIS === "Atendido" || estRIS === "Presente";
+          const ausente  = estRIS === "Asignado" && pasado;
+          const iconRIS  = atendido ? `<span style="color:#2e7d32;font-weight:700;margin-right:2px">✓</span>`
+                         : ausente  ? `<span style="color:#c62828;font-weight:700;margin-right:2px">✗</span>` : "";
+          const badgeRIS = risMatch
+            ? `<span style="background:#888;color:#fff;border-radius:3px;padding:0 3px;font-size:8px;font-weight:700;margin-left:3px">RIS</span>`
+            : "";
 
-          if (esFirst && act && risEnContinua) {
-            // Slot inicial CON RIS → turno 80% | RIS 20% → turno muestra solo nombre
-            const r    = risEnContinua;
-            const pres = act.presente === "Presente" ? "✅ " : "";
-            if (risNuevo && risActivoCol[di]) risActivoCol[di].mostrado = true;
-            html += `<td style="padding:0;border:1px solid #e4e8ee;cursor:pointer">
-              <div style="display:flex;height:100%;gap:1px">
-                <div class="slot-continua slot-libre" style="flex:4;background:${col.bg}18;border-left:3px solid ${col.bg};padding:3px 6px;overflow:hidden"
-                  data-fecha="${dia.fecha}" data-mins="${mins}">
-                  <div style="font-size:11px;font-weight:700;color:${col.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none">${pres}${act.apellido}, ${act.nombre}</div>
-                  <div style="font-size:9px;color:${col.text};opacity:.7;pointer-events:none">📍 ${act.origen}</div>
+          const turnoHTML = `
+            <div style="font-size:11px;font-weight:700;color:${col.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${iconRIS}${pres}${act.apellido}, ${act.nombre}</div>
+            <div style="font-size:10px;color:${col.text};opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">🔬 ${act.estudio}${badgeRIS}</div>
+            <div style="display:flex;align-items:baseline;gap:3px;margin-top:4px">
+              <span style="font-size:18px;font-weight:900;color:${col.border};line-height:1">${durMin}</span>
+              <span style="font-size:9px;font-weight:700;color:${col.border}">min</span>
+              <span style="font-size:9px;color:${col.text};opacity:.7">${horaI}→${horaF}</span>
+            </div>
+            <div style="font-size:9px;color:${col.text};opacity:.65;margin-top:2px">📍 ${act.origen}</div>`;
+
+          if (risNuevo) {
+            if (risActivoCol[di]) risActivoCol[di].mostrado = true;
+            const r   = risNuevo;
+            const est = r.estado || "";
+            html += `<td rowspan="${span}" style="padding:0;border:1px solid #e4e8ee;vertical-align:top">
+              <div style="display:flex;height:100%">
+                <div class="slot-turno" style="flex:4;background:${bg};border-left:3px solid ${col.border};padding:5px 6px;cursor:pointer;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-start"
+                  data-fecha="${dia.fecha}" data-mins="${mins}" data-fila="${act.fila}" data-tooltip="${encodeURIComponent(tip)}">
+                  <div style="pointer-events:none">${turnoHTML}</div>
                 </div>
-                <div class="slot-ris-side slot-content" style="flex:1;background:#f0f0f0;border-left:2px dashed #bbb;cursor:pointer;overflow:hidden;padding:2px 3px;display:flex;flex-direction:column;align-items:center;justify-content:center"
+                <div class="slot-ris-side" style="flex:1;background:#f0f0f0;border-left:2px dashed #bbb;cursor:pointer;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:4px 2px;gap:4px"
                   data-fecha="${dia.fecha}" data-mins="${mins}"
                   data-ris-nombre="${encodeURIComponent(r.apellido_nombre)}"
-                  data-ris-practica="${encodeURIComponent(r.practica||r.diagnostico||"")}"
+                  data-ris-practica="${encodeURIComponent(r.practica||"")}"
                   title="RIS: ${r.apellido_nombre} — clic para sobreturno">
                   <span style="background:#888;color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700;pointer-events:none">RIS</span>
+                  ${est ? `<span style="background:#555;color:#fff;border-radius:3px;padding:0 2px;font-size:7px;font-weight:700;pointer-events:none">${est}</span>` : ""}
+                  <span style="font-size:8px;color:#555;text-align:center;word-break:break-word;pointer-events:none;line-height:1.2">${r.apellido_nombre.split(",")[0]}</span>
                 </div>
-              </div></td>`;
-          } else if (esFirst && act) {
-            // Slot inicial SIN RIS → solo nombre + origen
-            const pres = act.presente === "Presente" ? "✅ " : "";
-            html += `<td class="slot-continua slot-libre"
-              style="background:${col.bg}18;border-left:3px solid ${col.bg};border-top:none;border-bottom:none;padding:4px 6px;cursor:pointer;vertical-align:middle;overflow:hidden"
-              data-fecha="${dia.fecha}" data-mins="${mins}" title="Clic para sobreturno">
-              <div style="pointer-events:none">
-                <div style="font-size:11px;font-weight:700;color:${col.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pres}${act.apellido}, ${act.nombre}</div>
-                <div style="font-size:9px;color:${col.text};opacity:.75">📍 ${act.origen}</div>
-              </div></td>`;
-          } else if (esSecond && act && risEnContinua) {
-            // Segunda continuación CON RIS → estudio 80% | RIS nombre 20%
-            const startM = act.mins !== undefined ? act.mins : mins;
-            const durMin = hasta - startM;
-            const horaI  = String(Math.floor(startM/60)).padStart(2,"0")+":"+String(startM%60).padStart(2,"0");
-            const r = risEnContinua;
-            html += `<td style="padding:0;border:1px solid #e4e8ee;cursor:pointer">
-              <div style="display:flex;height:100%;gap:1px">
-                <div class="slot-continua slot-libre" style="flex:4;background:${col.bg}0d;border-left:3px solid ${col.bg}55;padding:3px 6px;overflow:hidden"
-                  data-fecha="${dia.fecha}" data-mins="${mins}">
-                  <div style="font-size:10px;color:${col.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none">🔬 ${act.estudio}</div>
-                  <div style="font-size:9px;color:${col.text};opacity:.65;pointer-events:none">⏱ ${durMin}min · ${horaI}→${horaF}</div>
-                </div>
-                <div class="slot-ris-side slot-content" style="flex:1;background:#f0f0f0;border-left:2px dashed #bbb;cursor:pointer;overflow:hidden;padding:2px 3px;display:flex;flex-direction:column;align-items:center;justify-content:center"
-                  data-fecha="${dia.fecha}" data-mins="${mins}"
-                  data-ris-nombre="${encodeURIComponent(r.apellido_nombre)}"
-                  data-ris-practica="${encodeURIComponent(r.practica||r.diagnostico||"")}"
-                  title="RIS: ${r.apellido_nombre} — clic para sobreturno">
-                  <span style="background:#888;color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700;pointer-events:none">RIS</span>
-                </div>
-              </div></td>`;
-          } else if (esSecond && act) {
-            // Segunda continuación SIN RIS → estudio + duración
-            const startM = act.mins !== undefined ? act.mins : mins;
-            const durMin = hasta - startM;
-            const horaI  = String(Math.floor(startM/60)).padStart(2,"0")+":"+String(startM%60).padStart(2,"0");
-            html += `<td class="slot-continua slot-libre"
-              style="background:${col.bg}0d;border-left:3px solid ${col.bg}44;border-top:none;border-bottom:none;padding:3px 6px;cursor:pointer;vertical-align:middle;overflow:hidden"
-              data-fecha="${dia.fecha}" data-mins="${mins}" title="→${horaF} — clic para sobreturno">
-              <div style="pointer-events:none">
-                <div style="font-size:10px;color:${col.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🔬 ${act.estudio}</div>
-                <div style="font-size:9px;color:${col.text};opacity:.65">⏱ ${durMin}min · ${horaI}→${horaF}</div>
-              </div></td>`;
+              </div>
+            </td>`;
           } else {
-            // Resto → barra fina con hora fin
-            html += `<td class="slot-continua slot-libre"
-              style="background:${col.bg}0a;border-left:3px solid ${col.bg}33;border-top:none;border-bottom:none;padding:2px 6px;cursor:pointer"
-              data-fecha="${dia.fecha}" data-mins="${mins}" title="→${horaF} — clic para sobreturno">
-              <div style="height:100%;display:flex;align-items:center;justify-content:flex-end;pointer-events:none">
-                <span style="color:${col.border}55;font-size:8px;font-weight:600">→${horaF}</span>
-              </div></td>`;
+            html += `<td rowspan="${span}" class="slot-turno"
+              style="background:${bg};border-left:3px solid ${col.border};padding:5px 6px;vertical-align:top;cursor:pointer;overflow:hidden"
+              data-fecha="${dia.fecha}" data-mins="${mins}" data-fila="${act.fila}" data-tooltip="${encodeURIComponent(tip)}">
+              <div style="pointer-events:none">${turnoHTML}</div>
+            </td>`;
           }
+          continue;
+        }
 
-        } else if (risContinuacion) {
+        // ── Continuación de RIS standalone ───────────────
+        const risActivo       = risActivoCol[di];
+        const risContinuacion = !risNuevo && risActivo && risActivo.mostrado && mins < risActivo.hasta;
+
+        if (risContinuacion) {
           const r = risActivo.ris;
           html += `<td class="slot-ris-clickable" style="background:#f4f4f4;border-left:2px dashed #ccc;border:1px solid #ebebeb;cursor:pointer;padding:2px 5px"
             data-fecha="${dia.fecha}" data-mins="${mins}"
             data-ris-nombre="${encodeURIComponent(r.apellido_nombre)}"
             data-ris-practica="${encodeURIComponent(r.practica||"")}"
-            title="${r.apellido_nombre} · ${r.practica||""} — clic para sobreturno">
+            title="${r.apellido_nombre} — clic para sobreturno">
             <div style="height:100%;display:flex;align-items:center;justify-content:space-between;pointer-events:none">
               <div style="height:1px;flex:1;background:#ccc;border-top:1px dashed #bbb"></div>
               <span style="color:#bbb;font-size:9px;font-weight:600;padding:0 4px;flex-shrink:0">+</span>
             </div></td>`;
+          continue;
+        }
 
-        } else {
-          const esFranjaCardioSlot = s &&
-            (s.tipo === "franja" || s.tipo === "franja_origen" || s.tipo === "bloqueo_rec") &&
-            (s.label||"").toLowerCase().includes("cardiol");
+        // ── CARDIO + franjas ──────────────────────────────
+        const esFranjaCardioSlot = s &&
+          (s.tipo === "franja" || s.tipo === "franja_origen" || s.tipo === "bloqueo_rec") &&
+          (s.label||"").toLowerCase().includes("cardiol");
 
-          let cardioRender = [];
-          let skipRender   = false;
+        let cardioRender = [];
+        let skipRender   = false;
 
-          if (dia.diaSemana === 3 && esFranjaCardioSlot) {
-            const cardioDia = (cardioMap[dia.fecha] || []);
-            if (cardioActivoCol[di] && mins >= cardioActivoCol[di].hasta) cardioActivoCol[di] = null;
-            if (!cardioActivoCol[di]) {
-              const cpNuevo = cardioDia.find(c => c.mins < nextMins && (c.mins + (c.duracion||60)) > mins);
-              if (cpNuevo) {
-                const dniCP    = String(cpNuevo.dni||"").trim().replace(/^0+/,"");
-                const enAgenda = (dia.slots||[]).some(sl => sl.dni && String(sl.dni).trim().replace(/^0+/,"") === dniCP);
-                const enRIS    = (risMap[dia.fecha]||[]).some(r => {
-                  const dniR = String(r.documento||"").replace(/[A-Za-z]+/,"").trim().replace(/^0+/,"");
-                  return dniR === dniCP;
-                });
-                cardioActivoCol[di] = {
-                  cp: { ...cpNuevo, _cardio: true, _enAgenda: enAgenda, _enRIS: enRIS },
-                  hasta: cpNuevo.mins + (cpNuevo.duracion || 60),
-                  mostrado: false
-                };
-              }
-            }
-            if (cardioActivoCol[di]) {
-              if (!cardioActivoCol[di].mostrado) {
-                cardioActivoCol[di].mostrado = true;
-                cardioRender = [{ ...cardioActivoCol[di].cp }];
-              } else {
-                const bg = s.color || "#e8a0c0";
-                html += `<td style="background:${bg}22;border-left:3px solid ${bg}55;border:1px solid ${bg}33;padding:2px 5px">
-                  <div style="height:100%;display:flex;align-items:center;gap:4px;pointer-events:none">
-                    <div style="flex:1;height:1px;background:${bg}77"></div>
-                    <span style="color:${bg};font-size:8px;font-weight:600">cardio</span>
-                  </div></td>`;
-                skipRender = true;
-              }
+        if (dia.diaSemana === 3 && esFranjaCardioSlot) {
+          const cardioDia = (cardioMap[dia.fecha] || []);
+          if (cardioActivoCol[di] && mins >= cardioActivoCol[di].hasta) cardioActivoCol[di] = null;
+          if (!cardioActivoCol[di]) {
+            const cpNuevo = cardioDia.find(c => c.mins < nextMins && (c.mins + (c.duracion||60)) > mins);
+            if (cpNuevo) {
+              const dniCP    = String(cpNuevo.dni||"").trim().replace(/^0+/,"");
+              const enAgenda = (dia.slots||[]).some(sl => sl.dni && String(sl.dni).trim().replace(/^0+/,"") === dniCP);
+              const enRIS    = (risMap[dia.fecha]||[]).some(r => {
+                const dniR = String(r.documento||"").replace(/[A-Za-z]+/,"").trim().replace(/^0+/,"");
+                return dniR === dniCP;
+              });
+              cardioActivoCol[di] = {
+                cp: { ...cpNuevo, _cardio: true, _enAgenda: enAgenda, _enRIS: enRIS },
+                hasta: cpNuevo.mins + (cpNuevo.duracion || 60),
+                mostrado: false
+              };
             }
           }
-
-          if (!skipRender) {
-            if (risNuevo && risActivoCol[di]) risActivoCol[di].mostrado = true;
-            const renderRIS = cardioRender.length > 0 ? cardioRender : (risNuevo ? [risNuevo] : []);
-            html += _renderCeldaCombinada(s, renderRIS, dia.fecha, mins, risMap[dia.fecha] || [], activosPorCol[di] ? activosPorCol[di].hasta : mins + _paso, nextMins);
+          if (cardioActivoCol[di]) {
+            if (!cardioActivoCol[di].mostrado) {
+              cardioActivoCol[di].mostrado = true;
+              cardioRender = [{ ...cardioActivoCol[di].cp }];
+            } else {
+              const bg = s.color || "#e8a0c0";
+              html += `<td style="background:${bg}22;border-left:3px solid ${bg}55;border:1px solid ${bg}33;padding:2px 5px">
+                <div style="height:100%;display:flex;align-items:center;gap:4px;pointer-events:none">
+                  <div style="flex:1;height:1px;background:${bg}77"></div>
+                  <span style="color:${bg};font-size:8px;font-weight:600">cardio</span>
+                </div></td>`;
+              skipRender = true;
+            }
           }
+        }
+
+        if (!skipRender) {
+          if (risNuevo && risActivoCol[di]) risActivoCol[di].mostrado = true;
+          const renderRIS = cardioRender.length > 0 ? cardioRender : (risNuevo ? [risNuevo] : []);
+          html += _renderCeldaCombinada(s, renderRIS, dia.fecha, mins, risMap[dia.fecha] || []);
         }
       }
       html += "</tr>";
@@ -278,56 +278,26 @@ const AgendaView = (() => {
     _bindSlotClicks(container);
   }
 
-  // ── Celda combinada ───────────────────────────────────────
-  function _renderCeldaCombinada(slot, risSlot, fecha, mins, risDelDia, hasta, nextMins) {
+  // ── Celda combinada — solo para NO-turno (libre+RIS, franja+RIS, cardio) ──
+  function _renderCeldaCombinada(slot, risSlot, fecha, mins, risDelDia) {
     const tipo     = slot ? slot.tipo || "libre" : "libre";
     const tieneRIS = risSlot && risSlot.length > 0;
     const ris      = tieneRIS ? risSlot[0] : null;
-    const durMin   = hasta ? hasta - mins : _paso;
-    const horaF    = hasta ? String(Math.floor(hasta/60)).padStart(2,"0")+":"+String(hasta%60).padStart(2,"0") : "";
-    const horaI    = String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0");
 
-    // ── Turno single-slot + RIS → 80/20
-    if (tipo === "turno" && tieneRIS) {
-      const col  = _coloresOrigen(slot.origen);
-      const pres = slot.presente === "Presente" ? "✅ " : "";
-      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}`;
-      const est  = ris.estado || "";
-      const badgeEst = est ? `<span style="background:#666;color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">${est}</span>` : "";
-      const esSolo = durMin <= _paso;
-      return `<td style="padding:0;border:1px solid #e4e8ee">
-        <div style="display:flex;height:100%;gap:1px">
-          <div class="slot-turno" style="flex:4;background:${slot.color||col.bg};border-left:3px solid ${col.border};cursor:pointer;overflow:hidden;padding:3px 6px;display:flex;flex-direction:column;justify-content:center"
-            data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}">
-            <div style="font-size:11px;font-weight:700;color:${col.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none">${pres}${slot.apellido}, ${slot.nombre}</div>
-            <div style="font-size:10px;color:${col.text};opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none">🔬 ${slot.estudio}</div>
-            ${esSolo ? `<div style="font-size:9px;color:${col.text};opacity:.7;pointer-events:none">⏱ ${durMin}min · ${horaI}→${horaF} · 📍 ${slot.origen}</div>` : ""}
-          </div>
-          <div class="slot-ris-side" style="flex:1;background:#f0f0f0;border-left:2px dashed #bbb;cursor:pointer;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px"
-            data-fecha="${fecha}" data-mins="${mins}"
-            data-ris-nombre="${encodeURIComponent(ris.apellido_nombre)}"
-            data-ris-practica="${encodeURIComponent(ris.practica||"")}"
-            title="RIS: ${ris.apellido_nombre} — clic para sobreturno">
-            ${badgeEst}
-            <span style="background:#888;color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700;pointer-events:none">RIS</span>
-            <span style="font-size:8px;color:#777;text-align:center;pointer-events:none;overflow:hidden;text-overflow:ellipsis;max-width:100%">${ris.apellido_nombre.split(",")[0]}</span>
-          </div>
-        </div>
-      </td>`;
-    }
-
-    // ── Solo RIS en slot libre ──
+    // ── Solo RIS en slot libre ────────────────────────────
     if (tieneRIS && (tipo === "libre" || tipo === "continuacion")) {
       const hoy    = new Date(); hoy.setHours(0,0,0,0);
       const fParts = fecha.split("/");
-      const fDate  = new Date(parseInt(fParts[2]), parseInt(fParts[1])-1, parseInt(fParts[0]));
+      const fDate  = new Date(parseInt(fParts[2]),parseInt(fParts[1])-1,parseInt(fParts[0]));
       const pasado = fDate < hoy;
       const est    = ris.estado || "";
       const atendido = est === "Atendido" || est === "Presente";
       const ausente  = est === "Asignado" && pasado;
       const iconEst  = atendido ? `<span style="color:#2e7d32;font-weight:700">✓ </span>`
                      : ausente  ? `<span style="color:#c62828;font-weight:700">✗ </span>` : "";
-      const badgeEst = est ? `<span style="background:${atendido?"#4a9e5c":ausente?"#c62828":"#888"};color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">${est}</span>` : "";
+      const badgeEst = est
+        ? `<span style="background:${atendido?"#4a9e5c":ausente?"#c62828":"#888"};color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">${est}</span>`
+        : "";
       return `<td class="slot-ris-clickable" style="background:#f4f4f4;border-left:2px dashed #bbb;border:1px solid #e4e8ee;cursor:pointer;padding:3px 5px"
         data-fecha="${fecha}" data-mins="${mins}"
         data-ris-nombre="${encodeURIComponent(ris.apellido_nombre)}"
@@ -344,19 +314,20 @@ const AgendaView = (() => {
       </td>`;
     }
 
-    const cardioSlot = tieneRIS && risSlot[0]?._cardio ? risSlot[0] : null;
+    const cardioSlot = tieneRIS && risSlot[0] && risSlot[0]._cardio ? risSlot[0] : null;
 
-    // ── Franja + RIS → franja 20% | RIS 80% ──
+    // ── Franja + RIS → franja 20% vertical | RIS 80% ─────
     if (tieneRIS && !cardioSlot && slot &&
         (tipo === "franja" || tipo === "franja_origen" || tipo === "bloqueo_rec" || tipo === "bloqueo")) {
       const bg      = slot.color || "#ccc";
       const label   = slot.label || tipo;
       const est     = ris.estado || "";
       const atendido = est === "Atendido" || est === "Presente";
-      const ausente  = (est === "Asignado");
-      const badgeEst = est ? `<span style="background:${atendido?"#4a9e5c":ausente?"#888":"#888"};color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">${est}</span>` : "";
+      const badgeEst = est
+        ? `<span style="background:${atendido?"#4a9e5c":"#888"};color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">${est}</span>`
+        : "";
       return `<td style="padding:0;border:1px solid #e4e8ee">
-        <div style="display:flex;height:100%;gap:1px">
+        <div style="display:flex;height:100%">
           <div style="flex:1;background:${bg};overflow:hidden;display:flex;align-items:center;justify-content:center;padding:2px">
             <span style="font-size:8px;font-weight:700;color:#fff;writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-height:100%">${label}</span>
           </div>
@@ -376,7 +347,7 @@ const AgendaView = (() => {
       </td>`;
     }
 
-    // ── Cardio en franja ──
+    // ── Cardio en franja ──────────────────────────────────
     if (cardioSlot && slot) {
       const bg  = slot.color || "#e8a0c0";
       const c   = cardioSlot;
@@ -401,21 +372,18 @@ const AgendaView = (() => {
     }
 
     if (!slot) return "<td></td>";
-    return _renderSlot(slot, fecha, mins, risDelDia || [], hasta, nextMins);
+    return _renderSlot(slot, fecha, mins, risDelDia || []);
   }
 
-  // ── Render slot individual ────────────────────────────────
-  function _renderSlot(slot, fecha, mins, risDelDia, hasta, nextMins) {
+  // ── Render slot genérico (libre, bloqueo, franja sin RIS) ─
+  function _renderSlot(slot, fecha, mins, risDelDia) {
     slot._risDelDia = risDelDia || [];
-    const tipo   = slot.tipo || "libre";
-    const bg     = slot.color || "#fff";
-    const durMin = hasta ? hasta - mins : _paso;
-    const horaF  = hasta ? String(Math.floor(hasta/60)).padStart(2,"0")+":"+String(hasta%60).padStart(2,"0") : "";
-    const horaI  = String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0");
+    const tipo = slot.tipo || "libre";
+    const bg   = slot.color || "#fff";
 
     if (tipo === "libre") {
       const p = fecha.split("/");
-      const f = new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0]));
+      const f = new Date(parseInt(p[2]),parseInt(p[1])-1,parseInt(p[0]));
       f.setHours(0,0,0,0);
       const hoy = new Date(); hoy.setHours(0,0,0,0);
       const pasado = f < hoy;
@@ -423,51 +391,6 @@ const AgendaView = (() => {
         ? `<td class="slot-pasado" style="background:#fce8e8;cursor:default"><div class="slot-content"><span class="slot-label" style="color:#e0b0b0;font-size:9px">—</span></div></td>`
         : `<td class="slot-libre" style="background:${bg}" data-fecha="${fecha}" data-mins="${mins}" title="Libre — clic para asignar"><div class="slot-content"><span class="slot-label" style="color:#ccc">+</span></div></td>`;
     }
-
-    if (tipo === "turno") {
-      const col    = _coloresOrigen(slot.origen);
-      const pres   = slot.presente === "Presente" ? "✅ " : "";
-      const tip    = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${pres?"✅ Presente":""}`;
-      const dniLimpio = String(slot.dni||"").trim().replace(/^0+/,"");
-      const risMatch  = (slot._risDelDia||[]).find(r => {
-        const dniR = String(r.documento||"").replace(/[A-Za-z]+/,"").trim().replace(/^0+/,"");
-        return dniR === dniLimpio;
-      });
-      const estRIS   = risMatch ? (risMatch.estado||"") : "";
-      const hoy      = new Date(); hoy.setHours(0,0,0,0);
-      const fp       = fecha.split("/");
-      const fDate    = new Date(parseInt(fp[2]), parseInt(fp[1])-1, parseInt(fp[0]));
-      const pasado   = fDate < hoy;
-      const atendido = estRIS === "Atendido" || estRIS === "Presente";
-      const ausente  = estRIS === "Asignado" && pasado;
-      const iconRIS  = atendido ? `<span style="color:#2e7d32;font-weight:700;margin-right:2px">✓</span>`
-                     : ausente  ? `<span style="color:#c62828;font-weight:700;margin-right:2px">✗</span>` : "";
-      const badgeRIS = risMatch ? `<span style="background:#888;color:#fff;border-radius:3px;padding:0 2px;font-size:8px;font-weight:700;margin-left:2px">RIS</span>` : "";
-
-      // esSolo: el turno termina antes del próximo slot del grid → no habrá continuación
-      const esSolo = !hasta || !nextMins || hasta <= nextMins;
-      if (esSolo) {
-        // Single-slot → todo en una celda
-        return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border};padding:3px 6px;vertical-align:middle"
-          data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}">
-          <div style="pointer-events:none">
-            <div style="font-size:11px;font-weight:700;color:${col.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${iconRIS}${pres}${slot.apellido}, ${slot.nombre}</div>
-            <div style="display:flex;align-items:center;gap:4px;margin-top:1px">
-              <span style="font-size:13px;font-weight:800;color:${col.border};white-space:nowrap">${durMin}<span style="font-size:9px;font-weight:600">min</span></span>
-              <span style="font-size:9px;color:${col.text};opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🔬 ${slot.estudio}${badgeRIS}</span>
-            </div>
-            <div style="font-size:8px;color:${col.text};opacity:.65">${horaI}→${horaF} · 📍 ${slot.origen}</div>
-          </div></td>`;
-      }
-      // Multi-slot → solo nombre + origen en el slot inicial
-      return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border};padding:3px 6px;vertical-align:middle"
-        data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}">
-        <div style="pointer-events:none">
-          <div style="font-size:11px;font-weight:700;color:${col.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${iconRIS}${pres}${slot.apellido}, ${slot.nombre}</div>
-          <div style="font-size:9px;color:${col.text};opacity:.75">📍 ${slot.origen}${badgeRIS}</div>
-        </div></td>`;
-    }
-
     if (tipo === "continuacion") return `<td class="slot-continua" style="background:${bg}"><div class="slot-content"></div></td>`;
     return `<td class="slot-bloqueo" style="background:${bg}"><div class="slot-content"><span class="slot-label">${slot.label||""}</span></div></td>`;
   }
@@ -476,7 +399,7 @@ const AgendaView = (() => {
   function _bindSlotClicks(container) {
     function _esPasado(fecha) {
       const p = fecha.split("/");
-      const f = new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0]));
+      const f = new Date(parseInt(p[2]),parseInt(p[1])-1,parseInt(p[0]));
       f.setHours(0,0,0,0);
       const hoy = new Date(); hoy.setHours(0,0,0,0);
       return f < hoy;
