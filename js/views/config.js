@@ -103,10 +103,15 @@ const ConfigView = (() => {
           <div style="font-size:13px;font-weight:500">${f.concepto}</div>
           <div style="font-size:11px;color:var(--text-2)">${dias} · ${f.horaD}–${f.horaH}</div>
         </div>
+        <button class="cfg-edit-franja" data-idx="${i}" style="background:none;border:none;color:var(--text-2);cursor:pointer;font-size:14px" aria-label="Editar">✏️</button>
+        <button class="cfg-del-franja" data-idx="${i}" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px" aria-label="Eliminar">×</button>
       </div>`;
     }).join("");
     return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem">
-      <div style="font-weight:500;font-size:15px;margin-bottom:12px">🎨 Franjas recurrentes</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-weight:500;font-size:15px">🎨 Franjas recurrentes</span>
+        <button id="cfg-btn-nueva-franja" style="font-size:12px">+ Agregar</button>
+      </div>
       <div style="display:flex;flex-direction:column;gap:6px">${items || '<div style="font-size:13px;color:var(--text-2)">Sin franjas configuradas</div>'}</div>
     </div>`;
   }
@@ -245,6 +250,22 @@ const ConfigView = (() => {
       });
     });
 
+    // Franjas recurrentes
+    document.getElementById("cfg-btn-nueva-franja").addEventListener("click", () => _editarFranja(-1));
+
+    container.querySelectorAll(".cfg-edit-franja").forEach(btn => {
+      btn.addEventListener("click", () => _editarFranja(parseInt(btn.dataset.idx)));
+    });
+
+    container.querySelectorAll(".cfg-del-franja").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const i = parseInt(btn.dataset.idx);
+        if (!confirm(`¿Eliminar franja "${_datos.franjas[i].concepto}"?`)) return;
+        _datos.franjas.splice(i, 1);
+        _guardarFranjas();
+      });
+    });
+
     // Nueva restricción por código
     document.getElementById("cfg-btn-nueva-rest-cod").addEventListener("click", () => {
       const codigo   = prompt("Código (ej: MM, CAR):");
@@ -312,6 +333,39 @@ const ConfigView = (() => {
     if (nuevo) _datos.bloqueos.push(actualizado);
     else _datos.bloqueos[idx] = actualizado;
     _guardarBloqueos();
+  }
+
+  // ── Editar franja ─────────────────────────────────────────
+  function _editarFranja(idx) {
+    const nuevo = idx === -1;
+    const f = nuevo
+      ? { dia1:"", func1:"", dia2:"", func2:"", dia3:"", horaD:"", horaH:"", concepto:"", color:"#e06666" }
+      : {..._datos.franjas[idx]};
+    const concepto = prompt("Concepto (ej: Franja Exclusiva Neurología):", f.concepto);
+    if (!concepto) return;
+    const dia1    = prompt("Día desde (ej: LUNES, MARTES):", f.dia1);
+    if (!dia1) return;
+    const func1   = prompt("Función: 'hasta', 'y', o dejar vacío:", f.func1);
+    const dia2    = prompt("Día hasta/adicional (opcional):", f.dia2);
+    const func2   = prompt("Segunda función (opcional):", f.func2);
+    const dia3    = prompt("Tercer día (opcional):", f.dia3);
+    const horaD   = prompt("Hora desde (HH:MM):", f.horaD);
+    if (!horaD) return;
+    const horaH   = prompt("Hora hasta (HH:MM):", f.horaH);
+    if (!horaH) return;
+    const color   = prompt("Color hex (ej: #e06666):", f.color || "#e06666");
+    const actualizado = { dia1, func1: func1||"", dia2: dia2||"", func2: func2||"", dia3: dia3||"", horaD, horaH, concepto, color: color||"#e06666" };
+    if (nuevo) _datos.franjas.push(actualizado);
+    else _datos.franjas[idx] = actualizado;
+    _guardarFranjas();
+  }
+
+  async function _guardarFranjas() {
+    try {
+      await API.escribirConfig("franjas", _datos.franjas);
+      App.toast("Franjas guardadas", "ok");
+      _render();
+    } catch(err) { App.toast("Error: " + err.message, "error"); }
   }
 
   // ── Guardar secciones ─────────────────────────────────────
