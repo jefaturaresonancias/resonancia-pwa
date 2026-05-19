@@ -120,6 +120,7 @@ const ConfigView = (() => {
           <div style="font-size:13px;font-weight:500">${b.concepto}</div>
           <div style="font-size:11px;color:var(--text-2)">${b.fecha} · ${b.horaD}–${b.horaH}</div>
         </div>
+        <button class="cfg-edit-bloqueo" data-idx="${i}" style="background:none;border:none;color:var(--text-2);cursor:pointer;font-size:14px;margin-right:2px" aria-label="Editar">✏️</button>
         <button class="cfg-del-bloqueo" data-idx="${i}" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px" aria-label="Eliminar">×</button>
       </div>`
     ).join("");
@@ -235,15 +236,13 @@ const ConfigView = (() => {
       });
     });
 
-    document.getElementById("cfg-btn-nuevo-bloqueo").addEventListener("click", () => {
-      const fecha    = prompt("Fecha del bloqueo (dd/MM/yyyy):");
-      if (!fecha) return;
-      const horaD    = prompt("Hora desde (HH:MM):");
-      const horaH    = prompt("Hora hasta (HH:MM):");
-      const concepto = prompt("Concepto:");
-      if (!concepto) return;
-      _datos.bloqueos.push({ fecha, horaD, horaH, concepto });
-      _guardarBloqueos();
+    document.getElementById("cfg-btn-nuevo-bloqueo").addEventListener("click", () => _editarBloqueo(-1));
+
+    container.querySelectorAll(".cfg-edit-bloqueo").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const i = parseInt(btn.dataset.idx);
+        _editarBloqueo(i);
+      });
     });
 
     // Nueva restricción por código
@@ -295,6 +294,24 @@ const ConfigView = (() => {
     else _datos.estudios[idx] = actualizado;
     _datos.estudios.sort((a,b) => a.nombre.localeCompare(b.nombre));
     _guardarEstudios();
+  }
+
+  // ── Editar bloqueo ────────────────────────────────────────
+  function _editarBloqueo(idx) {
+    const nuevo = idx === -1;
+    const b     = nuevo ? { fecha:"", horaD:"", horaH:"", concepto:"" } : {..._datos.bloqueos[idx]};
+    const fecha    = prompt("Fecha del bloqueo (dd/MM/yyyy):", b.fecha);
+    if (!fecha) return;
+    const horaD    = prompt("Hora desde (HH:MM):", b.horaD);
+    if (!horaD) return;
+    const horaH    = prompt("Hora hasta (HH:MM):", b.horaH);
+    if (!horaH) return;
+    const concepto = prompt("Concepto:", b.concepto);
+    if (!concepto) return;
+    const actualizado = { fecha, horaD, horaH, concepto };
+    if (nuevo) _datos.bloqueos.push(actualizado);
+    else _datos.bloqueos[idx] = actualizado;
+    _guardarBloqueos();
   }
 
   // ── Guardar secciones ─────────────────────────────────────
