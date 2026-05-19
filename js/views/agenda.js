@@ -267,7 +267,7 @@ const AgendaView = (() => {
           if (!skipRender) {
             if (risNuevo && risActivoCol[di]) risActivoCol[di].mostrado = true;
             const renderRIS = cardioRender.length > 0 ? cardioRender : (risNuevo ? [risNuevo] : []);
-            html += _renderCeldaCombinada(s, renderRIS, dia.fecha, mins, risMap[dia.fecha] || [], activosPorCol[di] ? activosPorCol[di].hasta : mins + _paso);
+            html += _renderCeldaCombinada(s, renderRIS, dia.fecha, mins, risMap[dia.fecha] || [], activosPorCol[di] ? activosPorCol[di].hasta : mins + _paso, nextMins);
           }
         }
       }
@@ -279,7 +279,7 @@ const AgendaView = (() => {
   }
 
   // ── Celda combinada ───────────────────────────────────────
-  function _renderCeldaCombinada(slot, risSlot, fecha, mins, risDelDia, hasta) {
+  function _renderCeldaCombinada(slot, risSlot, fecha, mins, risDelDia, hasta, nextMins) {
     const tipo     = slot ? slot.tipo || "libre" : "libre";
     const tieneRIS = risSlot && risSlot.length > 0;
     const ris      = tieneRIS ? risSlot[0] : null;
@@ -401,11 +401,11 @@ const AgendaView = (() => {
     }
 
     if (!slot) return "<td></td>";
-    return _renderSlot(slot, fecha, mins, risDelDia || [], hasta);
+    return _renderSlot(slot, fecha, mins, risDelDia || [], hasta, nextMins);
   }
 
   // ── Render slot individual ────────────────────────────────
-  function _renderSlot(slot, fecha, mins, risDelDia, hasta) {
+  function _renderSlot(slot, fecha, mins, risDelDia, hasta, nextMins) {
     slot._risDelDia = risDelDia || [];
     const tipo   = slot.tipo || "libre";
     const bg     = slot.color || "#fff";
@@ -444,7 +444,8 @@ const AgendaView = (() => {
                      : ausente  ? `<span style="color:#c62828;font-weight:700;margin-right:2px">✗</span>` : "";
       const badgeRIS = risMatch ? `<span style="background:#888;color:#fff;border-radius:3px;padding:0 2px;font-size:8px;font-weight:700;margin-left:2px">RIS</span>` : "";
 
-      const esSolo = durMin <= _paso;
+      // esSolo: el turno termina antes del próximo slot del grid → no habrá continuación
+      const esSolo = !hasta || !nextMins || hasta <= nextMins;
       if (esSolo) {
         // Single-slot → todo en una celda
         return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border};padding:3px 6px;vertical-align:middle"
