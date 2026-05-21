@@ -158,18 +158,21 @@ const App = (() => {
         _pinActual += btn.dataset.n;
         _actualizarPuntos();
         if (_pinActual.length === 4) {
-          const pinCorrecto = _pinRolObjetivo === "admin"
-            ? Config.getPinAdmin()
-            : Config.getPinJefatura();
-          if (_pinActual === pinCorrecto) {
-            Config.setRol(_pinRolObjetivo);
-            document.getElementById("screen-pin").classList.add("hidden");
-            document.getElementById("app").classList.remove("hidden");
-            _actualizarRolUI();
-          } else {
-            document.getElementById("pin-error").textContent = "PIN incorrecto";
-            setTimeout(() => { _pinActual = ""; _actualizarPuntos(); document.getElementById("pin-error").textContent = ""; }, 800);
-          }
+          const pinIngresado = _pinActual;
+          _pinActual = "";
+          document.getElementById("pin-error").textContent = "Verificando...";
+          Config.validarPin(_pinRolObjetivo, pinIngresado).then(valido => {
+            if (valido) {
+              Config.setRol(_pinRolObjetivo);
+              document.getElementById("pin-error").textContent = "";
+              document.getElementById("screen-pin").classList.add("hidden");
+              document.getElementById("app").classList.remove("hidden");
+              _actualizarRolUI();
+            } else {
+              document.getElementById("pin-error").textContent = "PIN incorrecto";
+              setTimeout(() => { _pinActual = ""; _actualizarPuntos(); document.getElementById("pin-error").textContent = ""; }, 800);
+            }
+          });
         }
       });
     });
@@ -181,6 +184,13 @@ const App = (() => {
     document.getElementById("pin-clear").addEventListener("click", () => {
       _pinActual = "";
       _actualizarPuntos();
+    });
+    document.getElementById("btn-pin-volver").addEventListener("click", () => {
+    document.getElementById("screen-pin").classList.add("hidden");
+    document.getElementById("screen-rol").classList.remove("hidden");
+    _pinActual = "";
+    _actualizarPuntos();
+    document.getElementById("pin-error").textContent = "";
     });
   }
 
@@ -253,17 +263,33 @@ const App = (() => {
       btn.addEventListener("click", () => showView(btn.dataset.view));
     });
 
-    document.getElementById("nav-cambiar-pin").addEventListener("click", () => {
+    document.getElementById("nav-cambiar-pin").addEventListener("click", async () => {
       const rol = Config.getRol();
-      const pinActual = rol === "admin" ? Config.getPinAdmin() : Config.getPinJefatura();
-      const nuevo = prompt(`PIN actual confirmado.\nIngresá el nuevo PIN de ${rol === "admin" ? "Admin" : "Jefatura"} (4 dígitos):`);
+      const pinActual = prompt(`Ingresá el PIN actual de ${rol === "admin" ? "Admin" : "Jefatura"}:`);
+      if (!pinActual) return;
+      const valido = await Config.validarPin(rol, pinActual);
+      if (!valido) { App.toast("PIN actual incorrecto", "error"); return; }
+      const nuevo = prompt("Ingresá el nuevo PIN (4 dígitos):");
       if (!nuevo) return;
-      if (!/^\d{4}$/.test(nuevo)) { toast("El PIN debe tener exactamente 4 dígitos", "error"); return; }
+      if (!/^\d{4}$/.test(nuevo)) { App.toast("El PIN debe tener exactamente 4 dígitos", "error"); return; }
       const confirmar = prompt("Repetí el nuevo PIN:");
-      if (nuevo !== confirmar) { toast("Los PINs no coinciden", "error"); return; }
-      if (rol === "admin") Config.setPinAdmin(nuevo);
-      else Config.setPinJefatura(nuevo);
-      toast("PIN actualizado correctamente", "ok");
+      if (nuevo !== confirmar) { App.toast("Los PINs no coinciden", "error"); return; }
+      try {
+        const res = await fetch(
+          Config.getUrl() +
+          "?action=cambiarPin&rol=" + encodeURIComponent(rol) +
+          "&pinActual=" + encodeURIComponent(pinActual) +
+          "&pinNuevo=" + encodeURIComponent(nuevo)
+        );
+        const json = await res.json();
+        if (json.ok && json.data && json.data.actualizado) {
+          App.toast("PIN actualizado correctamente", "ok");
+        } else {
+          App.toast("Error al actualizar el PIN", "error");
+        }
+      } catch {
+        App.toast("Error de conexión", "error");
+      }
     });
 
     document.getElementById("btn-cambiar-rol").addEventListener("click", () => {

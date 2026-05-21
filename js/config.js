@@ -20,11 +20,13 @@ const Config = (() => {
         const res = await fetch(
           this.getUrl() +
           "?action=validarPin&rol=" + encodeURIComponent(rol) +
-          "&pin=" + encodeURIComponent(pin)
+          "&pin=" + encodeURIComponent(pin),
+          { redirect: "follow" }
         );
         const json = await res.json();
         return json.ok === true && json.data && json.data.valido === true;
-      } catch {
+      } catch(e) {
+        console.error("validarPin error:", e);
         return false;
       }
     }
