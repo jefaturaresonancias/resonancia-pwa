@@ -40,16 +40,16 @@ const TurnoView = (() => {
     _actualizarTiempo();
     _poblarSelect();
     document.getElementById("t-estudio-sel").value = "";
-    // Limpiar slots anteriores
-    _limpiarSlots();
+    // Solo limpiar slots si NO hay un slot preseleccionado desde la agenda
+    if (!_slotSeleccionado) _limpiarSlots();
   }
 
-  function _quitarEstudio(nombre) {
+    function _quitarEstudio(nombre) {
     _estudiosElegidos = _estudiosElegidos.filter(e => e !== nombre);
     _renderChips();
     _actualizarTiempo();
     _poblarSelect();
-    _limpiarSlots();
+    if (!_slotSeleccionado) _limpiarSlots();
   }
 
   function _renderChips() {
