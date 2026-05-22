@@ -4,7 +4,7 @@ const AgendaView = (() => {
   let _modo       = "semana";
   let _fechaDesde = _lunesDeHoy();
   let _mesBase    = _primeroDeMes(new Date());
-  let _paso       = 40;
+  let _paso       = 20;
 
   function parsearMinsJS(hora) {
     if (!hora) return 0;
