@@ -132,6 +132,26 @@ const AgendaView = (() => {
     }
     const slots = Array.from(slotsSet).sort((a,b) => a-b);
 
+    // Normalizar continuaciones: slots del mismo paciente (misma fila) → tipo continuacion
+    for (const dia of datos) {
+      const vistos = new Map(); // fila → mins del primer slot
+      for (const s of dia.slots) {
+        if (s.tipo !== "turno") continue;
+        if (vistos.has(s.fila)) {
+          s.tipo = "continuacion";
+          s.color = s.color; // mantener color
+        } else {
+          vistos.set(s.fila, s.mins);
+          // Calcular hasta cuándo llega este turno
+          const sigsDelMismo = dia.slots.filter(sl => sl.fila === s.fila && sl.mins > s.mins);
+          const ultimoMins = sigsDelMismo.length > 0
+            ? Math.max(...sigsDelMismo.map(sl => sl.mins)) + _paso
+            : s.mins + _paso;
+          s.duracion = ultimoMins - s.mins;
+        }
+      }
+    }
+
     let html = '<table class="agenda-table"><thead><tr><th class="col-hora">Hora</th>';
     for (const d of datos) html += `<th class="${d.esFeriado?"feriado-col":""}">${d.label}${d.esFeriado?" 🚫":""}</th>`;
     html += "</tr></thead><tbody>";
