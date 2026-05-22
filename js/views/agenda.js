@@ -4,7 +4,65 @@ const AgendaView = (() => {
   let _modo       = "semana";
   let _fechaDesde = _lunesDeHoy();
   let _mesBase    = _primeroDeMes(new Date());
-  let _paso       = 20;
+   let _paso              = 20;
+  let _estudiosConfigCache = null;
+
+  // ── Calcular duración real de práctica RIS (Config − 10 min) ──
+  function _duracionRIS(practica) {
+    if (!_estudiosConfigCache || !practica) return 20;
+    // Normalizar texto para comparación
+    function norm(s) {
+      return s.toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+        .replace(/\bgado\b/g,"contraste")
+        .replace(/contaste/g,"contraste")
+        .replace(/\bcolangiografia por resonancia magnetica\b/,"colangiorresonancia")
+        .replace(/\bmacizo craneo facial\b/,"macizo craneofacial")
+        .replace(/\bsacro iliacas\b/,"sacroiliacas")
+        .replace(/\bambas rodillas\b/,"rodilla ambas")
+        .replace(/\bambos hombros\b/,"hombro ambos")
+        .replace(/\bambas manos\b/,"mano ambas")
+        .replace(/\bambas caderas\b/,"cadera ambas")
+        .replace(/\borbitas oculares\b/,"orbitas")
+        .replace(/\bvasos de cuello\b/,"angiorresonancia de vasos")
+        .replace(/\bresonancia dinamica de pelvis\b/,"pelvis")
+        .replace(/\bprostatica\b/,"prostatica")
+        .replace(/\bcerebro con protocolo epilepsia\b/,"cerebro protocolo epilepsia")
+        .replace(/\bhipofisis\b/,"hipofisis")
+        .replace(/\s+/g," ").trim();
+    }
+    // Separar prácticas múltiples por " · "
+    const partes = practica.split(/\s*·\s*/);
+    let total = 0;
+    for (const parte of partes) {
+      const pNorm = norm(parte);
+      let dur = 0;
+      // 1. Exact match normalizado
+      for (const [nombre, cfg] of Object.entries(_estudiosConfigCache)) {
+        if (norm(nombre) === pNorm) { dur = cfg.duracion; break; }
+      }
+      // 2. Config contiene todas las palabras clave de la práctica RIS
+      if (!dur) {
+        const palabras = pNorm.split(" ").filter(w => w.length > 3);
+        for (const [nombre, cfg] of Object.entries(_estudiosConfigCache)) {
+          const nNorm = norm(nombre);
+          if (palabras.length > 0 && palabras.every(w => nNorm.includes(w))) {
+            dur = cfg.duracion; break;
+          }
+        }
+      }
+      // 3. Primera palabra clave principal matchea
+      if (!dur) {
+        const primera = pNorm.split(" ")[0];
+        for (const [nombre, cfg] of Object.entries(_estudiosConfigCache)) {
+          if (norm(nombre).startsWith(primera)) { dur = cfg.duracion; break; }
+        }
+      }
+      // 4. Fallback
+      total += (dur || 30) - 10;
+    }
+    return Math.max(total, 10);
+  }
 
   function parsearMinsJS(hora) {
     if (!hora) return 0;
@@ -118,7 +176,7 @@ const AgendaView = (() => {
 
         // Si hay RIS nuevo → registrar activo, marcar como NO mostrado aún
         if (risNuevo) {
-          const dur = (risNuevo.duracion && risNuevo.duracion > 0) ? risNuevo.duracion : _paso;
+          const dur = _duracionRIS(risNuevo.practica);
           risActivoCol[di] = { ris: risNuevo, hasta: risNuevo.mins + dur, mostrado: false };
         } else if (risActivoCol[di] && mins >= risActivoCol[di].hasta) {
           risActivoCol[di] = null;
@@ -144,16 +202,18 @@ const AgendaView = (() => {
               <span style="color:${col.border}88;font-size:9px;font-weight:600;padding:0 4px;flex-shrink:0">+</span>
             </div></td>`;
         } else if (risContinuacion) {
-          // Continuación de RIS — clickeable para sobreturno
-          const r = risActivo.ris;
-          html += `<td class="slot-ris-clickable" style="background:#f4f4f4;border-left:2px dashed #ccc;border:1px solid #ebebeb;cursor:pointer;padding:2px 5px"
+          const r     = risActivo.ris;
+          const hasta = risActivo.hasta;
+          const horaF = String(Math.floor(hasta/60)).padStart(2,"0")+":"+String(hasta%60).padStart(2,"0");
+          html += `<td class="slot-ris-clickable"
+            style="background:#f4f4f4;border-left:2px dashed #bbb;border:1px solid #ebebeb;cursor:pointer;padding:0 6px"
             data-fecha="${dia.fecha}" data-mins="${mins}"
             data-ris-nombre="${encodeURIComponent(r.apellido_nombre)}"
             data-ris-practica="${encodeURIComponent(r.practica)}"
-            title="${r.apellido_nombre} · ${r.practica} — clic para sobreturno">
+            title="${r.apellido_nombre} · ${r.practica} — hasta ${horaF} — clic para sobreturno">
             <div style="height:100%;display:flex;align-items:center;justify-content:space-between;pointer-events:none">
-              <div style="height:1px;flex:1;background:#ccc;border-top:1px dashed #bbb"></div>
-              <span style="color:#bbb;font-size:9px;font-weight:600;padding:0 4px;flex-shrink:0">+</span>
+              <div style="height:1px;flex:1;background:#bbb;border-top:1px dashed #ccc"></div>
+              <span style="color:#999;font-size:8px;font-weight:700;padding:0 4px;flex-shrink:0">→${horaF}</span>
             </div></td>`;
         } else {
           // ── CARDIO: lógica unificada ──
@@ -560,6 +620,9 @@ const AgendaView = (() => {
       const cached   = sessionStorage.getItem(cacheKey);
 
       let datos, risMap, cardioMap;
+      if (!_estudiosConfigCache) {
+        try { const cfg = await API.config(); _estudiosConfigCache = cfg.estudios || {}; } catch(_) {}
+      }
       if (cached) {
         ({ datos, risMap, cardioMap } = JSON.parse(cached));
       } else {
