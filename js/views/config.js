@@ -78,18 +78,43 @@ const ConfigView = (() => {
 
   // ── Sección Feriados ──────────────────────────────────────
   function _seccionFeriados(feriados) {
-    const chips = feriados.map((f,i) =>
-      `<div style="display:inline-flex;align-items:center;gap:6px;background:var(--danger-bg,#fce8e8);border:0.5px solid var(--danger-border,#f5c6c6);border-radius:6px;padding:4px 10px;font-size:12px;color:var(--danger,#c62828)">
-        ${f.fecha} — ${f.concepto}
-        <button class="cfg-del-feriado" data-idx="${i}" style="background:none;border:none;color:inherit;cursor:pointer;font-size:14px;padding:0;line-height:1" aria-label="Eliminar">×</button>
-      </div>`
-    ).join(" ");
+    const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+    // Agrupar por mes
+    const porMes = {};
+    feriados.forEach((f, i) => {
+      const p   = f.fecha.split("/");
+      const mes = parseInt(p[1]) - 1;
+      if (!porMes[mes]) porMes[mes] = [];
+      porMes[mes].push({ ...f, _idx: i });
+    });
+
+    const cols = Object.keys(porMes).sort((a,b) => a-b).map(mes => {
+      const items = porMes[mes].map(f =>
+        `<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border)">
+          <div style="flex-shrink:0;width:28px;height:28px;border-radius:8px;background:#fce8e8;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#c62828">
+            ${f.fecha.split("/")[0]}
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.concepto}</div>
+            <div style="font-size:10px;color:var(--text-2)">${f.fecha}</div>
+          </div>
+          <button class="cfg-del-feriado" data-idx="${f._idx}" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:0;line-height:1;flex-shrink:0" aria-label="Eliminar">×</button>
+        </div>`
+      ).join("");
+      return `<div style="background:var(--bg);border-radius:10px;padding:10px 12px">
+        <div style="font-size:11px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">${MESES[mes]}</div>
+        ${items}
+      </div>`;
+    }).join("");
+
     return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <span style="font-weight:500;font-size:15px">🗓 Feriados 2026</span>
         <button id="cfg-btn-nuevo-feriado" style="font-size:12px">+ Agregar</button>
       </div>
-      <div id="cfg-chips-feriados" style="display:flex;flex-wrap:wrap;gap:8px">${chips}</div>
+      <div id="cfg-chips-feriados" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
+        ${cols || '<div style="font-size:13px;color:var(--text-2)">Sin feriados cargados</div>'}
+      </div>
     </div>`;
   }
 
