@@ -841,7 +841,6 @@ const AgendaView = (() => {
   function init() {
     document.getElementById("btn-semana-ant").onclick = () => { _fechaDesde.setDate(_fechaDesde.getDate()-7); _cargarSemana(); };
     document.getElementById("btn-semana-sig").onclick = () => { _fechaDesde.setDate(_fechaDesde.getDate()+7); _cargarSemana(); };
-    document.getElementById("btn-agenda-hoy").onclick = () => { _fechaDesde = _lunesDeHoy(); _cargarSemana(); };
     document.getElementById("agenda-paso").onchange   = e => { _paso = parseInt(e.target.value); cargar(); };
     document.getElementById("agenda-rango-label").textContent = _labelRango();
 
