@@ -518,7 +518,7 @@ const AgendaView = (() => {
     el.style.top  = Math.min(e.clientY+12, window.innerHeight-el.offsetHeight-8)+"px";
   }
 
-  // ── VISTA MES ─────────────────────────────────────────────
+// ── VISTA MES ─────────────────────────────────────────────
   function _renderMes(datos, risMes) {
     risMes = risMes || {};
     const container = document.getElementById("agenda-container");
@@ -533,7 +533,32 @@ const AgendaView = (() => {
         else if (s.tipo==="turno") ocupados++;
         else bloqueados++;
       }
-      resumenMap[dia.fecha] = { libres, ocupados, bloqueados, esFeriado: dia.esFeriado, feriado: dia.feriado };
+      // Recopilar franjas del día
+      const franjasDelDia = [];
+      const vistasLabels = new Set();
+      for (const s of dia.slots) {
+        if (s.tipo === "franja" || s.tipo === "franja_origen" || s.tipo === "bloqueo_rec" || s.tipo === "bloqueo") {
+          const key = s.label + "|" + s.color;
+          if (!vistasLabels.has(key) && s.label) {
+            // Encontrar rango horario de esta franja
+            const slotsDeEstaFranja = dia.slots.filter(sl =>
+              (sl.tipo === "franja" || sl.tipo === "franja_origen" || sl.tipo === "bloqueo_rec" || sl.tipo === "bloqueo") &&
+              sl.label === s.label && sl.color === s.color
+            );
+            const minI = Math.min(...slotsDeEstaFranja.map(sl => sl.mins));
+            const minF = Math.max(...slotsDeEstaFranja.map(sl => sl.mins)) + _paso;
+            const hI   = String(Math.floor(minI/60)).padStart(2,"0");
+            const hF   = String(Math.floor(minF/60)).padStart(2,"0");
+            franjasDelDia.push({ label: s.label, color: s.color, horaD: hI, horaH: hF });
+            vistasLabels.add(key);
+          }
+        }
+      }
+      resumenMap[dia.fecha] = {
+        libres, ocupados, bloqueados,
+        esFeriado: dia.esFeriado, feriado: dia.feriado,
+        franjas: franjasDelDia
+      };
     }
 
     const año = _mesBase.getFullYear(), mes = _mesBase.getMonth();
@@ -543,18 +568,110 @@ const AgendaView = (() => {
 
     const hoyStr = _strFecha(new Date());
     const DIAS = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+    const DIAS_CORTO = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
 
     let totalOcup = 0, totalLibres = 0;
     for (const v of Object.values(resumenMap)) {
       if (!v.esFeriado) { totalOcup += v.ocupados; totalLibres += v.libres; }
     }
     const totalRIS = Object.values(risMes).reduce((a,v) => a + v.length, 0);
+    const PROMEDIO = 32;
 
-    let html = `<div class="cal-mes-wrap"><table class="cal-mes-table"><thead><tr>`;
+    // ── Helper: color de barra según ocupación ──
+    function _colorBarra(ocupados, libres) {
+      const total = ocupados + libres;
+      if (total === 0) return "#ccc";
+      const pct = ocupados / PROMEDIO;
+      if (pct >= 1)    return "#e05555";
+      if (pct >= 0.8)  return "#f0c040";
+      return "#4a9e5c";
+    }
+
+    // ── Helper: color de texto sobre fondo de franja ──
+    function _textColorFromBg(hex) {
+      if (!hex) return "#555";
+      const r = parseInt(hex.slice(1,3),16);
+      const g = parseInt(hex.slice(3,5),16);
+      const b = parseInt(hex.slice(5,7),16);
+      const lum = (0.299*r + 0.587*g + 0.114*b) / 255;
+      return lum > 0.6 ? "#555" : "#fff";
+    }
+
+    // ── Helper: oscurecer hex para texto ──
+    function _darken(hex) {
+      if (!hex || hex.length < 7) return "#333";
+      const r = Math.max(0, parseInt(hex.slice(1,3),16) - 80);
+      const g = Math.max(0, parseInt(hex.slice(3,5),16) - 80);
+      const b = Math.max(0, parseInt(hex.slice(5,7),16) - 80);
+      return `rgb(${r},${g},${b})`;
+    }
+
+    let html = `
+    <style>
+      .cal-mes-wrap2 { padding: .25rem .5rem .5rem; display:flex; flex-direction:column; height:100%; }
+      .cal-mes-table2 { width:100%; border-collapse:collapse; table-layout:fixed; flex:1; }
+      .cal-mes-table2 thead th {
+        background: var(--navy, #1a3a5c); color:#fff;
+        padding:7px 4px; font-size:11px; font-weight:700;
+        text-align:center; border-right:1px solid rgba(255,255,255,.15);
+        border-radius:0;
+      }
+      .cal-dia2 {
+        border:1px solid #e2e8f0; vertical-align:top; padding:0;
+        background:#fff; cursor:pointer;
+        height:calc((100vh - 200px) / 6); min-height:90px;
+        overflow:hidden; transition:box-shadow .12s;
+      }
+      .cal-dia2:hover { box-shadow:0 2px 8px rgba(0,0,0,.1); z-index:1; position:relative; }
+      .cal-dia2-vacio { background:#f8f9fb; cursor:default; border-color:transparent; }
+      .cal-dia2-vacio:hover { box-shadow:none; }
+      .cal-dia2-hoy { border:2px solid #1a3a5c !important; }
+      .cal-dia2-feriado { background:#fff5f5 !important; }
+      .cal-d2-head {
+        display:flex; align-items:center; justify-content:space-between;
+        padding:4px 7px 3px; border-bottom:1px solid #e8edf3;
+        background:#f4f7fb;
+      }
+      .cal-dia2-feriado .cal-d2-head { background:#fff0f0; border-bottom-color:#f0c0c0; }
+      .cal-dia2-hoy .cal-d2-head { background:#e8f0fb; border-bottom-color:#b0c8e8; }
+      .cal-d2-num { font-size:13px; font-weight:800; color:#1a3a5c; line-height:1; }
+      .cal-d2-num-hoy {
+        background:#1a3a5c; color:#fff;
+        width:22px; height:22px; border-radius:50%;
+        display:flex; align-items:center; justify-content:center; font-size:11px;
+      }
+      .cal-d2-dow { font-size:9px; font-weight:700; color:#aaa; letter-spacing:.05em; text-transform:uppercase; }
+      .cal-dia2-hoy .cal-d2-dow { color:#1a3a5c; }
+      .cal-d2-body { padding:4px 6px 5px; display:flex; flex-direction:column; gap:3px; }
+      .cal-franjas2 { display:flex; flex-wrap:wrap; gap:2px; }
+      .franja-pill2 {
+        font-size:8px; font-weight:700; padding:1px 5px 1px 4px;
+        border-radius:3px; white-space:nowrap; line-height:1.5;
+        display:flex; align-items:center; gap:2px;
+      }
+      .cal-ocup-wrap { margin-top:2px; }
+      .cal-ocup-bar { height:6px; border-radius:3px; background:#e2e8f0; overflow:hidden; margin-bottom:3px; }
+      .cal-ocup-fill { height:100%; border-radius:3px; }
+      .cal-ocup-nums { display:flex; align-items:center; gap:6px; }
+      .cal-ocup-turnos { font-size:10px; font-weight:700; color:#1a3a5c; }
+      .cal-ocup-libres { font-size:9px; color:#888; }
+      .cal-ocup-ris { font-size:9px; color:#888; }
+      .cal-feriado-lbl { font-size:9px; color:#c05050; font-weight:600; margin-top:2px; }
+      .cal-pie2 {
+        display:flex; gap:1rem; align-items:center;
+        padding:.5rem 0 .2rem; font-size:12px; font-weight:600;
+        border-top:1px solid #e2e8f0; margin-top:.4rem;
+        flex-wrap:wrap;
+      }
+    </style>
+    <div class="cal-mes-wrap2">
+      <table class="cal-mes-table2">
+        <thead><tr>`;
+
     for (const d of DIAS) html += `<th>${d}</th>`;
     html += `</tr></thead><tbody><tr>`;
 
-    for (let i=0; i<primerDia; i++) html += `<td class="cal-dia cal-dia-vacio"></td>`;
+    for (let i=0; i<primerDia; i++) html += `<td class="cal-dia2 cal-dia2-vacio"></td>`;
 
     let col = primerDia;
     for (let dia=1; dia<=diasMes; dia++) {
@@ -563,64 +680,91 @@ const AgendaView = (() => {
       const res       = resumenMap[fechaStr];
       const esHoy     = fechaStr === hoyStr;
       const esDom     = fechaDate.getDay() === 0;
+      const dowLabel  = DIAS_CORTO[fechaDate.getDay()];
 
-      let cls = "cal-dia";
-      if (esHoy) cls += " cal-dia-hoy";
-      if (esDom) cls += " cal-dia-dom";
+      let cls = "cal-dia2";
+      if (esHoy)            cls += " cal-dia2-hoy";
+      if (res?.esFeriado)   cls += " cal-dia2-feriado";
 
       let contenido = "";
+
+      const numHtml = esHoy
+        ? `<div class="cal-d2-num cal-d2-num-hoy">${dia}</div>`
+        : `<span class="cal-d2-num">${dia}</span>`;
+
+      const head = `<div class="cal-d2-head">${numHtml}<span class="cal-d2-dow">${dowLabel}</span></div>`;
+
       if (!res) {
-        const DIAS_C2 = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
-        contenido = `<div class="cal-d-head"><span class="cal-d-num">${dia}</span><span class="cal-d-name">${DIAS_C2[fechaDate.getDay()]}</span></div>`;
+        contenido = head;
       } else if (res.esFeriado) {
-        cls += " cal-dia-feriado";
-        const DIAS_C = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
-        contenido = `<div class="cal-d-head"><span class="cal-d-num">${dia}</span><span class="cal-d-name" style="color:#c05050">${DIAS_C[fechaDate.getDay()]}</span></div><div class="cal-d-body"><div class="cal-feriado-label">🚫 ${res.feriado||"Feriado"}</div></div>`;
+        contenido = `${head}
+          <div class="cal-d2-body">
+            <div class="cal-feriado-lbl">🚫 ${res.feriado||"Feriado"}</div>
+          </div>`;
       } else {
-        const total = res.libres + res.ocupados;
-        const pct   = total > 0 ? res.libres/total : 0;
-        if      (pct===0 && total>0) cls += " cal-dia-lleno";
-        else if (pct>0 && pct<0.25)  cls += " cal-dia-casi-lleno";
-        const barOcup  = total>0 ? Math.round((res.ocupados/total)*100) : 0;
+        const total     = res.libres + res.ocupados;
+        const barW      = Math.min(100, Math.round((res.ocupados / PROMEDIO) * 100));
+        const barColor  = _colorBarra(res.ocupados, res.libres);
         const risDelDia = (risMes[fechaStr] || []).length;
-        const DIAS_CORTO = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
-        contenido = `
-          <div class="cal-d-head">
-            <span class="cal-d-num">${dia}</span>
-            <span class="cal-d-name">${DIAS_CORTO[fechaDate.getDay()]}</span>
-          </div>
-          <div class="cal-d-body">
-            <div class="cal-barra">
-              <div class="cal-barra-ocu" style="width:${barOcup}%"></div>
-              <div class="cal-barra-lib" style="width:${100-barOcup}%"></div>
-            </div>
-            ${risDelDia > 0 ? `<div class="cal-barra-ris-wrap"><div class="cal-barra-ris"></div></div>` : ""}
-            <div class="cal-contadores">
-              <span class="cal-ocu-badge">● ${res.ocupados}</span>
-              <span class="cal-lib-badge">▲ ${res.libres}</span>
-              ${risDelDia > 0 ? `<span class="cal-ris-badge">📋 ${risDelDia}</span>` : ""}
+
+        // Pills de franjas con horario
+        const franjasHtml = res.franjas.length > 0
+          ? `<div class="cal-franjas2">${res.franjas.map(f => {
+              const bg   = f.color || "#ccc";
+              const txt  = _darken(bg);
+              const short = f.label
+                .replace("Franja Exclusiva ","")
+                .replace("Solo mamarias Santojanni","Mama")
+                .replace("Internados CEDETAC","Cedetac")
+                .replace("Solo internados","Internados")
+                .replace("Mantenimiento","Mant.");
+              return `<span class="franja-pill2" style="background:${bg}33;color:${txt};border:1px solid ${bg}88">
+                ${short} <span style="opacity:.7;font-weight:500">${f.horaD}-${f.horaH}</span>
+              </span>`;
+            }).join("")}</div>`
+          : "";
+
+        const libresLabel = res.libres <= 0 ? `<span style="color:#e05555;font-size:9px;font-weight:700">lleno</span>`
+                          : `<span class="cal-ocup-libres">▲ ${res.libres} libres</span>`;
+
+        contenido = `${head}
+          <div class="cal-d2-body">
+            ${franjasHtml}
+            <div class="cal-ocup-wrap">
+              <div class="cal-ocup-bar">
+                <div class="cal-ocup-fill" style="width:${barW}%;background:${barColor}"></div>
+              </div>
+              <div class="cal-ocup-nums">
+                <span class="cal-ocup-turnos">● ${res.ocupados}</span>
+                ${libresLabel}
+                ${risDelDia > 0 ? `<span class="cal-ocup-ris">📋 ${risDelDia}</span>` : ""}
+              </div>
             </div>
           </div>`;
       }
 
-      html += `<td class="${cls}" data-fecha="${fechaStr}" title="Clic para ver semana">${contenido}</td>`;
+      html += `<td class="${cls}" data-fecha="${fechaStr}" title="${fechaStr}">${contenido}</td>`;
       col++;
       if (col===7 && dia<diasMes) { html += `</tr><tr>`; col=0; }
     }
 
     const resto = col===0 ? 0 : 7-col;
-    for (let i=0; i<resto; i++) html += `<td class="cal-dia cal-dia-vacio"></td>`;
+    for (let i=0; i<resto; i++) html += `<td class="cal-dia2 cal-dia2-vacio"></td>`;
+
     html += `</tr></tbody></table>
-      <div class="cal-pie">
-        <span class="cal-pie-lib">▲ ${totalLibres} slots libres en el mes</span>
-        <span class="cal-pie-sep">·</span>
-        <span class="cal-pie-ocu">● ${totalOcup} turnos asignados</span>
-        ${totalRIS > 0 ? `<span class="cal-pie-sep">·</span><span class="cal-pie-ris">📋 ${totalRIS} RIS</span>` : ""}
+      <div class="cal-pie2">
+        <span style="color:#2e7d32">▲ ${totalLibres} libres en el mes</span>
+        <span style="color:#999">·</span>
+        <span style="color:#1a3a5c">● ${totalOcup} turnos asignados</span>
+        <span style="color:#999">·</span>
+        <span style="color:#888">promedio diario: ${Math.round(totalOcup / diasMes)}</span>
+        ${totalRIS > 0 ? `<span style="color:#999">·</span><span style="color:#888">📋 ${totalRIS} RIS</span>` : ""}
       </div>
     </div>`;
+
     container.innerHTML = html;
 
-    container.querySelectorAll(".cal-dia[data-fecha]").forEach(td => {
+    container.querySelectorAll(".cal-dia2[data-fecha]").forEach(td => {
       td.addEventListener("click", () => { App.irAListaDia(td.dataset.fecha); });
     });
   }
