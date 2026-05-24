@@ -3,9 +3,10 @@
 const Config = (() => {
   const KEY_URL = "rmn_api_url";
   const KEY_ROL = "rmn_rol";
+  const DEFAULT_URL = "https://script.google.com/macros/s/AKfycbz-fzW9c4tVFfE1gmmzA4G3hJtEXHgaF35xGThLbOR2ZuIOXGDh_Ru-6UkWlZfS1WRv/exec";
 
   return {
-    getUrl()  { return localStorage.getItem(KEY_URL) || ""; },
+    getUrl()  { return localStorage.getItem(KEY_URL) || DEFAULT_URL; },
     setUrl(v) { localStorage.setItem(KEY_URL, v.trim()); },
     clearUrl(){ localStorage.removeItem(KEY_URL); },
 
