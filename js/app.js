@@ -172,6 +172,10 @@ const App = (() => {
               document.getElementById("pin-error").textContent = "PIN incorrecto";
               setTimeout(() => { _pinActual = ""; _actualizarPuntos(); document.getElementById("pin-error").textContent = ""; }, 800);
             }
+          }).catch(err => {
+            console.error("Error validando PIN:", err);
+            document.getElementById("pin-error").textContent = "Error de conexión";
+            setTimeout(() => { _pinActual = ""; _actualizarPuntos(); document.getElementById("pin-error").textContent = ""; }, 1500);
           });
         }
       });
