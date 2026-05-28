@@ -218,12 +218,19 @@ const AgendaView = (() => {
           const col = act ? _coloresOrigen(act.origen) : { bg:"#f0f0f0", border:"#ddd" };
           const _hasta  = activosPorCol[di] ? activosPorCol[di].hasta : mins + _paso;
           const _horaF  = String(Math.floor(_hasta/60)).padStart(2,"0")+":"+String(_hasta%60).padStart(2,"0");
+          const nombreCont  = act ? `${act.apellido}, ${act.nombre}` : "";
+          const estudioCont = act ? act.estudio : "";
           html += `<td class="slot-continua slot-libre"
-            style="background:${col.bg}22;border-left:3px solid ${col.bg}88;border-top:none;border-bottom:none;padding:0 6px;cursor:pointer"
-            data-fecha="${dia.fecha}" data-mins="${mins}" title="Continúa hasta ${_horaF} — clic para sobreturno">
-            <div style="height:100%;display:flex;align-items:center;justify-content:space-between;pointer-events:none">
-              <div style="height:1px;flex:1;background:${col.border}44;border-top:1px solid ${col.border}33"></div>
-              <span style="color:${col.border}99;font-size:8px;font-weight:700;padding:0 4px;flex-shrink:0">→${_horaF}</span>
+            style="background:${col.bg}22;border-left:3px solid ${col.border};padding:2px 5px;cursor:pointer"
+            data-fecha="${dia.fecha}" data-mins="${mins}" title="${nombreCont} — hasta ${_horaF} — clic para sobreturno">
+            <div style="height:100%;display:flex;align-items:center;justify-content:space-between;pointer-events:none;gap:4px">
+              <div style="flex:1;overflow:hidden;min-width:0">
+                ${nombreCont
+                  ? `<div style="font-size:10px;font-weight:600;color:${col.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nombreCont}</div>
+                     <div style="font-size:9px;color:${col.text}99;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${estudioCont}</div>`
+                  : `<div style="height:1px;flex:1;background:${col.border}44;border-top:1px solid ${col.border}33"></div>`}
+              </div>
+              <span style="color:${col.border};font-size:8px;font-weight:700;padding:0 2px;flex-shrink:0">→${_horaF}</span>
             </div></td>`;
         } else if (risContinuacion) {
           const r     = risActivo.ris;
