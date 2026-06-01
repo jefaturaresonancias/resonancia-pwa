@@ -113,23 +113,10 @@ const AgendaView = (() => {
     if (!datos || !datos.length) { container.innerHTML = '<div class="empty-state">Sin datos.</div>'; return; }
 
     const MIN_I = 0, MIN_F = 24*60;
-    const slotsBase = datos[0].slots.filter(s => s.mins >= MIN_I && s.mins < MIN_F).map(s => s.mins);
-    const slotsSet  = new Set(slotsBase);
-
-    // Agregar horarios de turnos que no caen en el paso del grid (ej: 21:30 con paso 40)
-    for (const dia of datos) {
-      for (const s of dia.slots) {
-        if (s.tipo === "turno" && s.mins >= MIN_I && s.mins < MIN_F && !slotsSet.has(s.mins)) {
-          slotsSet.add(s.mins);
-        }
-      }
-      for (const r of (risMap[dia.fecha] || [])) {
-        const rm = typeof r.mins === "number" ? r.mins : parsearMinsJS(r.hora);
-        if (rm >= MIN_I && rm < MIN_F && !slotsSet.has(rm)) {
-          slotsSet.add(rm);
-        }
-      }
-    }
+    const slotsSet = new Set();
+    // Base en 5 min para capturar cualquier horario
+    for (let m = MIN_I; m < MIN_F; m += 5) slotsSet.add(m);
+    
     const slots = Array.from(slotsSet).sort((a,b) => a-b);
 
     // Normalizar continuaciones: slots del mismo paciente (misma fila) → tipo continuacion
