@@ -118,13 +118,28 @@ const ParteView = (() => {
       "RM ",
     ];
 
-    const partes = practica.split(/\s*-\s*/);
+const partes = String(practica).split(/\s*·\s*|\s*-\s*/);
     const acortadas = partes.map(p => {
       let s = p.trim().toUpperCase();
+      let esAngio = false;
       for (const pref of PREFIJOS) {
-        if (s.startsWith(pref)) { s = s.slice(pref.length).trim(); break; }
+        if (s.startsWith(pref)) {
+          if (pref.includes("ANGIO")) esAngio = true;
+          s = s.slice(pref.length).trim();
+          break;
+        }
       }
-      // Capitalizar
+      // Si venía de ANGIORRESONANCIA, preservar contexto
+      if (esAngio) {
+        const MAPEOS_ANGIO = {
+          "CEREBRO":               "Angiorresonancia cerebro",
+          "CEREBRO CON CONTRASTE": "Angiorresonancia cerebro con contraste",
+          "VASOS DE CUELLO":       "Angiorresonancia vasos cuello",
+          "VASOS CUELLO":          "Angiorresonancia vasos cuello",
+        };
+        if (MAPEOS_ANGIO[s]) return MAPEOS_ANGIO[s];
+        return "Angiorresonancia " + s.charAt(0).toLowerCase() + s.slice(1).toLowerCase();
+      }
       return s.charAt(0) + s.slice(1).toLowerCase();
     });
 
