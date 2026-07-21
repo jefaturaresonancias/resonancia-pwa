@@ -9,13 +9,22 @@
 // ─────────────────────────────────────────────────────────────
 
 function doGet(e) {
-  const action = (e && e.parameter && e.parameter.action) || "ping";
+  const p      = e && e.parameter || {};
+  const action = p.action || "ping";
+
   try {
-    return _jsonOk(_routeGet(action, e.parameter || {}));
+    // Intentar como acción GET primero
+    // Si es acción de mutación, routear a _routePost con los mismos parámetros
+    const mutaciones = ["asignar","presente","anular"];
+    if (mutaciones.indexOf(action) >= 0) {
+      return _jsonOk(_routePost(action, p));
+    }
+    return _jsonOk(_routeGet(action, p));
   } catch (err) {
     Logger.log("doGet error [" + action + "]: " + err);
     return _jsonErr(err.message);
   }
+  
 }
 
 function doPost(e) {
@@ -40,20 +49,34 @@ function _routeGet(action, p) {
     case "turnos":       return _apiTurnos(p);
     case "slots":        return _apiSlots(p);
     case "buscar":       return _apiBuscar(p);
-    case "leerRIS":      return _apiLeerRIS(p);
+    case "leerRIS":          return _apiLeerRIS(p);
+    case "leerCardiologia":  return _apiLeerCardiologia(p);
     case "leerRISRango": return _apiLeerRISRango(p);
-    case "verificarRIS": return _apiVerificarRIS(p);
-    default:             throw new Error("Acción no reconocida: " + action);
+    case "verificarRIS":   return _apiVerificarRIS(p);
+    case "escribirRIS":         return _apiEscribirRIS({ fecha: p.fecha, filas: JSON.parse(p.filas || "[]") });
+    case "actualizarPracticasRIS": return _apiActualizarPracticasRIS({ fecha: p.fecha, items: JSON.parse(p.items || "[]") });
+    case "actualizarEstadosRIS": return _apiActualizarEstadosRIS(p);
+    case "normalizarRIS":  return _apiNormalizarRIS();
+    case "ordenarRIS":     return _apiOrdenarRIS();
+    case "leerConfig":     return _apiLeerConfig(p);
+    case "escribirConfig": return _apiEscribirConfig(p);
+    case "consolidarRIS":  return _apiConsolidarRIS();
+    case 'escribirLog':    return _escribirLog(p);
+    case 'leerLog':     return _leerLog(p);
+    case 'validarPin':  return _apiValidarPin(p);
+    case 'cambiarPin':  return _apiCambiarPin(p);
+    default:            throw new Error("Acción no reconocida: " + action);
   }
 }
 
 function _routePost(action, body) {
   switch (action) {
-    case "asignar":     return _apiAsignar(body);
-    case "presente":    return _apiPresente(body);
-    case "anular":      return _apiAnular(body);
-    case "escribirRIS": return _apiEscribirRIS(body);
-    default:            throw new Error("Acción POST no reconocida: " + action);
+    case "asignar":              return _apiAsignar(body);
+    case "presente":             return _apiPresente(body);
+    case "anular":               return _apiAnular(body);
+    case "escribirRIS":          return _apiEscribirRIS(body);
+    case "actualizarEstadosRIS": return _apiActualizarEstadosRIS(body);  // ← AGREGAR
+    default: throw new Error("Acción POST no reconocida: " + action);
   }
 }
 
@@ -118,6 +141,7 @@ function _apiAgenda(p) {
   const turnosBD    = leerTurnosBD({ soloActivos: true });
   const turnosMap   = {};
 
+  // ── 1) Cargar turnos locales (Base de datos) — tienen prioridad ──
   for (const t of turnosBD) {
     if (!todasFechas.includes(t.fechaStr)) continue;
     const listaEst = t.estudio.split(",").map(s => s.trim()).filter(s => s);
@@ -141,6 +165,40 @@ function _apiAgenda(p) {
     }
   }
 
+  // ── 2) Mergear turnos RIS (SIGEHOS) — una sola vez, fuera del loop ──
+  try {
+    const risPorFecha = _apiLeerRISRango({ desde: fechaAStr(desde, tz), dias: String(diasCount) });
+    for (const fechaStr of Object.keys(risPorFecha)) {
+      if (!todasFechas.includes(fechaStr)) continue;
+      for (const r of risPorFecha[fechaStr]) {
+        const dur = r.duracion || 20;
+        const partes    = str(r.apellido_nombre).split(",");
+        const apellidoR = partes[0] ? partes[0].trim() : "";
+        const nombreR   = partes.length > 1 ? partes.slice(1).join(",").trim() : "";
+
+        for (let m = r.mins; m < r.mins + dur; m += 10) {
+          const clave = fechaStr + "_" + m;
+          if (turnosMap[clave]) continue; // ya hay turno local — no pisar
+          turnosMap[clave] = {
+            esInicio:      m === r.mins,
+            nombre:        nombreR || r.apellido_nombre,
+            apellido:      apellidoR,
+            dni:           r.documento,
+            estudio:       r.practica,
+            origen:        "RIS",
+            presente:      r.estado || "",
+            observaciones: r.cobertura ? ("Cobertura: " + r.cobertura) : "",
+            fila:          null,
+            esRIS:         true
+          };
+        }
+      }
+    }
+  } catch (err) {
+    Logger.log("Error mergeando RIS en agenda: " + err);
+  }
+
+  // ── 3) Armar la grilla de días/slots (sin cambios) ──
   const result = [];
   const NOMBRES_DIA = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
   const NOMBRES_MES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
@@ -247,6 +305,7 @@ function _colorOrigenHex(o) {
     case "DIRECCIÓN":
     case "DIRECCION":   return "#a98fd4";
     case "TRASLADO":    return "#3c9ab8";
+    case "RIS":         return "#8899aa"; 
     default:            return "#e8a09a";
   }
 }
@@ -260,6 +319,7 @@ function _colorContinuacionHex(o) {
     case "DIRECCIÓN":
     case "DIRECCION":   return "#cec0ea";
     case "TRASLADO":    return "#74b9d4";
+    case "RIS":         return "#c5cdd6";
     default:            return "#f2c8c5";
   }
 }
@@ -494,4 +554,378 @@ function _apiAnular(body) {
   }
 
   return { mensaje: "Turno anulado", timestamp: ahora };
+}
+
+// ─────────────────────────────────────────────────────────────
+//  GET ?action=leerCardiologia&desde=dd/MM/yyyy&dias=7
+//  Lee pacientes de la agenda de Cardiología del Sheet externo.
+//  Filtra por rango de fechas y devuelve agrupado por fecha.
+// ─────────────────────────────────────────────────────────────
+function _apiLeerCardiologia(p) {
+  if (!p.desde) throw new Error("Falta parámetro desde");
+
+  const SHEET_ID  = "15HBStrd51hmS9w_4gQ-uWORKFNsSm1jWcSo_HbzqrCs";
+  const HOJA_NOMBRE = "2026";
+  const tz  = Session.getScriptTimeZone();
+  const dias = parseInt(p.dias || "7");
+
+  // Construir set de fechas válidas
+  const pt     = p.desde.split("/");
+  const inicio = new Date(parseInt(pt[2]), parseInt(pt[1])-1, parseInt(pt[0]));
+  inicio.setHours(0,0,0,0);
+  const fechasSet = new Set();
+  for (let i = 0; i < dias; i++) {
+    const d = new Date(inicio);
+    d.setDate(inicio.getDate() + i);
+    fechasSet.add(fechaAStr(d, tz));
+  }
+
+  // Leer sheet externo
+  const ss   = SpreadsheetApp.openById(SHEET_ID);
+  const hoja = ss.getSheetByName(HOJA_NOMBRE);
+  if (!hoja) throw new Error("No se encontró la hoja: " + HOJA_NOMBRE);
+
+  const ultima = Math.max(hoja.getLastRow(), 2);
+  const datos  = hoja.getRange(2, 1, ultima - 1, 11).getValues();
+  // Cols: A=FECHA(0), B=HORA(1), C=DNI(2), D=APELLIDO Y NOMBRE(3),
+  //       E=EDAD(4), F=TELEFONO(5), G=DIAGNOSTICO(6), H=PESO(7),
+  //       I=TALLA(8), J=SOLICITANTE(9), K=ESTADO(10)
+
+  const porFecha = {};
+
+  for (const row of datos) {
+    if (!row[0]) continue;
+
+    // Normalizar fecha
+    let fechaStr = "";
+    if (row[0] instanceof Date) {
+      fechaStr = fechaAStr(row[0], tz);
+    } else {
+      const s = str(row[0]).trim();
+      // Puede venir como dd/mm/yyyy o yyyy-mm-dd
+      if (s.includes("/")) {
+        fechaStr = s;
+      } else if (s.includes("-")) {
+        const p2 = s.split("-");
+        fechaStr = `${p2[2]}/${p2[1]}/${p2[0]}`;
+      }
+    }
+
+    if (!fechasSet.has(fechaStr)) continue;
+
+    const estado = str(row[10]).trim().toUpperCase();
+    if (estado === "CANCELADO" || estado === "CANCEL." || estado === "CANCELA...") continue;
+
+    // La hora puede ser fracción decimal (Sheets time) o string "HH:MM"
+    let mins = 0;
+    if (typeof row[1] === "number") {
+      // Fracción de día: 0.333... = 8hs
+      mins = Math.round(row[1] * 24 * 60);
+    } else if (row[1] instanceof Date) {
+      mins = row[1].getHours() * 60 + row[1].getMinutes();
+    } else {
+      mins = parsearMinutos(str(row[1]).trim());
+    }
+
+    // Solo franja cardiología: 08:00 - 14:00
+    if (mins < 8*60 || mins >= 14*60) continue;
+
+    if (!porFecha[fechaStr]) porFecha[fechaStr] = [];
+    porFecha[fechaStr].push({
+      fecha:          fechaStr,
+      hora:           minutosAHora(mins),
+      mins:           mins,
+      duracion:       60, // 1 hora por paciente
+      dni:            str(row[2]).trim(),
+      apellido_nombre: str(row[3]).trim(),
+      diagnostico:    str(row[6]).trim(),
+      estado:         str(row[10]).trim()
+    });
+  }
+
+  // Ordenar por hora dentro de cada día
+  for (const f of Object.keys(porFecha)) {
+    porFecha[f].sort((a,b) => a.mins - b.mins);
+  }
+
+  return porFecha;
+}
+
+function _escribirLog(params) {
+  try {
+    const id    = params.sheetId || '';
+    const ss    = id 
+      ? SpreadsheetApp.openById(id)
+      : SpreadsheetApp.getActiveSpreadsheet();
+    let sheet   = ss.getSheetByName('Log_Bot');
+    
+    if (!sheet) {
+      sheet = ss.insertSheet('Log_Bot');
+      sheet.appendRow(['FECHA', 'HORA', 'STATUS', 'FILAS', 'MENSAJE']);
+      sheet.getRange(1, 1, 1, 5).setFontWeight('bold');
+      sheet.setFrozenRows(1);
+    }
+    
+    sheet.appendRow([
+      params.fecha    || '',
+      params.hora     || '',
+      params.status   || '',
+      Number(params.filas) || 0,
+      params.mensaje  || '',
+      params.maquina  || 'LOCAL',
+    ]);
+    
+    return { ok: true };
+      
+  } catch(err) {
+    throw new Error(err.message);
+  }
+}
+
+function _leerLog(p) {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Log_Bot');
+  if (!sheet) return { filas: [], total: 0 };
+
+  const ultima = Math.max(sheet.getLastRow(), 2);
+  const limite = parseInt(p.limite || '20');
+  const datos  = sheet.getRange(2, 1, ultima - 1, 5).getValues();
+
+  const filas = datos
+    .filter(r => r[0])
+   .map(r => ({
+      fecha:   r[0] instanceof Date ? Utilities.formatDate(r[0], 'America/Argentina/Buenos_Aires', 'dd/MM/yyyy') : String(r[0] || ''),
+      hora:    r[1] instanceof Date ? Utilities.formatDate(r[1], 'America/Argentina/Buenos_Aires', 'HH:mm:ss') : String(r[1] || ''),
+      status:  String(r[2] || ''),
+      filas:   Number(r[3] || 0),
+      mensaje: String(r[4] || ''),
+      maquina: String(r[5] || ''),
+    }))
+    .reverse()
+    .slice(0, limite);
+
+  return { filas, total: filas.length };
+}
+
+function _apiLeerConfig(p) {
+  const ss     = SpreadsheetApp.getActiveSpreadsheet();
+  const config = ss.getSheetByName("Config");
+  const tz     = Session.getScriptTimeZone();
+  const tipo   = p.tipo || p.seccion || "all";
+
+  // ── Bloqueos ──
+  const bloqueos = [];
+  if (tipo === "bloqueos" || tipo === "all") {
+    const data = config.getRange("J3:M500").getValues();
+    for (let i = 0; i < data.length; i++) {
+      if (!data[i][0]) continue;
+      const fecha = data[i][0];
+      bloqueos.push({
+        fila:      i + 3,
+        fecha:     fecha instanceof Date ? fechaAStr(fecha, tz) : str(fecha),
+        horaD:     str(data[i][1]),
+        horaH:     str(data[i][2]),
+        concepto:  str(data[i][3])
+      });
+    }
+    if (tipo === "bloqueos") return { bloqueos };
+  }
+
+  // ── Franjas ──
+  const franjas = [];
+  if (tipo === "franjas" || tipo === "all") {
+    const data = config.getRange("O3:W500").getValues();
+    for (let i = 0; i < data.length; i++) {
+      if (!data[i][0]) continue;
+      franjas.push({
+        fila:     i + 3,
+        dia1:     str(data[i][0]),
+        func1:    str(data[i][1]),
+        dia2:     str(data[i][2]),
+        func2:    str(data[i][3]),
+        dia3:     str(data[i][4]),
+        horaD:    str(data[i][5]),
+        horaH:    str(data[i][6]),
+        concepto: str(data[i][7]),
+        color:    str(data[i][8]) || "#e06666"
+      });
+    }
+    if (tipo === "franjas") return { franjas };
+  }
+
+  // ── Estudios ──
+  const estudios = [];
+  if (tipo === "all") {
+    const cfg = cargarConfigCalendario();
+    const cfgEst = cargarConfigEstudios();
+
+    // Estudios desde Config A2:D
+    const dataEst = config.getRange("A2:D500").getValues();
+    for (let i = 0; i < dataEst.length; i++) {
+      const nombre = str(dataEst[i][0]);
+      if (!nombre) continue;
+      estudios.push({
+        nombre,
+        estadistica:  str(dataEst[i][1]),
+        restriccion:  str(dataEst[i][2]),
+        duracion:     Number(dataEst[i][3]) || 0
+      });
+    }
+
+    // Feriados
+    const feriados = Object.entries(cfg.feriados).map(([fecha, concepto]) => ({ fecha, concepto }));
+
+    // Restricciones horarias (franjas por código)
+    const restricciones = [];
+    for (const [codigo, reglas] of Object.entries(cfg.restriccionesHorarias || {})) {
+      for (const r of reglas) {
+        restricciones.push({ codigo, ...r,
+          horaD: minutosAHora(r.minDesde), horaH: minutosAHora(r.minHasta) });
+      }
+    }
+
+    // Restricciones por origen
+    const restriccionesOrigen = [];
+    for (const [origen, reglas] of Object.entries(cfg.restriccionesOrigen || {})) {
+      for (const r of reglas) {
+        restriccionesOrigen.push({ origen, ...r,
+          horaD: minutosAHora(r.minDesde), horaH: minutosAHora(r.minHasta) });
+      }
+    }
+
+    return { estudios, feriados, franjas, bloqueos, restricciones, restriccionesOrigen };
+  }
+
+  throw new Error("Sección no soportada: " + tipo);
+}
+
+function _apiEscribirConfig(p) {
+  const ss     = SpreadsheetApp.getActiveSpreadsheet();
+  const config = ss.getSheetByName("Config");
+  const tipo   = p.tipo || p.seccion || "bloqueos";
+  const datos  = p.datos ? JSON.parse(p.datos) : null;
+
+  if (tipo === "bloqueos") {
+    const bloqueos = datos || (typeof p.bloqueos === "string" ? JSON.parse(p.bloqueos) : (p.bloqueos || []));
+    config.getRange("J3:M500").clearContent();
+    if (bloqueos.length > 0) {
+      const filas = bloqueos.map(b => [b.fecha, b.horaDesde || b.horaD, b.horaHasta || b.horaH, b.concepto]);
+      config.getRange(3, 10, filas.length, 4).setValues(filas);
+    }
+    _invalidarCacheConfig();
+    return { escritos: bloqueos.length };
+  }
+
+  if (tipo === "franjas") {
+    const franjas = datos || (typeof p.franjas === "string" ? JSON.parse(p.franjas) : (p.franjas || []));
+    config.getRange("O3:W500").clearContent();
+    if (franjas.length > 0) {
+      const filas = franjas.map(f => [
+        f.dia1, f.func1||"", f.dia2||"", f.func2||"", f.dia3||"",
+        f.horaD, f.horaH, f.concepto, f.color||"#e06666"
+      ]);
+      config.getRange(3, 15, filas.length, 9).setValues(filas);
+    }
+    _invalidarCacheConfig();
+    return { escritos: franjas.length };
+  }
+
+  return { error: "Tipo no reconocido" };
+}
+
+function _apiValidarPin(p) {
+  if (!p.rol || !p.pin) throw new Error("Faltan parámetros rol y pin");
+  const props = PropertiesService.getScriptProperties();
+  const key   = p.rol === "jefatura" ? "PIN_JEFATURA" : "PIN_ADMIN";
+  const pin   = props.getProperty(key) || "";
+  return { valido: pin !== "" && String(p.pin) === pin };
+}
+
+function _apiCambiarPin(p) {
+  if (!p.rol || !p.pinActual || !p.pinNuevo) throw new Error("Faltan parámetros");
+  const props    = PropertiesService.getScriptProperties();
+  const key      = p.rol === "admin" ? "PIN_ADMIN" : "PIN_JEFATURA";
+  const pinGuard = props.getProperty(key) || "";
+  if (String(p.pinActual) !== pinGuard) return { actualizado: false };
+  if (!/^\d{4}$/.test(p.pinNuevo)) throw new Error("PIN inválido");
+  props.setProperty(key, String(p.pinNuevo));
+  return { actualizado: true };
+}
+
+function normalizarPracticasBDRIS() {
+  const ss    = SpreadsheetApp.getActive();
+  const hoja  = ss.getSheetByName("BD_RIS");
+  if (!hoja) { Logger.log("No se encontró BD_RIS"); return; }
+
+  const data = hoja.getDataRange().getValues();
+  const COL_PRACTICA = 4; // columna E (0-indexed)
+
+  const PREFIJOS = [
+    "RESONANCIA MAGNETICA NUCLEAR DE ",
+    "RESONANCIA MAGNETICA FUNCIONAL DE ",
+    "RESONANCIA MAGNETICA DE ",
+    "RESONANCIA MAGNETICA ",
+    "ANGIORRESONANCIA DE ",
+    "ANGIORRESONANCIA ",
+    "COLANGIORRESONANCIA DE ",
+    "COLANGIORRESONANCIA ",
+    "COLANGIO RESONANCIA DE ",
+    "COLANGIO-RESONANCIA DE ",
+    "COLANGIOGRAFIA POR RM DE ",
+    "COLANGIOGRAFIA POR RM ",
+    "RMN DE ",
+    "RM DE ",
+    "RM ",
+  ];
+
+  function normalizar(practica) {
+    if (!practica) return "";
+    const partes = String(practica).split(/\s*·\s*|\s*-\s*/);
+    const acortadas = partes.map(p => {
+      let s = p.trim().toUpperCase();
+      let esAngio = false;
+      for (const pref of PREFIJOS) {
+        if (s.startsWith(pref)) {
+          if (pref.includes("ANGIO")) esAngio = true;
+          s = s.slice(pref.length).trim();
+          break;
+        }
+      }
+      // Si venía de ANGIORRESONANCIA, preservar contexto
+      if (esAngio) {
+        const MAPEOS_ANGIO = {
+          "CEREBRO":               "Angiorresonancia cerebro",
+          "CEREBRO CON CONTRASTE": "Angiorresonancia cerebro con contraste",
+          "VASOS DE CUELLO":       "Angiorresonancia vasos cuello",
+          "VASOS CUELLO":          "Angiorresonancia vasos cuello",
+        };
+        if (MAPEOS_ANGIO[s]) return MAPEOS_ANGIO[s];
+        return "Angiorresonancia " + s.charAt(0).toLowerCase() + s.slice(1).toLowerCase();
+      }
+      return s.charAt(0) + s.slice(1).toLowerCase();
+    });
+    // Deduplicar
+    const vistos = new Set();
+    const resultado = [];
+    for (const a of acortadas) {
+      const key = a.toLowerCase().trim();
+      if (key && !vistos.has(key)) {
+        vistos.add(key);
+        resultado.push(a);
+      }
+    }
+    return resultado.join(" · ");
+  }
+
+  let modificadas = 0;
+  for (let i = 1; i < data.length; i++) {
+    const original   = String(data[i][COL_PRACTICA] || "").trim();
+    const normalizada = normalizar(original);
+    if (original !== normalizada && normalizada) {
+      hoja.getRange(i + 1, COL_PRACTICA + 1).setValue(normalizada);
+      modificadas++;
+    }
+  }
+
+  Logger.log(`Listo — ${modificadas} filas actualizadas de ${data.length - 1} totales`);
 }
