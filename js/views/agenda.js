@@ -80,6 +80,22 @@ const AgendaView = (() => {
     d.setHours(0, 0, 0, 0);
     return d;
   }
+  function _lunesDe(d) {
+    const r = new Date(d);
+    const dia = r.getDay();
+    r.setDate(r.getDate() - (dia === 0 ? 6 : dia - 1));
+    r.setHours(0, 0, 0, 0);
+    return r;
+  }
+  // Próxima ocurrencia (incluyendo hoy) del día ISO indicado: 1=lunes … 5=viernes
+  function _proximoDiaSemana(diaSemanaISO) {
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    const dowHoy = hoy.getDay() === 0 ? 7 : hoy.getDay();
+    const diff = ((diaSemanaISO - dowHoy) % 7 + 7) % 7;
+    const objetivo = new Date(hoy);
+    objetivo.setDate(hoy.getDate() + diff);
+    return objetivo;
+  }
   function _primeroDeMes(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
   function _strFecha(d)     { return API.fechaAStr(d); }
 
@@ -943,6 +959,9 @@ const AgendaView = (() => {
     _renderFiltros();
     document.getElementById("btn-semana-ant").onclick = () => { _fechaDesde.setDate(_fechaDesde.getDate()-7); _cargarSemana(); };
     document.getElementById("btn-semana-sig").onclick = () => { _fechaDesde.setDate(_fechaDesde.getDate()+7); _cargarSemana(); };
+    document.getElementById("btn-semana-hoy").onclick = () => { _fechaDesde = _lunesDeHoy(); _cargarSemana(); };
+    document.getElementById("btn-semana-lun").onclick = () => { _fechaDesde = _lunesDe(_proximoDiaSemana(1)); _cargarSemana(); };
+    document.getElementById("btn-semana-vie").onclick = () => { _fechaDesde = _lunesDe(_proximoDiaSemana(5)); _cargarSemana(); };
     document.getElementById("agenda-paso").onchange   = e => { _paso = parseInt(e.target.value); cargar(); };
     document.getElementById("agenda-rango-label").textContent = _labelRango();
 
