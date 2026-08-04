@@ -352,6 +352,22 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 .slot-label    { font-size: 10px; font-weight: 600; text-align: center; opacity: .8; }
 .slot-presente { font-size: 9px; color: var(--success); font-weight: 700; }
 
+/* Bloques fusionados (rowspan > 1): hay espacio de sobra, mostramos todo sin truncar */
+.slot-content-expandido { justify-content: flex-start; gap: 2px; padding: 4px 5px; }
+.slot-content-expandido .slot-nombre { white-space: normal; overflow: visible; text-overflow: clip; }
+.slot-detalle {
+  font-size: 9px; line-height: 1.2; opacity: .75;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.slot-estudio-full {
+  font-size: 10px; line-height: 1.25; opacity: .9;
+  white-space: normal; overflow: visible; margin-top: 1px;
+}
+.slot-origen-badge {
+  font-size: 8px; font-weight: 700; opacity: .6;
+  text-transform: uppercase; letter-spacing: .03em; margin-top: auto;
+}
+
 /* ── LISTA DEL DÍA ──────────────────────────────────────────*/
 .lista-stats {
   padding: .5rem 1.25rem;
@@ -630,6 +646,9 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 .slot-ris-vacio { background: #fafafa; border: 1px solid #eee; }
 .slot-ris-clickable { transition: background .1s; }
 .slot-ris-clickable:hover { background: #ebebeb !important; }
+/* Continuación de un mismo RIS: sin borde superior, para que se lea como una
+   sola barra gris continua aunque cada fila siga siendo su propia celda clickeable */
+.slot-ris-continua { border-top: none !important; }
 .slot-ris-side { transition: filter .1s; }
 .slot-ris-side:hover { filter: brightness(.92); }
 

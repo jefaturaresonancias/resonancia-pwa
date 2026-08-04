@@ -323,7 +323,14 @@ const AgendaView = (() => {
           const r     = risActivo.ris;
           const hasta = risActivo.hasta;
           const horaF = String(Math.floor(hasta/60)).padStart(2,"0")+":"+String(hasta%60).padStart(2,"0");
-          html += `<td class="slot-ris-clickable"
+          // Solo mostramos la etiqueta "→hora" en la última fila del tramo, para que
+          // el resto se lea como una sola barra gris continua (sin texto repetido)
+          // aunque cada slot sigue siendo su propia celda clickeable.
+          const esUltimaFila = nextMins >= hasta;
+          const etiqueta = esUltimaFila
+            ? `<span style="color:#999;font-size:8px;font-weight:700;padding:0 4px;flex-shrink:0">→${horaF}</span>`
+            : "";
+          html += `<td class="slot-ris-clickable slot-ris-continua"
             style="background:#f4f4f4;border-left:2px dashed #bbb;border:1px solid #ebebeb;cursor:pointer;padding:0 6px"
             data-fecha="${dia.fecha}" data-mins="${mins}"
             data-ris-nombre="${encodeURIComponent(r.apellido_nombre)}"
@@ -331,7 +338,7 @@ const AgendaView = (() => {
             title="${r.apellido_nombre} · ${r.practica} — hasta ${horaF} — clic para sobreturno">
             <div style="height:100%;display:flex;align-items:center;justify-content:space-between;pointer-events:none">
               <div style="height:1px;flex:1;background:#bbb;border-top:1px dashed #ccc"></div>
-              <span style="color:#999;font-size:8px;font-weight:700;padding:0 4px;flex-shrink:0">→${horaF}</span>
+              ${etiqueta}
             </div></td>`;
         } else {
           // ── CARDIO: lógica unificada ──
@@ -565,9 +572,22 @@ const AgendaView = (() => {
         horaFinBadge = `<span style="color:${col.text};opacity:.7;font-size:9px;font-weight:700;margin-left:3px">→${horaF}</span>`;
       }
 
+      const dniTexto = slot.dni ? `DNI: ${slot.dni}` : "";
+
+      // Con espacio de sobra (bloque fusionado) mostramos toda la info sin truncar,
+      // en vez de esconderla detrás del tooltip al pasar el mouse.
+      const contenido = rowspan > 1
+        ? `<div class="slot-content slot-content-expandido">
+            <span class="slot-nombre" style="color:${col.text}">${iconRIS}${slot.apellido}, ${slot.nombre} ${pres}${horaFinBadge}</span>
+            ${dniTexto ? `<span class="slot-detalle" style="color:${col.text}">${dniTexto}</span>` : ""}
+            <span class="slot-estudio-full" style="color:${col.text}">${slot.estudio}${badgeRIS}</span>
+            <span class="slot-origen-badge" style="color:${col.text}">${slot.origen||""}</span>
+          </div>`
+        : `<div class="slot-content"><span class="slot-nombre" style="color:${col.text}">${iconRIS}${slot.apellido}, ${slot.nombre} ${pres}</span><span class="slot-estudio" style="color:${col.text}">${slot.estudio}${badgeRIS}</span></div>`;
+
       return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border}" data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}"${rowspanAttr}
         data-fturno="1" data-origen="${slot.origen||""}" data-presente="${slot.presente==="Presente"?"1":"0"}" data-estudio="${(slot.estudio||"").toLowerCase()}"
-        ><div class="slot-content"><span class="slot-nombre" style="color:${col.text}">${iconRIS}${slot.apellido}, ${slot.nombre} ${pres}${horaFinBadge}</span><span class="slot-estudio" style="color:${col.text}">${slot.estudio}${badgeRIS}</span></div></td>`;
+        >${contenido}</td>`;
     }
     if (tipo === "continuacion") return `<td class="slot-continua" style="background:${bg}"${rowspanAttr}><div class="slot-content"></div></td>`;
     return `<td class="slot-bloqueo" style="background:${bg}"${rowspanAttr}><div class="slot-content"><span class="slot-label">${slot.label||""}</span></div></td>`;
