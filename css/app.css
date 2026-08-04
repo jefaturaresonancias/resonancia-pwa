@@ -244,6 +244,17 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 }
 
 /* ── AGENDA GRID ─────────────────────────────────────────────*/
+.agenda-leyenda {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .6rem;
+  padding: .4rem 1.25rem; font-size: 11px; color: var(--text-2);
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.agenda-leyenda-item { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.agenda-leyenda-sw {
+  width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0;
+  border: 1px solid rgba(0,0,0,.15);
+}
 .agenda-container { flex: 1; overflow: auto; padding: 0; }
 .agenda-table {
   border-collapse: collapse; width: 100%; table-layout: fixed;
