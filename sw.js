@@ -1,10 +1,11 @@
 const CACHE = "rmn-v1";
 const ASSETS = [
-  "/", "/index.html",
-  "/css/app.css",
-  "/js/config.js", "/js/api.js", "/js/app.js",
-  "/js/views/agenda.js", "/js/views/lista.js", "/js/views/turno.js",
-  "/manifest.json"
+  "./", "./index.html",
+  "./css/app.css",
+  "./js/config.js", "./js/api.js", "./js/app.js",
+  "./js/views/agenda.js", "./js/views/lista.js", "./js/views/turno.js",
+  "./manifest.json",
+  "./icons/Icon-192.png", "./icons/Icon-512.png"
 ];
 
 self.addEventListener("install", e => {

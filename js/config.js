@@ -18,15 +18,9 @@ const Config = (() => {
     // Valida PIN contra la API — devuelve Promise<boolean>
     async validarPin(rol, pin) {
       try {
-        const res = await fetch(
-          this.getUrl() +
-          "?action=validarPin&rol=" + encodeURIComponent(rol) +
-          "&pin=" + encodeURIComponent(pin),
-          { redirect: "follow" }
-        );
-        const json = await res.json();
-        return json.ok === true && json.data && json.data.valido === true;
-      } catch(e) {
+        const data = await API.get({ action: "validarPin", rol, pin });
+        return data && data.valido === true;
+      } catch (e) {
         console.error("validarPin error:", e);
         return false;
       }

@@ -305,7 +305,11 @@ const App = (() => {
 
     document.getElementById("btn-refresh").addEventListener("click", () => {
       if (_viewActual === "agenda") AgendaView.cargar();
-      if (_viewActual === "lista")  ListaView.cargar();
+      else if (_viewActual === "lista")  ListaView.cargar();
+      else if (_viewActual === "pami")   PamiView.cargar();
+      else if (_viewActual === "config") ConfigView.cargar();
+      else if (_viewActual === "bot")    BotView.cargar();
+      else if (_viewActual === "stats")  StatsView.cargar();
     });
   }
 
@@ -356,7 +360,7 @@ const App = (() => {
 
   // ── Service Worker ────────────────────────────────────────
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/sw.js").catch(err => {
+    navigator.serviceWorker.register("sw.js").catch(err => {
       console.warn("SW no registrado:", err);
     });
   }
