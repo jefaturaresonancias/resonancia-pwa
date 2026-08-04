@@ -205,6 +205,12 @@
             </div>
           </div>
           <div id="agenda-leyenda" class="agenda-leyenda"></div>
+          <div id="agenda-filtros" class="agenda-filtros">
+            <div class="agenda-filtros-grupo"><span class="agenda-filtros-label">Origen:</span><span id="filtro-origen-chips" class="agenda-filtros-grupo"></span></div>
+            <div class="agenda-filtros-grupo"><span class="agenda-filtros-label">Estado:</span><span id="filtro-estado-chips" class="agenda-filtros-grupo"></span></div>
+            <div class="agenda-filtros-grupo"><span class="agenda-filtros-label">Estudio:</span><input type="text" id="filtro-estudio" placeholder="Buscar estudio…"></div>
+            <button type="button" id="btn-filtros-limpiar" class="agenda-filtros-limpiar hidden">✕ Limpiar filtros</button>
+          </div>
           <div id="agenda-loading" class="loading-bar hidden">⏳ Cargando agenda…</div>
           <div id="agenda-container" class="agenda-container"></div>
         </div>

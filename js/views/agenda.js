@@ -6,6 +6,9 @@ const AgendaView = (() => {
   let _mesBase    = _primeroDeMes(new Date());
    let _paso              = 20;
   let _estudiosConfigCache = null;
+  let _filtroOrigenes = new Set(); // vacío = todos
+  let _filtroEstados  = new Set(); // vacío = todos
+  let _filtroEstudio  = "";
 
   // ── Calcular duración real de práctica RIS (Config − 10 min) ──
   function _duracionRIS(practica) {
@@ -116,6 +119,82 @@ const AgendaView = (() => {
     html += `<span class="agenda-leyenda-item"><span class="agenda-leyenda-sw" style="background:#f4f4f4;border-style:dashed;border-color:#bbb"></span>RIS (fuera de agenda)</span>`;
     html += `<span class="agenda-leyenda-item"><span class="agenda-leyenda-sw" style="background:repeating-linear-gradient(45deg,#ccc,#ccc 3px,#eee 3px,#eee 6px)"></span>Franja / restricción (color según configuración)</span>`;
     el.innerHTML = html;
+  }
+
+  // ── Filtros rápidos (origen / estado / estudio) ────────────
+  const ORIGENES_FILTRO = [
+    { key: "AMBULATORIO", label: "Ambulatorio" },
+    { key: "GUARDIA",     label: "Guardia" },
+    { key: "INTERNACION", label: "Internación" },
+    { key: "DIRECCION",   label: "Dirección" },
+    { key: "TRASLADO",    label: "Traslado" },
+    { key: "OTRO",        label: "Otro" },
+  ];
+
+  function _normOrigen(o) {
+    const norm = (o || "").toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return ORIGENES_FILTRO.some(x => x.key === norm) ? norm : "OTRO";
+  }
+
+  function _renderFiltros() {
+    const contOrigen = document.getElementById("filtro-origen-chips");
+    contOrigen.innerHTML = ORIGENES_FILTRO.map(o =>
+      `<button type="button" class="filtro-chip" data-tipo="origen" data-val="${o.key}">${o.label}</button>`
+    ).join("");
+
+    const contEstado = document.getElementById("filtro-estado-chips");
+    contEstado.innerHTML = `
+      <button type="button" class="filtro-chip" data-tipo="estado" data-val="presente">Presente</button>
+      <button type="button" class="filtro-chip" data-tipo="estado" data-val="pendiente">Pendiente</button>`;
+
+    document.querySelectorAll("#agenda-filtros .filtro-chip").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const set = btn.dataset.tipo === "origen" ? _filtroOrigenes : _filtroEstados;
+        const val = btn.dataset.val;
+        if (set.has(val)) set.delete(val); else set.add(val);
+        btn.classList.toggle("activo");
+        _aplicarFiltros();
+        _actualizarBtnLimpiar();
+      });
+    });
+
+    document.getElementById("filtro-estudio").addEventListener("input", e => {
+      _filtroEstudio = e.target.value.trim().toLowerCase();
+      _aplicarFiltros();
+      _actualizarBtnLimpiar();
+    });
+
+    document.getElementById("btn-filtros-limpiar").addEventListener("click", () => {
+      _filtroOrigenes.clear();
+      _filtroEstados.clear();
+      _filtroEstudio = "";
+      document.getElementById("filtro-estudio").value = "";
+      document.querySelectorAll("#agenda-filtros .filtro-chip.activo").forEach(b => b.classList.remove("activo"));
+      _aplicarFiltros();
+      _actualizarBtnLimpiar();
+    });
+  }
+
+  function _actualizarBtnLimpiar() {
+    const hayFiltro = _filtroOrigenes.size || _filtroEstados.size || _filtroEstudio;
+    document.getElementById("btn-filtros-limpiar").classList.toggle("hidden", !hayFiltro);
+  }
+
+  // Atenúa (no elimina) los turnos que no matchean, para no romper los rowspan
+  function _aplicarFiltros() {
+    document.querySelectorAll("#agenda-container [data-fturno]").forEach(el => {
+      const origen   = _normOrigen(el.dataset.origen);
+      const presente = el.dataset.presente === "1";
+      const estudio  = el.dataset.estudio || "";
+      let visible = true;
+      if (_filtroOrigenes.size && !_filtroOrigenes.has(origen)) visible = false;
+      if (_filtroEstados.size) {
+        const key = presente ? "presente" : "pendiente";
+        if (!_filtroEstados.has(key)) visible = false;
+      }
+      if (_filtroEstudio && !estudio.includes(_filtroEstudio)) visible = false;
+      el.classList.toggle("slot-dimmed", !visible);
+    });
   }
 
   // ── VISTA SEMANA ──────────────────────────────────────────
@@ -301,6 +380,7 @@ const AgendaView = (() => {
     html += "</tbody></table>";
     container.innerHTML = html;
     _bindSlotClicks(container);
+    _aplicarFiltros();
   }
 
   // ── Celda combinada: turno propio + RIS en la misma fila ──
@@ -324,7 +404,8 @@ const AgendaView = (() => {
       return `<td${rowspanAttr} style="padding:0;border:1px solid #e4e8ee;height:36px">
         <div style="display:flex;height:100%;gap:1px">
           <div class="slot-turno slot-content" style="flex:1;background:${slot.color||"#a8d5a2"};border-left:3px solid ${col.border};cursor:pointer;overflow:hidden"
-            data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}">
+            data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}"
+            data-fturno="1" data-origen="${slot.origen||""}" data-presente="${slot.presente==="Presente"?"1":"0"}" data-estudio="${(slot.estudio||"").toLowerCase()}">
             <span class="slot-nombre" style="color:${col.text}">${slot.apellido}, ${slot.nombre} ${pres}${horaFinBadge}</span>
             <span class="slot-estudio" style="color:${col.text}">${slot.estudio}</span>
           </div>
@@ -468,7 +549,9 @@ const AgendaView = (() => {
         horaFinBadge = `<span style="color:${col.text};opacity:.7;font-size:9px;font-weight:700;margin-left:3px">→${horaF}</span>`;
       }
 
-      return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border}" data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}"${rowspanAttr}><div class="slot-content"><span class="slot-nombre" style="color:${col.text}">${iconRIS}${slot.apellido}, ${slot.nombre} ${pres}${horaFinBadge}</span><span class="slot-estudio" style="color:${col.text}">${slot.estudio}${badgeRIS}</span></div></td>`;
+      return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border}" data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}"${rowspanAttr}
+        data-fturno="1" data-origen="${slot.origen||""}" data-presente="${slot.presente==="Presente"?"1":"0"}" data-estudio="${(slot.estudio||"").toLowerCase()}"
+        ><div class="slot-content"><span class="slot-nombre" style="color:${col.text}">${iconRIS}${slot.apellido}, ${slot.nombre} ${pres}${horaFinBadge}</span><span class="slot-estudio" style="color:${col.text}">${slot.estudio}${badgeRIS}</span></div></td>`;
     }
     if (tipo === "continuacion") return `<td class="slot-continua" style="background:${bg}"${rowspanAttr}><div class="slot-content"></div></td>`;
     return `<td class="slot-bloqueo" style="background:${bg}"${rowspanAttr}><div class="slot-content"><span class="slot-label">${slot.label||""}</span></div></td>`;
@@ -790,6 +873,8 @@ const AgendaView = (() => {
     document.getElementById("btn-modo-mes").classList.toggle("modo-activo",    modo==="mes");
     document.getElementById("ctrl-semana").classList.toggle("hidden", modo!=="semana");
     document.getElementById("ctrl-mes").classList.toggle("hidden",    modo!=="mes");
+    document.getElementById("agenda-filtros").classList.toggle("hidden", modo!=="semana");
+    document.getElementById("agenda-leyenda").classList.toggle("hidden", modo!=="semana");
     if (modo==="semana") _cargarSemana(); else _cargarMes();
   }
 
@@ -855,6 +940,7 @@ const AgendaView = (() => {
 
   function init() {
     _renderLeyenda();
+    _renderFiltros();
     document.getElementById("btn-semana-ant").onclick = () => { _fechaDesde.setDate(_fechaDesde.getDate()-7); _cargarSemana(); };
     document.getElementById("btn-semana-sig").onclick = () => { _fechaDesde.setDate(_fechaDesde.getDate()+7); _cargarSemana(); };
     document.getElementById("agenda-paso").onchange   = e => { _paso = parseInt(e.target.value); cargar(); };

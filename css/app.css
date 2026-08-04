@@ -255,6 +255,31 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
   width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0;
   border: 1px solid rgba(0,0,0,.15);
 }
+.agenda-filtros {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .9rem;
+  padding: .4rem 1.25rem; font-size: 11px; color: var(--text-2);
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.agenda-filtros-grupo { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.agenda-filtros-label { font-weight: 700; margin-right: 2px; }
+.filtro-chip {
+  border: 1.5px solid #d0d8e2; background: #fff; border-radius: 12px;
+  padding: 2px 9px; font-size: 11px; font-weight: 600; cursor: pointer;
+  color: var(--text-2); transition: all .12s;
+}
+.filtro-chip:hover  { border-color: #98a8bc; }
+.filtro-chip.activo { background: var(--navy, #1a3a5c); border-color: var(--navy, #1a3a5c); color: #fff; }
+#filtro-estudio {
+  border: 1.5px solid #d0d8e2; border-radius: 6px; padding: 3px 8px;
+  font-size: 11px; width: 160px;
+}
+.agenda-filtros-limpiar {
+  border: none; background: none; color: #c62828; font-weight: 700;
+  font-size: 11px; cursor: pointer; padding: 2px 6px;
+}
+.slot-dimmed { opacity: .2 !important; filter: grayscale(65%); }
+
 .agenda-container { flex: 1; overflow: auto; padding: 0; }
 .agenda-table {
   border-collapse: collapse; width: 100%; table-layout: fixed;
