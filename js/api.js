@@ -213,6 +213,12 @@ const API = (() => {
     /** Log del bot — últimas ejecuciones */
     leerLog(limite = 20) {
       return get({ action: 'leerLog', limite });
+    },
+
+    /** Validaciones de agenda (reglas.js del bot) — turnos que violan
+     *  restricciones operativas fijas (horarios de contraste, cardio, etc). */
+    leerValidacionesAgenda() {
+      return get({ action: 'leerValidacionesAgenda' });
     }
 
   };
