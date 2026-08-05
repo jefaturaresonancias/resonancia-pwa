@@ -25,7 +25,7 @@ const App = (() => {
     _viewActual = id;
 
     // Cargar datos de la vista al activarla
-    if (id === "agenda") AgendaView.cargar();
+    if (id === "agenda") AgendaView.cargar(true);
     if (id === "lista")  ListaView.cargar();
     if (id === "turno")  { TurnoView.abrirPanel(); return; }
     if (id === "stats")  StatsView.cargar();
