@@ -1026,3 +1026,167 @@ function _apiLeerValidacionesAgenda() {
   filas.reverse();
   return filas;
 }
+
+// ============================================================
+//  Reglas Agenda — pestaña nueva en el mismo Sheet BD_RIS.
+//  Reglas operativas fijas que valida reglas.js (resonancia-bot): antes
+//  hardcodeadas en el bot, ahora editables desde acá (modal en la PWA).
+//  Una fila por ventana horaria, agrupadas por ID compartido — evita
+//  serializar JSON anidado en una celda, y queda legible a simple vista.
+//  Columnas: A=ID | B=Nombre | C=Tipo | D=Modo | E=PalabraClave | F=Motivo |
+//            G=Activa | H=Dias (separados por ";") | I=HoraDesde | J=HoraHasta
+// ============================================================
+function _getHojaReglasAgenda() {
+  const ss   = SpreadsheetApp.getActiveSpreadsheet();
+  let hoja   = ss.getSheetByName("Reglas Agenda");
+  if (!hoja) {
+    hoja = ss.insertSheet("Reglas Agenda");
+    hoja.getRange(1, 1, 1, 10).setValues([[
+      "ID", "NOMBRE", "TIPO", "MODO", "PALABRA_CLAVE", "MOTIVO", "ACTIVA", "DIAS", "HORA_DESDE", "HORA_HASTA"
+    ]]);
+    hoja.getRange(1, 1, 1, 10)
+      .setBackground("#4a2c1f").setFontColor("#ffffff")
+      .setFontWeight("bold").setHorizontalAlignment("center");
+    hoja.setFrozenRows(1);
+  }
+  return hoja;
+}
+
+function _slugRegla(nombre) {
+  return String(nombre || "regla")
+    .toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40) || "regla";
+}
+
+// HORA_DESDE/HORA_HASTA se guardan como texto ("08:00") pero Sheets las
+// autoconvierte a Date al escribirlas — mismo gotcha ya documentado en
+// _apiEliminarFilaRIS/_apiLeerValidacionesAgenda.
+function _horaDeCelda(val) {
+  return val instanceof Date ? minutosAHora(parsearMinutos(val)) : str(val);
+}
+
+function _leerFilasReglasAgenda() {
+  const hoja   = _getHojaReglasAgenda();
+  const ultima = Math.max(hoja.getLastRow(), 2);
+  const datos  = hoja.getRange(2, 1, ultima - 1, 10).getValues();
+  return { hoja, datos };
+}
+
+function _agruparReglas(datos) {
+  const porId = {};
+  for (const row of datos) {
+    if (!row[0]) continue;
+    const id = str(row[0]);
+    if (!porId[id]) {
+      porId[id] = {
+        id,
+        nombre:       str(row[1]),
+        tipo:         str(row[2]) || "ventana_horaria",
+        modo:         str(row[3]),
+        palabraClave: str(row[4]),
+        motivo:       str(row[5]),
+        activa:       str(row[6]).toUpperCase() !== "FALSE",
+        ventanas:     []
+      };
+    }
+    porId[id].ventanas.push({
+      // separador ";" a propósito — con "," el locale es-AR de Sheets
+      // puede autoconvertir algo como "1,2" al número decimal 1.2
+      dias:      String(row[7] || "").split(";").map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n)),
+      horaDesde: _horaDeCelda(row[8]),
+      horaHasta: _horaDeCelda(row[9])
+    });
+  }
+  return Object.values(porId);
+}
+
+// ─────────────────────────────────────────────────────────────
+//  GET ?action=leerReglasAgenda
+//  Devuelve todas las reglas configuradas, agrupadas con sus ventanas.
+// ─────────────────────────────────────────────────────────────
+function _apiLeerReglasAgenda() {
+  const { datos } = _leerFilasReglasAgenda();
+  return _agruparReglas(datos);
+}
+
+// ─────────────────────────────────────────────────────────────
+//  POST { action:"guardarReglaAgenda", regla }
+//  regla: { id?, nombre, tipo, modo, palabraClave, motivo, activa,
+//           ventanas:[{dias:[...], horaDesde, horaHasta}] }
+//  Upsert: si id no viene, se genera del nombre (sufijo si ya existe).
+//  Reescribe TODA la pestaña con un solo setValues (no fila por fila) —
+//  minimiza la ventana de inconsistencia si algo falla a mitad de camino;
+//  el volumen de filas acá es chico (reglas, no turnos), no hay problema
+//  de performance.
+// ─────────────────────────────────────────────────────────────
+function _apiGuardarReglaAgenda(body) {
+  const regla = typeof body.regla === 'string' ? JSON.parse(body.regla) : body.regla;
+  if (!regla || !regla.nombre || !regla.modo || !Array.isArray(regla.ventanas) || regla.ventanas.length === 0) {
+    throw new Error("Faltan campos: nombre, modo, ventanas[]");
+  }
+  for (const v of regla.ventanas) {
+    if (!v.horaDesde || !v.horaHasta || v.horaHasta <= v.horaDesde) {
+      throw new Error(`Ventana inválida (${v.horaDesde}-${v.horaHasta}): horaHasta debe ser mayor a horaDesde — si cruza medianoche, cargá dos ventanas separadas`);
+    }
+  }
+
+  const { hoja, datos } = _leerFilasReglasAgenda();
+  const idsExistentes = new Set(datos.map(r => str(r[0])).filter(Boolean));
+
+  let id = regla.id;
+  if (!id) {
+    const base = _slugRegla(regla.nombre);
+    id = base;
+    let n = 2;
+    while (idsExistentes.has(id)) { id = `${base}_${n}`; n++; }
+  }
+
+  const filasOtras = datos.filter(r => str(r[0]) !== id);
+  const filasNuevas = regla.ventanas.map(v => [
+    id,
+    regla.nombre,
+    regla.tipo || "ventana_horaria",
+    regla.modo,
+    regla.palabraClave || "",
+    regla.motivo || "",
+    regla.activa === false ? "FALSE" : "TRUE",
+    (v.dias || []).join(";"),
+    v.horaDesde,
+    v.horaHasta
+  ]);
+
+  const todas = filasOtras.concat(filasNuevas);
+
+  hoja.getRange(2, 1, Math.max(hoja.getLastRow() - 1, 1), 10).clearContent();
+  if (todas.length > 0) {
+    hoja.getRange(2, 1, todas.length, 10).setValues(todas);
+  }
+
+  return { id, mensaje: `Regla "${regla.nombre}" guardada (${filasNuevas.length} ventana(s))` };
+}
+
+// ─────────────────────────────────────────────────────────────
+//  POST { action:"eliminarReglaAgenda", id }
+//  Borra todas las filas de ese id. Mismo criterio de reescritura
+//  completa que _apiGuardarReglaAgenda.
+// ─────────────────────────────────────────────────────────────
+function _apiEliminarReglaAgenda(body) {
+  if (!body.id) throw new Error("Falta id");
+
+  const { hoja, datos } = _leerFilasReglasAgenda();
+  const quedan = datos.filter(r => str(r[0]) !== body.id);
+
+  if (quedan.length === datos.length) {
+    return { eliminada: false, motivo: "No se encontró esa regla (¿ya se borró antes?)" };
+  }
+
+  hoja.getRange(2, 1, Math.max(hoja.getLastRow() - 1, 1), 10).clearContent();
+  if (quedan.length > 0) {
+    hoja.getRange(2, 1, quedan.length, 10).setValues(quedan);
+  }
+
+  return { eliminada: true };
+}
