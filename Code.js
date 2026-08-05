@@ -1081,14 +1081,23 @@ function colorContinuacionRIS()  { return "#eef2fb"; }
 
 // Corré esta función UNA sola vez (Apps Script → seleccionar
 // "_configurarToggleRIS" en el desplegable de arriba → ▶ Ejecutar) para
-// agregar el checkbox de "Mostrar RIS" junto a los demás controles de la fila 10.
+// agregar los checkboxes de "Mostrar RIS" y "Repetir encabezado" en la fila 10.
+// Si ya la corriste antes para RIS, se puede volver a correr sin problema —
+// solo agrega lo que falte.
 function _configurarToggleRIS() {
   const portada = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Portada");
+
   portada.getRange("I10").setValue("MOSTRAR RIS")
     .setFontFamily("Nunito").setFontSize(10).setFontWeight("bold")
     .setHorizontalAlignment("center").setVerticalAlignment("middle");
   portada.getRange("J10").insertCheckboxes().setValue(true);
-  SpreadsheetApp.getUi().alert("✅ Listo — el checkbox de RIS quedó en J10.");
+
+  portada.getRange("L10").setValue("REPETIR ENCABEZADO")
+    .setFontFamily("Nunito").setFontSize(10).setFontWeight("bold")
+    .setHorizontalAlignment("center").setVerticalAlignment("middle");
+  portada.getRange("M10").insertCheckboxes().setValue(false);
+
+  SpreadsheetApp.getUi().alert("✅ Listo — checkboxes de RIS (J10) y encabezado repetido (M10) instalados.");
 }
 
 function vistaPrevia() {
@@ -1104,6 +1113,9 @@ function vistaPrevia() {
   // Checkbox J10 ("MOSTRAR RIS") — si todavía no se instaló (_configurarToggleRIS),
   // la celda está vacía y por default se sigue mostrando RIS.
   const mostrarRIS   = portada.getRange("J10").getValue() !== false;
+  // Checkbox M10 ("REPETIR ENCABEZADO") — por default apagado (no se repite),
+  // a diferencia de RIS, acá el default de "celda vacía" es false.
+  const repetirEncabezado = portada.getRange("M10").getValue() === true;
 
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
@@ -1219,7 +1231,7 @@ const etiqueta = t.dni + " - " + t.apellido + "\n" + t.estudio +
   let contadorFilas = 0;
 
   for (const m of slots) {
-    if (PASO_GRILLA < 40 && contadorFilas > 0 && contadorFilas % 26 === 0) {
+    if (repetirEncabezado && PASO_GRILLA < 40 && contadorFilas > 0 && contadorFilas % 26 === 0) {
       valores.push(encabezadoFila);
       colores.push(encabezadoColor);
       notas.push(new Array(totalCols).fill(""));
