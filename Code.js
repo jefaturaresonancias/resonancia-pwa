@@ -1079,6 +1079,18 @@ function colorContinuacion(origen) {
 function colorRIS()              { return "#dce4f7"; }
 function colorContinuacionRIS()  { return "#eef2fb"; }
 
+// Corré esta función UNA sola vez (Apps Script → seleccionar
+// "_configurarToggleRIS" en el desplegable de arriba → ▶ Ejecutar) para
+// agregar el checkbox de "Mostrar RIS" junto a los demás controles de la fila 10.
+function _configurarToggleRIS() {
+  const portada = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Portada");
+  portada.getRange("I10").setValue("MOSTRAR RIS")
+    .setFontFamily("Nunito").setFontSize(10).setFontWeight("bold")
+    .setHorizontalAlignment("center").setVerticalAlignment("middle");
+  portada.getRange("J10").insertCheckboxes().setValue(true);
+  SpreadsheetApp.getUi().alert("✅ Listo — el checkbox de RIS quedó en J10.");
+}
+
 function vistaPrevia() {
   const ss      = SpreadsheetApp.getActiveSpreadsheet();
   const portada = ss.getSheetByName("Portada");
@@ -1089,6 +1101,9 @@ function vistaPrevia() {
   const DIAS         = Number(portadaVista[0]) || 12;
   const PASO_GRILLA  = Number(portadaVista[2]) || 40;
   const PASO_BD      = 10;
+  // Checkbox J10 ("MOSTRAR RIS") — si todavía no se instaló (_configurarToggleRIS),
+  // la celda está vacía y por default se sigue mostrando RIS.
+  const mostrarRIS   = portada.getRange("J10").getValue() !== false;
 
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
@@ -1134,7 +1149,7 @@ const etiqueta = t.dni + " - " + t.apellido + "\n" + t.estudio +
   // risInfoMap guarda TODAS las apariciones de RIS (aunque estén tapadas por un turno
   // local) para poder avisar por nota; turnosMap solo recibe RIS en slots libres.
   const risInfoMap = {};
-  try {
+  if (mostrarRIS) try {
     const risPorFecha = _apiLeerRISRango({ desde: fechaAStr(hoy, tz), dias: String(DIAS) });
     for (const fechaStr of Object.keys(risPorFecha)) {
       if (!todasFechas.includes(fechaStr)) continue;
