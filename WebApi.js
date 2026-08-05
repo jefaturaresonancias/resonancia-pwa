@@ -182,11 +182,16 @@ function _apiAgenda(p) {
         const nombreR   = partes.length > 1 ? partes.slice(1).join(",").trim() : "";
         const filaRIS   = "ris_" + fechaStr.replace(/\//g,"") + "_" + r.mins + "_" + str(r.documento);
 
-        for (let m = r.mins; m < r.mins + dur; m += 10) {
+        // BD_RIS trae horarios reales (ej. 1:25, 2:35) que no siempre caen en un
+        // múltiplo de 10 — la grilla solo lee claves alineadas a 10 min, así que
+        // alineamos el inicio hacia abajo para que el turno no quede invisible.
+        const minsInicio = Math.floor(r.mins / 10) * 10;
+
+        for (let m = minsInicio; m < r.mins + dur; m += 10) {
           const clave = fechaStr + "_" + m;
           if (turnosMap[clave]) continue; // ya hay turno local — no pisar
           turnosMap[clave] = {
-          esInicio:      m === r.mins,
+          esInicio:      m === minsInicio,
           nombre:        nombreR || r.apellido_nombre,
           apellido:      apellidoR,
           dni:           r.documento,

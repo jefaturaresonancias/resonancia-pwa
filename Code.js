@@ -23,8 +23,18 @@ function parsearMinutos(val) {
   if (!val && val !== 0) return 0;
   if (val instanceof Date) return val.getHours() * 60 + val.getMinutes();
   if (typeof val === "number") return Math.round(val * 24 * 60) % (24 * 60);
-  const s = String(val).replace("a.m.", "").replace("p.m.", "").trim().split(":");
-  return parseInt(s[0]) * 60 + (parseInt(s[1]) || 0);
+
+  const texto = String(val).trim();
+  const esPM  = /p\.?\s*m\.?/i.test(texto);
+  const esAM  = /a\.?\s*m\.?/i.test(texto);
+  const s     = texto.replace(/[ap]\.?\s*m\.?/i, "").trim().split(":");
+
+  let horas = parseInt(s[0]) || 0;
+  const minutos = parseInt(s[1]) || 0;
+  if (esPM && horas < 12) horas += 12;   // 2:20 p.m. → 14:20
+  if (esAM && horas === 12) horas = 0;   // 12:00 a.m. → 00:00
+
+  return horas * 60 + minutos;
 }
 
 /** Convierte minutos a string "HH:MM". */
@@ -1064,6 +1074,11 @@ function colorContinuacion(origen) {
   }
 }
 
+// Turnos de BD_RIS mostrados como guía — color propio, distinto de cualquier origen real,
+// para que nunca se confundan con un turno local confirmado.
+function colorRIS()              { return "#dce4f7"; }
+function colorContinuacionRIS()  { return "#eef2fb"; }
+
 function vistaPrevia() {
   const ss      = SpreadsheetApp.getActiveSpreadsheet();
   const portada = ss.getSheetByName("Portada");
@@ -1115,6 +1130,41 @@ const etiqueta = t.dni + " - " + t.apellido + "\n" + t.estudio +
     }
   }
 
+  // ── Turnos RIS (BD_RIS) — guía en los huecos libres, nunca pisa un turno local ──
+  // risInfoMap guarda TODAS las apariciones de RIS (aunque estén tapadas por un turno
+  // local) para poder avisar por nota; turnosMap solo recibe RIS en slots libres.
+  const risInfoMap = {};
+  try {
+    const risPorFecha = _apiLeerRISRango({ desde: fechaAStr(hoy, tz), dias: String(DIAS) });
+    for (const fechaStr of Object.keys(risPorFecha)) {
+      if (!todasFechas.includes(fechaStr)) continue;
+      for (const r of risPorFecha[fechaStr]) {
+        const dur         = r.duracion || 20;
+        const apellidoR    = str(r.apellido_nombre).split(",")[0].trim();
+        const etiquetaRIS  = str(r.documento) + " - " + apellidoR + "\n" + r.practica;
+        const notaRIS      = "RIS: " + str(r.documento) + " - " + apellidoR + " — " + r.practica;
+
+        // BD_RIS trae horarios reales (ej. 1:25, 2:35) que no siempre caen en un
+        // múltiplo de PASO_BD — la grilla solo lee claves alineadas a 10 min, así
+        // que alineamos el inicio hacia abajo para que el turno no quede invisible.
+        const minsInicio = Math.floor(r.mins / PASO_BD) * PASO_BD;
+
+        for (let m = minsInicio; m < r.mins + dur; m += PASO_BD) {
+          const clave = fechaStr + "_" + m;
+          if (!risInfoMap[clave]) risInfoMap[clave] = notaRIS;
+          if (turnosMap[clave]) continue; // ya hay turno local en este sub-slot — no pisar
+          if (m === minsInicio) {
+            turnosMap[clave] = { texto: etiquetaRIS, origen: "RIS", esRIS: true };
+          } else if (!turnosMap[clave]) {
+            turnosMap[clave] = { texto: "·", origen: "RIS", esRIS: true };
+          }
+        }
+      }
+    }
+  } catch (err) {
+    Logger.log("Error mergeando RIS en vistaPrevia: " + err);
+  }
+
   const { feriados, bloqueos, bloqueosRecurrentes, restriccionesHorarias, restriccionesOrigen } = cargarConfigCalendario();
 
   const NOMBRES_DIA = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
@@ -1134,6 +1184,7 @@ const etiqueta = t.dni + " - " + t.apellido + "\n" + t.estudio +
 
   const valores = [];
   const colores = [];
+  const notas   = [];
 
   // Encabezado
   const encabezadoFila  = [""];
@@ -1147,6 +1198,7 @@ const etiqueta = t.dni + " - " + t.apellido + "\n" + t.estudio +
   }
   valores.push(encabezadoFila);
   colores.push(encabezadoColor);
+  notas.push(new Array(totalCols).fill(""));
 
   const encabezadosIntermedios = [];
   let contadorFilas = 0;
@@ -1155,6 +1207,7 @@ const etiqueta = t.dni + " - " + t.apellido + "\n" + t.estudio +
     if (PASO_GRILLA < 40 && contadorFilas > 0 && contadorFilas % 26 === 0) {
       valores.push(encabezadoFila);
       colores.push(encabezadoColor);
+      notas.push(new Array(totalCols).fill(""));
       encabezadosIntermedios.push(FILA_INICIO + valores.length - 1);
     }
     contadorFilas++;
@@ -1162,6 +1215,7 @@ const etiqueta = t.dni + " - " + t.apellido + "\n" + t.estudio +
     const horaStr   = minutosAHora(m);
     const filaVal   = [horaStr];
     const filaColor = ["#e8eaf0"];
+    const filaNota  = [""];
 
     for (const d of dias) {
       const fStr      = fechaAStr(d, tz);
@@ -1170,6 +1224,7 @@ const etiqueta = t.dni + " - " + t.apellido + "\n" + t.estudio +
       if (feriados[fStr]) {
         filaVal.push("🚫");
         filaColor.push("#e06666");
+        filaNota.push("");
         continue;
       }
 
@@ -1183,20 +1238,34 @@ const etiqueta = t.dni + " - " + t.apellido + "\n" + t.estudio +
         }
         if (bloqueoPuntual) break;
       }
-      if (bloqueoPuntual) { filaVal.push(bloqueoPuntual); filaColor.push("#e06666"); continue; }
+      if (bloqueoPuntual) { filaVal.push(bloqueoPuntual); filaColor.push("#e06666"); filaNota.push(""); continue; }
 
-      // Turno de paciente
-      let textoSlot = "", origenSlot = "", ocupado = false;
+      // Turno de paciente — el turno local siempre gana la celda; RIS solo se dibuja
+      // si ningún sub-slot de esta celda tiene turno local. Si un turno local tapa
+      // un RIS, se deja aviso en la nota de la celda (no se pierde la info).
+      let textoLocal = "", origenLocal = "", ocupadoLocal = false;
+      let textoRis = "", ocupadoRis = false;
+      let notaRis = "";
       for (let sub = 0; sub < PASO_GRILLA; sub += PASO_BD) {
-        const turno = turnosMap[fStr + "_" + (m + sub)];
+        const clave = fStr + "_" + (m + sub);
+        const turno = turnosMap[clave];
         if (turno) {
-          ocupado = true;
-          if (turno.texto && turno.texto !== "·") { textoSlot = turno.texto; origenSlot = turno.origen; }
-          else if (!textoSlot) { origenSlot = turno.origen; }
+          if (turno.esRIS) {
+            ocupadoRis = true;
+            if (turno.texto && turno.texto !== "·") textoRis = turno.texto;
+          } else {
+            ocupadoLocal = true;
+            if (turno.texto && turno.texto !== "·") { textoLocal = turno.texto; origenLocal = turno.origen; }
+            else if (!textoLocal) { origenLocal = turno.origen; }
+          }
         }
+        if (risInfoMap[clave] && !notaRis) notaRis = risInfoMap[clave];
       }
-      if (textoSlot) { filaVal.push(textoSlot); filaColor.push(colorPorOrigen(origenSlot)); continue; }
-      if (ocupado)   { filaVal.push(""); filaColor.push(colorContinuacion(origenSlot)); continue; }
+
+      if (textoLocal)   { filaVal.push(textoLocal); filaColor.push(colorPorOrigen(origenLocal)); filaNota.push(notaRis); continue; }
+      if (ocupadoLocal) { filaVal.push(""); filaColor.push(colorContinuacion(origenLocal)); filaNota.push(notaRis); continue; }
+      if (textoRis)     { filaVal.push("🔷 " + textoRis); filaColor.push(colorRIS()); filaNota.push(""); continue; }
+      if (ocupadoRis)   { filaVal.push(""); filaColor.push(colorContinuacionRIS()); filaNota.push(""); continue; }
 
       // Bloqueo recurrente
       let bloqueoRec = null;
@@ -1208,7 +1277,7 @@ const etiqueta = t.dni + " - " + t.apellido + "\n" + t.estudio +
         }
         if (bloqueoRec) break;
       }
-      if (bloqueoRec) { filaVal.push(bloqueoRec.concepto); filaColor.push(bloqueoRec.color); continue; }
+      if (bloqueoRec) { filaVal.push(bloqueoRec.concepto); filaColor.push(bloqueoRec.color); filaNota.push(""); continue; }
 
       // Franja por código o por origen
       let bloqueoVista = null;
@@ -1236,22 +1305,25 @@ const etiqueta = t.dni + " - " + t.apellido + "\n" + t.estudio +
           }
         }
       }
-      if (bloqueoVista) { filaVal.push(bloqueoVista.leyenda); filaColor.push(bloqueoVista.color); continue; }
+      if (bloqueoVista) { filaVal.push(bloqueoVista.leyenda); filaColor.push(bloqueoVista.color); filaNota.push(""); continue; }
 
-      filaVal.push(""); filaColor.push("#ffffff");
+      filaVal.push(""); filaColor.push("#ffffff"); filaNota.push("");
     }
     valores.push(filaVal);
     colores.push(filaColor);
+    notas.push(filaNota);
   }
 
   // Fila pie
   valores.push(encabezadoFila);
   colores.push(encabezadoColor);
+  notas.push(new Array(totalCols).fill(""));
 
   const totalFilasConPie = valores.length;
   const rangoGrilla = portada.getRange(FILA_INICIO, 1, totalFilasConPie, totalCols);
   rangoGrilla.setValues(valores);
   rangoGrilla.setBackgrounds(colores);
+  rangoGrilla.setNotes(notas);
 
   // Formato encabezados intermedios
   for (const filaEnc of encabezadosIntermedios) {
