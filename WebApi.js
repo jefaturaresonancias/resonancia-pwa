@@ -69,6 +69,7 @@ function _routeGet(action, p) {
     case 'eliminarFilaRIS': return _apiEliminarFilaRIS(p)
     case 'leerCardiacas':   return _apiLeerCardiacas(p)
     case 'eliminarFilaCardiacas': return _apiEliminarFilaCardiacas(p)
+    case 'leerValidacionesAgenda': return _apiLeerValidacionesAgenda()
     default:            throw new Error("Acción no reconocida: " + action);
   }
 }
@@ -80,7 +81,8 @@ function _routePost(action, body) {
     case "anular":               return _apiAnular(body);
     case "modificar":            return _apiModificar(body);
     case "escribirRIS":          return _apiEscribirRIS(body);
-    case "actualizarEstadosRIS": return _apiActualizarEstadosRIS(body);  // ← AGREGAR
+    case "actualizarEstadosRIS": return _apiActualizarEstadosRIS(body);  
+    case "registrarValidacionesAgenda": return _apiRegistrarValidacionesAgenda(body);
     default: throw new Error("Acción POST no reconocida: " + action);
   }
 }

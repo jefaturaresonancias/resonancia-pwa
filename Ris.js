@@ -910,3 +910,115 @@ function _apiEliminarFilaCardiacas(p) {
   hoja.deleteRow(fila);
   return { eliminada: true };
 }
+
+// ============================================================
+//  Validaciones Agenda — pestaña nueva en el mismo Sheet BD_RIS.
+//  Vuelca los problemas que detecta reglas.js (resonancia-bot): horarios
+//  reservados, restricciones de contraste fuera de franja, etc. Solo
+//  registro/consulta — no interactúa con BD_RIS ni con la app del RIS.
+//  Columnas: A=Fecha | B=Hora | C=Documento | D=Paciente | E=Práctica |
+//            F=Regla | G=Motivo | H=Origen | I=Hash
+// ============================================================
+function _getHojaValidacionesAgenda() {
+  const ss   = SpreadsheetApp.getActiveSpreadsheet();
+  let hoja   = ss.getSheetByName("Validaciones Agenda");
+  if (!hoja) {
+    hoja = ss.insertSheet("Validaciones Agenda");
+    hoja.getRange(1, 1, 1, 9).setValues([[
+      "FECHA", "HORA", "DOCUMENTO", "PACIENTE", "PRÁCTICA", "REGLA", "MOTIVO", "ORIGEN", "HASH"
+    ]]);
+    hoja.getRange(1, 1, 1, 9)
+      .setBackground("#7a1f1f").setFontColor("#ffffff")
+      .setFontWeight("bold").setHorizontalAlignment("center");
+    hoja.setFrozenRows(1);
+  }
+  return hoja;
+}
+
+function _hashValidacionAgenda(fecha, hora, documento, regla) {
+  return `${fecha}|${hora}|${String(documento).trim().toUpperCase()}|${regla}`;
+}
+
+// ─────────────────────────────────────────────────────────────
+//  POST { action:"registrarValidacionesAgenda", origen, items:[...] }
+//  items: [{ fecha, hora, documento, paciente, practica, regla, motivo }]
+//  Dedup por fecha+hora+documento+regla — mismo criterio que
+//  _apiEscribirRIS: si ya está registrada, no la duplica.
+// ─────────────────────────────────────────────────────────────
+function _apiRegistrarValidacionesAgenda(body) {
+  const { origen, items } = body;
+  if (!items || !Array.isArray(items))
+    throw new Error("Faltan campos: items[]");
+
+  const hoja   = _getHojaValidacionesAgenda();
+  const ultima = Math.max(hoja.getLastRow(), 2);
+  const datos  = hoja.getRange(2, 1, ultima - 1, 9).getValues();
+
+  const existentes = new Set();
+  for (const row of datos) {
+    if (row[8]) existentes.add(str(row[8]));
+  }
+
+  let agregadas = 0, descartadas = 0;
+  const nuevasFilas = [];
+
+  for (const it of items) {
+    const hash = _hashValidacionAgenda(it.fecha, it.hora || "", it.documento || "", it.regla || "");
+    if (existentes.has(hash)) { descartadas++; continue; }
+    nuevasFilas.push([
+      it.fecha     || "",
+      it.hora      || "",
+      it.documento || "",
+      it.paciente  || "",
+      it.practica  || "",
+      it.regla     || "",
+      it.motivo    || "",
+      origen       || "",
+      hash
+    ]);
+    existentes.add(hash);
+    agregadas++;
+  }
+
+  if (nuevasFilas.length > 0) {
+    const filaDest = hoja.getLastRow() + 1;
+    hoja.getRange(filaDest, 1, nuevasFilas.length, 9).setValues(nuevasFilas);
+  }
+
+  return {
+    agregadas,
+    descartadas,
+    mensaje: agregadas === 0
+      ? "Sin cambios — todas las validaciones ya estaban registradas"
+      : `${agregadas} validaciones nuevas registradas, ${descartadas} ya existían`
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+//  GET ?action=leerValidacionesAgenda
+//  Devuelve todas las filas de la pestaña "Validaciones Agenda", más
+//  nuevas primero. Pensada para que un HTML de solo lectura la consuma
+//  directo (fetch con action=leerValidacionesAgenda) sin pasar por el bot.
+// ─────────────────────────────────────────────────────────────
+function _apiLeerValidacionesAgenda() {
+  const hoja   = _getHojaValidacionesAgenda();
+  const ultima = Math.max(hoja.getLastRow(), 2);
+  const datos  = hoja.getRange(2, 1, ultima - 1, 9).getValues();
+
+  const filas = [];
+  for (const row of datos) {
+    if (!row[0]) continue;
+    filas.push({
+      fecha:     str(row[0]),
+      hora:      str(row[1]),
+      documento: str(row[2]),
+      paciente:  str(row[3]),
+      practica:  str(row[4]),
+      regla:     str(row[5]),
+      motivo:    str(row[6]),
+      origen:    str(row[7])
+    });
+  }
+  filas.reverse();
+  return filas;
+}
