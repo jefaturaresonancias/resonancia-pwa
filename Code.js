@@ -86,13 +86,12 @@ function instalarTrigger() {
 // ─────────────────────────────────────────────────────────────
 
 function getDispatchSimple() {
-  return [
-    { sheet: "Portada", col: 9, row: 8, valor: "Ok", fn: "_limpiarPortadaDesdeEdit" }
-  ];
+  return [];
 }
 
 function getDispatchInstalable() {
   return [
+    { sheet: "Portada",    col: 9,  row: 8,   valor: "Ok",       fn: "_limpiarPortadaDesdeEdit" },
     { sheet: "Portada",    col: 12, row: 3,   valor: "Ok",       fn: "chequearTurnos"         },
     { sheet: "Portada",    col: 8,  row: 8,   valor: "Ok",       fn: "_validarYGenerarAgenda"  },
     { sheet: "Portada",    col: 12, row: 8,   valor: "*",        fn: "modificarTurno"          },

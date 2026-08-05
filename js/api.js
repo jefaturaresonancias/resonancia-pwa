@@ -125,6 +125,16 @@ const API = (() => {
       return post({ action: "anular", fila });
     },
 
+    /**
+     * Reprograma un turno existente (fecha y/o estudio) en una sola operación atómica.
+     * @param {number} fila   Fila original en Base de datos
+     * @param {object} datos  { tipo, nombre, apellido, dni, estudio, origen, fecha, hora, observaciones }
+     */
+    modificar(fila, datos) {
+      sessionStorage.clear();
+      return post({ action: "modificar", fila, ...datos });
+    },
+
     // ── RIS ────────────────────────────────────────────────
 
     /** Pacientes de agenda cardiología para un rango de fechas */

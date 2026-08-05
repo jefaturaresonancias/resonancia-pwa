@@ -15,7 +15,7 @@ function doGet(e) {
   try {
     // Intentar como acción GET primero
     // Si es acción de mutación, routear a _routePost con los mismos parámetros
-    const mutaciones = ["asignar","presente","anular"];
+    const mutaciones = ["asignar","presente","anular","modificar"];
     if (mutaciones.indexOf(action) >= 0) {
       return _jsonOk(_routePost(action, p));
     }
@@ -78,6 +78,7 @@ function _routePost(action, body) {
     case "asignar":              return _apiAsignar(body);
     case "presente":             return _apiPresente(body);
     case "anular":               return _apiAnular(body);
+    case "modificar":            return _apiModificar(body);
     case "escribirRIS":          return _apiEscribirRIS(body);
     case "actualizarEstadosRIS": return _apiActualizarEstadosRIS(body);  // ← AGREGAR
     default: throw new Error("Acción POST no reconocida: " + action);
@@ -179,6 +180,7 @@ function _apiAgenda(p) {
         const partes    = str(r.apellido_nombre).split(",");
         const apellidoR = partes[0] ? partes[0].trim() : "";
         const nombreR   = partes.length > 1 ? partes.slice(1).join(",").trim() : "";
+        const filaRIS   = "ris_" + fechaStr.replace(/\//g,"") + "_" + r.mins + "_" + str(r.documento);
 
         for (let m = r.mins; m < r.mins + dur; m += 10) {
           const clave = fechaStr + "_" + m;
@@ -192,7 +194,7 @@ function _apiAgenda(p) {
           origen:        "RIS",
           presente:      r.estado || "",
           observaciones: r.cobertura ? ("Cobertura: " + r.cobertura) : "",
-          fila:          filaRIS,   // ✅ ya no null
+          fila:          filaRIS,
           esRIS:         true
           };
         }
@@ -571,6 +573,88 @@ function _apiAnular(body) {
   }
 
   return { mensaje: "Turno anulado", timestamp: ahora };
+}
+
+// ─────────────────────────────────────────────────────────────
+//  POST modificar — reprograma un turno (fecha o estudio),
+//  vinculando el turno original y el nuevo con un modId,
+//  igual que hace Portada (Code.js modificarTurno + confirmarTurno)
+// ─────────────────────────────────────────────────────────────
+
+function _apiModificar(body) {
+  const { fila, tipo, nombre, apellido, dni, estudio, origen, fecha, hora, observaciones } = body;
+  if (!fila || !tipo) throw new Error("Faltan campos: fila, tipo");
+  if (!nombre || !apellido || !dni || !estudio || !fecha || !hora)
+    throw new Error("Faltan campos obligatorios del nuevo turno");
+
+  const ss        = SpreadsheetApp.getActiveSpreadsheet();
+  const baseDatos = ss.getSheetByName("Base de datos");
+  const tz        = Session.getScriptTimeZone();
+  const ahora     = Utilities.formatDate(new Date(), tz, "dd/MM/yyyy HH:mm:ss");
+  const modId     = "mod_" + new Date().getTime();
+
+  // 1. Marcar la fila original como modificada (mismas columnas que Code.js modificarTurno)
+  baseDatos.getRange(fila, 10).setValue(tipo);   // tipoMod: "Fecha" | "Estudio"
+  baseDatos.getRange(fila, 11).setValue(ahora);  // fechaMod
+  baseDatos.getRange(fila, 12).setValue(modId);
+
+  // 2. Borrar el turnoId original de BD central (igual que _apiAnular)
+  try {
+    const turnoIdOriginal = str(baseDatos.getRange(fila, 18).getValue());
+    if (turnoIdOriginal) {
+      const bdC       = _bdCentral();
+      const filaVieja = _buscarFilaBDCentral(bdC, turnoIdOriginal);
+      if (filaVieja > 0) bdC.deleteRow(filaVieja);
+    }
+  } catch (err) {
+    Logger.log("Error BD central [modificar/borrar]: " + err);
+  }
+
+  // 3. Insertar la fila nueva (mismo patrón que _apiAsignar) + modId de vínculo
+  const pt        = fecha.split("/");
+  const fechaDate = new Date(parseInt(pt[2]), parseInt(pt[1]) - 1, parseInt(pt[0]));
+  fechaDate.setHours(12, 0, 0, 0);
+  const hp            = hora.split(":");
+  const horaFraccion  = (parseInt(hp[0]) * 60 + parseInt(hp[1])) / (24 * 60);
+  const ultimaFila    = Math.max(baseDatos.getLastRow() + 1, 2);
+
+  baseDatos.getRange(ultimaFila, 1, 1, 9).setValues([[
+    fechaDate, horaFraccion,
+    capitalizar(nombre), capitalizar(apellido),
+    String(dni), estudio,
+    origen || "AMBULATORIO", "Ok", ahora
+  ]]);
+  baseDatos.getRange(ultimaFila, 12).setValue(modId);
+  if (observaciones) baseDatos.getRange(ultimaFila, 17).setValue(observaciones);
+
+  const turnoId = "t_" + new Date().getTime();
+  baseDatos.getRange(ultimaFila, 18).setValue(turnoId);
+
+  // 4. Sincronizar BD central (igual que _apiAsignar, origen "PWA")
+  try {
+    const bdC     = _bdCentral();
+    const filaBDC = bdC.getLastRow() + 1;
+    bdC.getRange(filaBDC, 1, 1, 9).setValues([[
+      fechaDate, horaFraccion,
+      capitalizar(nombre), capitalizar(apellido),
+      String(dni), estudio,
+      origen || "AMBULATORIO", "Ok", ahora
+    ]]);
+    if (observaciones) bdC.getRange(filaBDC, 17).setValue(observaciones);
+    bdC.getRange(filaBDC, 18).setValue(turnoId);
+    bdC.getRange(filaBDC, 19).setValue("PWA");
+  } catch (err) {
+    Logger.log("Error BD central [modificar]: " + err);
+  }
+
+  // ✅ Refrescar la grilla dibujada en Portada
+  try {
+    vistaPrevia();
+  } catch (err) {
+    Logger.log("Error refrescando vistaPrevia tras modificar: " + err);
+  }
+
+  return { turnoId, fila: ultimaFila, modId, mensaje: "Turno modificado correctamente" };
 }
 
 // ─────────────────────────────────────────────────────────────

@@ -255,10 +255,14 @@ const TurnoView = (() => {
         const tooltipOrig = document.getElementById("form-turno").dataset.tooltipOriginal || "";
         const confirmar = confirm(`¿Modificar turno?\n\nDE: ${tooltipOrig}\n\nA: ${apellido}, ${nombre} — ${fecha} ${_slotSeleccionado.hora} hs\n¿Confirmás?`);
         if (!confirmar) { btn.disabled = false; btn.textContent = "✓ Confirmar turno"; return; }
-        await API.anular(filaOriginal);
+        const estudioOriginal = document.getElementById("form-turno").dataset.estudioOriginal || "";
+        const tipo = estudio !== estudioOriginal ? "Estudio" : "Fecha";
+        await API.modificar(filaOriginal, { tipo, nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs });
         document.getElementById("form-turno").dataset.filaOriginal = "";
+        document.getElementById("form-turno").dataset.estudioOriginal = "";
+      } else {
+        await API.asignar({ nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs });
       }
-      await API.asignar({ nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs });
       const result = document.getElementById("turno-result");
       result.className = "turno-result ok";
       result.innerHTML = `✅ Turno confirmado<br><strong>${apellido}, ${nombre}</strong><br>${estudio}<br>📅 ${fecha} · 🕐 ${_slotSeleccionado.hora} hs`;
@@ -415,9 +419,10 @@ const TurnoView = (() => {
     aviso.innerHTML = `✏️ Modificando turno de <strong>${turno.apellido}, ${turno.nombre}</strong><br><span style="font-weight:400;color:#888">Seleccioná nueva fecha y horario. Al confirmar se anula el turno original.</span>`;
     document.getElementById("form-turno").insertBefore(aviso, document.getElementById("form-turno").firstChild);
 
-    // Guardar fila original para anular al confirmar
+    // Guardar fila original y estudio original para reprogramar al confirmar
     document.getElementById("form-turno").dataset.filaOriginal = fila;
     document.getElementById("form-turno").dataset.tooltipOriginal = tooltipTexto;
+    document.getElementById("form-turno").dataset.estudioOriginal = turno.estudio;
   }
 
   return { init, prefill, cargarEstudios, mostrarAvisoRIS, abrirPanel, cerrarPanel, abrirPanelModificar };
