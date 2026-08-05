@@ -86,6 +86,7 @@ function _routePost(action, body) {
     case "registrarValidacionesAgenda": return _apiRegistrarValidacionesAgenda(body);
     case "guardarReglaAgenda": return _apiGuardarReglaAgenda(body);
     case "eliminarReglaAgenda": return _apiEliminarReglaAgenda(body);
+    case "actualizarCoberturaRIS": return _apiActualizarCoberturaRIS(body);
     default: throw new Error("Acción POST no reconocida: " + action);
   }
 }

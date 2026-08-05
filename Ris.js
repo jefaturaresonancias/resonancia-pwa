@@ -1190,3 +1190,45 @@ function _apiEliminarReglaAgenda(body) {
 
   return { eliminada: true };
 }
+
+// ─────────────────────────────────────────────────────────────
+//  POST { action:"actualizarCoberturaRIS", fecha, items:[...] }
+//  Actualiza la columna COBERTURA (col G) de registros existentes.
+//  Mismo patrón que _apiActualizarPracticasRIS (matchea por fecha+documento,
+//  columna 7 en vez de columna 5) — Postgres es la fuente de verdad para
+//  cobertura: bot-diario.js la actualiza ahí en cada corrida pero el Sheet
+//  no tenía forma de recibir ese cambio hasta ahora.
+// ─────────────────────────────────────────────────────────────
+function _apiActualizarCoberturaRIS(p) {
+  if (!p.fecha || !p.items) throw new Error("Faltan campos: fecha e items");
+  const items = typeof p.items === 'string' ? JSON.parse(p.items) : p.items;
+  const tz     = Session.getScriptTimeZone();
+  const hoja   = _getHojaBDRIS();
+  const ultima = Math.max(hoja.getLastRow(), 2);
+  const datos  = hoja.getRange(2, 1, ultima - 1, 9).getValues();
+
+  let actualizadas = 0;
+  for (const item of items) {
+    const dniBuscado = str(item.documento).replace(/^(DNI|CIBO|RP)\s*/i,"").trim().toUpperCase();
+    for (let i = 0; i < datos.length; i++) {
+      const row = datos[i];
+      if (!row[0]) continue;
+      const fechaStr = row[0] instanceof Date ? fechaAStr(row[0], tz) : str(row[0]);
+      if (fechaStr !== p.fecha) continue;
+      const dniFila = str(row[2]).replace(/^(DNI|CIBO|RP)\s*/i,"").trim().toUpperCase();
+      if (dniFila === dniBuscado) {
+        const coberturaActual = str(row[6]).trim();
+        const coberturaNueva  = str(item.cobertura).trim();
+        if (coberturaNueva !== coberturaActual) {
+          hoja.getRange(i + 2, 7).setValue(coberturaNueva); // columna G = cobertura
+          actualizadas++;
+        }
+        break;
+      }
+    }
+  }
+  return {
+    actualizadas,
+    mensaje: `${actualizadas} coberturas actualizadas de ${items.length} buscadas`
+  };
+}
