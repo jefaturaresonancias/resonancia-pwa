@@ -1030,4 +1030,3 @@ function normalizarPracticasBDRIS() {
 
   Logger.log(`Listo — ${modificadas} filas actualizadas de ${data.length - 1} totales`);
 }
-

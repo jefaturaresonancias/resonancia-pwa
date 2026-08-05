@@ -1,0 +1,12 @@
+# Este proyecto de Apps Script convive en el mismo repo que la PWA,
+# pero solo estos archivos son el backend real que corre en Apps Script.
+# Todo lo demás (frontend de la PWA, service worker, borradores) NO debe
+# subirse: rompe los activadores porque referencia globals de navegador
+# (navigator, document, window) que no existen en el runtime de Apps Script.
+**/*
+
+!Code.js
+!WebApi.js
+!Ris.js
+!prueba.js
+!appsscript.json
