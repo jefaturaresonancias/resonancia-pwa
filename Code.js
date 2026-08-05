@@ -1092,12 +1092,12 @@ function _configurarToggleRIS() {
     .setHorizontalAlignment("center").setVerticalAlignment("middle");
   portada.getRange("J10").insertCheckboxes().setValue(true);
 
-  portada.getRange("L10").setValue("REPETIR ENCABEZADO")
+  portada.getRange("K10").setValue("REPETIR ENCABEZADO")
     .setFontFamily("Nunito").setFontSize(10).setFontWeight("bold")
     .setHorizontalAlignment("center").setVerticalAlignment("middle");
-  portada.getRange("M10").insertCheckboxes().setValue(false);
+  portada.getRange("L10").insertCheckboxes().setValue(false);
 
-  SpreadsheetApp.getUi().alert("✅ Listo — checkboxes de RIS (J10) y encabezado repetido (M10) instalados.");
+  SpreadsheetApp.getUi().alert("✅ Listo — checkboxes de RIS (J10) y encabezado repetido (L10) instalados.");
 }
 
 function vistaPrevia() {
@@ -1113,9 +1113,9 @@ function vistaPrevia() {
   // Checkbox J10 ("MOSTRAR RIS") — si todavía no se instaló (_configurarToggleRIS),
   // la celda está vacía y por default se sigue mostrando RIS.
   const mostrarRIS   = portada.getRange("J10").getValue() !== false;
-  // Checkbox M10 ("REPETIR ENCABEZADO") — por default apagado (no se repite),
+  // Checkbox L10 ("REPETIR ENCABEZADO") — por default apagado (no se repite),
   // a diferencia de RIS, acá el default de "celda vacía" es false.
-  const repetirEncabezado = portada.getRange("M10").getValue() === true;
+  const repetirEncabezado = portada.getRange("L10").getValue() === true;
 
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
