@@ -304,7 +304,7 @@ const App = (() => {
     });
 
     document.getElementById("btn-refresh").addEventListener("click", () => {
-      if (_viewActual === "agenda") AgendaView.cargar();
+      if (_viewActual === "agenda") AgendaView.cargar(true);
       else if (_viewActual === "lista")  ListaView.cargar();
       else if (_viewActual === "pami")   PamiView.cargar();
       else if (_viewActual === "config") ConfigView.cargar();

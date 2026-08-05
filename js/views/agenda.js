@@ -914,14 +914,14 @@ const AgendaView = (() => {
     if (modo==="semana") _cargarSemana(); else _cargarMes();
   }
 
-  async function _cargarSemana() {
+  async function _cargarSemana(forzar = false) {
     const loading = document.getElementById("agenda-loading");
     document.getElementById("agenda-rango-label").textContent = _labelRango();
     loading.classList.remove("hidden");
     try {
       const desde    = _strFecha(_fechaDesde);
       const cacheKey = `agenda_sem_${desde}_${_paso}`;
-      const cached   = sessionStorage.getItem(cacheKey);
+      const cached   = forzar ? null : sessionStorage.getItem(cacheKey);
 
       let datos, risMap, cardioMap;
       if (!_estudiosConfigCache) {
@@ -943,7 +943,7 @@ const AgendaView = (() => {
     finally     { loading.classList.add("hidden"); }
   }
 
-  async function _cargarMes() {
+  async function _cargarMes(forzar = false) {
     const loading = document.getElementById("agenda-loading");
     document.getElementById("agenda-mes-label").textContent = _labelMes();
     loading.classList.remove("hidden");
@@ -955,7 +955,7 @@ const AgendaView = (() => {
       lunes.setDate(p.getDate()-(dow===0?6:dow-1));
       const desde    = _strFecha(lunes);
       const cacheKey = `agenda_mes_${desde}_${_paso}`;
-      const cached   = sessionStorage.getItem(cacheKey);
+      const cached   = forzar ? null : sessionStorage.getItem(cacheKey);
 
       let datosMes, risMes;
       if (cached) {
@@ -972,7 +972,7 @@ const AgendaView = (() => {
     finally      { loading.classList.add("hidden"); }
   }
 
-  function cargar() { if(_modo==="semana") _cargarSemana(); else _cargarMes(); }
+  function cargar(forzar = false) { if(_modo==="semana") _cargarSemana(forzar); else _cargarMes(forzar); }
 
   function init() {
     _renderLeyenda();

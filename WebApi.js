@@ -170,46 +170,13 @@ function _apiAgenda(p) {
     }
   }
 
-  // ── 2) Mergear turnos RIS (SIGEHOS) — una sola vez, fuera del loop ──
-  try {
-    const risPorFecha = _apiLeerRISRango({ desde: fechaAStr(desde, tz), dias: String(diasCount) });
-    for (const fechaStr of Object.keys(risPorFecha)) {
-      if (!todasFechas.includes(fechaStr)) continue;
-      for (const r of risPorFecha[fechaStr]) {
-        const dur = r.duracion || 20;
-        const partes    = str(r.apellido_nombre).split(",");
-        const apellidoR = partes[0] ? partes[0].trim() : "";
-        const nombreR   = partes.length > 1 ? partes.slice(1).join(",").trim() : "";
-        const filaRIS   = "ris_" + fechaStr.replace(/\//g,"") + "_" + r.mins + "_" + str(r.documento);
+  // RIS (SIGEHOS) NO se mergea acá — el frontend (agenda.js) ya trae BD_RIS por su
+  // cuenta con API.leerRISRango() y dibuja la celda de "guía / sobreturno" en los
+  // slots libres. Mergearlo también en turnosMap lo hacía indistinguible de un
+  // turno local real: quedaba con tipo "turno" clickeable, exponiendo "Modificar"/
+  // "Anular" sobre una fila de RIS que no existe en Base de datos.
 
-        // BD_RIS trae horarios reales (ej. 1:25, 2:35) que no siempre caen en un
-        // múltiplo de 10 — la grilla solo lee claves alineadas a 10 min, así que
-        // alineamos el inicio hacia abajo para que el turno no quede invisible.
-        const minsInicio = Math.floor(r.mins / 10) * 10;
-
-        for (let m = minsInicio; m < r.mins + dur; m += 10) {
-          const clave = fechaStr + "_" + m;
-          if (turnosMap[clave]) continue; // ya hay turno local — no pisar
-          turnosMap[clave] = {
-          esInicio:      m === minsInicio,
-          nombre:        nombreR || r.apellido_nombre,
-          apellido:      apellidoR,
-          dni:           r.documento,
-          estudio:       r.practica,
-          origen:        "RIS",
-          presente:      r.estado || "",
-          observaciones: r.cobertura ? ("Cobertura: " + r.cobertura) : "",
-          fila:          filaRIS,
-          esRIS:         true
-          };
-        }
-      }
-    }
-  } catch (err) {
-    Logger.log("Error mergeando RIS en agenda: " + err);
-  }
-
-  // ── 3) Armar la grilla de días/slots (sin cambios) ──
+  // ── 2) Armar la grilla de días/slots ──
   const result = [];
   const NOMBRES_DIA = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
   const NOMBRES_MES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
