@@ -1001,6 +1001,7 @@ function _apiRegistrarValidacionesAgenda(body) {
 //  directo (fetch con action=leerValidacionesAgenda) sin pasar por el bot.
 // ─────────────────────────────────────────────────────────────
 function _apiLeerValidacionesAgenda() {
+  const tz     = Session.getScriptTimeZone();
   const hoja   = _getHojaValidacionesAgenda();
   const ultima = Math.max(hoja.getLastRow(), 2);
   const datos  = hoja.getRange(2, 1, ultima - 1, 9).getValues();
@@ -1008,9 +1009,12 @@ function _apiLeerValidacionesAgenda() {
   const filas = [];
   for (const row of datos) {
     if (!row[0]) continue;
+    // Sheets autoconvierte texto con pinta de fecha/hora a un Date real al
+    // escribirlo (aunque _apiRegistrarValidacionesAgenda mande un string
+    // plano) — mismo gotcha ya documentado en _apiEliminarFilaRIS.
     filas.push({
-      fecha:     str(row[0]),
-      hora:      str(row[1]),
+      fecha:     row[0] instanceof Date ? fechaAStr(row[0], tz) : str(row[0]),
+      hora:      row[1] instanceof Date ? minutosAHora(parsearMinutos(row[1])) : str(row[1]),
       documento: str(row[2]),
       paciente:  str(row[3]),
       practica:  str(row[4]),
