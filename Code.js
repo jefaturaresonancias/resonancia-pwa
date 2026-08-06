@@ -1002,7 +1002,11 @@ function confirmarTurno(filaAgendaC) {
     SpreadsheetApp.getUi().alert("⚠️ Turno guardado localmente pero no se pudo escribir en la BD central.\nError: " + err);
   }
 
-  props.deleteAllProperties();
+  // Limpiar solo las variables temporales de este flujo (prefijo "p_") —
+  // deleteAllProperties() se llevaba puesto PIN_JEFATURA/PIN_ADMIN cada vez
+  // que se confirmaba o cancelaba un turno acá, porque viven en el mismo
+  // Script Properties.
+  Object.keys(props.getProperties()).forEach(k => { if (k.startsWith("p_")) props.deleteProperty(k); });
 
   SpreadsheetApp.getUi().alert(
     "✅ Turno confirmado:\n" + "─".repeat(30) + "\n" +
@@ -1688,7 +1692,11 @@ function cancelarAgendaC() {
     baseDatos.getRange(parseInt(modFila), 10, 1, 3).clearContent();
   }
 
-  props.deleteAllProperties();
+  // Limpiar solo las variables temporales de este flujo (prefijo "p_") —
+  // deleteAllProperties() se llevaba puesto PIN_JEFATURA/PIN_ADMIN cada vez
+  // que se confirmaba o cancelaba un turno acá, porque viven en el mismo
+  // Script Properties.
+  Object.keys(props.getProperties()).forEach(k => { if (k.startsWith("p_")) props.deleteProperty(k); });
   const hojaAgenda = ss.getSheetByName("AgendaC");
   if (hojaAgenda) ss.deleteSheet(hojaAgenda);
   ss.setActiveSheet(ss.getSheetByName("Portada"));
