@@ -843,3 +843,35 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 .card-turno.card-int .btn-card-pres:hover {
   background: #c9a000 !important; color: #fff !important;
 }
+
+/* ── MODAL CENTRADO (Reglas de Agenda) ────────────────────────
+   Primer modal centrado real del proyecto — todo lo demás son paneles
+   slide-in (#turno-panel). z-index por encima de esos (200/201) para
+   que nunca colisionen si algún día coexisten. */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45);
+  z-index: 300; display: flex; align-items: center; justify-content: center;
+  padding: 1.5rem;
+}
+.modal-overlay.hidden { display: none; }
+.modal-box {
+  background: var(--surface); border-radius: var(--radius-lg);
+  width: 100%; max-width: 560px; max-height: 85vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0,0,0,.25);
+}
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.modal-header h3 { font-size: 1rem; color: var(--navy); }
+.modal-close {
+  background: transparent; border: none; font-size: 1.3rem; line-height: 1;
+  color: var(--text-3); cursor: pointer; padding: 4px 8px; border-radius: 6px;
+}
+.modal-close:hover { background: var(--bg); color: var(--text); }
+.modal-body { padding: 1.25rem; overflow-y: auto; flex: 1; }
+.modal-footer {
+  display: flex; justify-content: flex-end; gap: .5rem;
+  padding: 1rem 1.25rem; border-top: 1px solid var(--border); flex-shrink: 0;
+}

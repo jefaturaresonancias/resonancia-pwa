@@ -219,6 +219,19 @@ const API = (() => {
      *  restricciones operativas fijas (horarios de contraste, cardio, etc). */
     leerValidacionesAgenda() {
       return get({ action: 'leerValidacionesAgenda' });
+    },
+
+    /** Reglas de agenda editables — las que arma el motor genérico de
+     *  reglas.js. regla va como JSON string (mismo patrón que escribirConfig,
+     *  necesario porque todo viaja como querystring, no body real). */
+    leerReglasAgenda() {
+      return get({ action: 'leerReglasAgenda' });
+    },
+    guardarReglaAgenda(regla) {
+      return get({ action: 'guardarReglaAgenda', regla: JSON.stringify(regla) });
+    },
+    eliminarReglaAgenda(id) {
+      return get({ action: 'eliminarReglaAgenda', id });
     }
 
   };
