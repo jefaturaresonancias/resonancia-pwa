@@ -18,7 +18,7 @@ const Config = (() => {
     // Valida PIN contra la API — devuelve Promise<boolean>
     async validarPin(rol, pin) {
       try {
-        const data = await API.get({ action: "validarPin", rol, pin });
+        const data = await API.validarPin(rol, pin);
         return data && data.valido === true;
       } catch (e) {
         console.error("validarPin error:", e);

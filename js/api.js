@@ -215,6 +215,16 @@ const API = (() => {
       return get({ action: 'leerLog', limite });
     },
 
+    /** Valida el PIN de jefatura/admin. @returns {Promise<{valido:boolean}>} */
+    validarPin(rol, pin) {
+      return get({ action: 'validarPin', rol, pin });
+    },
+
+    /** Cambia el PIN de jefatura/admin. */
+    cambiarPin(rol, pinActual, pinNuevo) {
+      return get({ action: 'cambiarPin', rol, pinActual, pinNuevo });
+    },
+
     /** Validaciones de agenda (reglas.js del bot) — turnos que violan
      *  restricciones operativas fijas (horarios de contraste, cardio, etc). */
     leerValidacionesAgenda() {

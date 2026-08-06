@@ -280,14 +280,8 @@ const App = (() => {
       const confirmar = prompt("Repetí el nuevo PIN:");
       if (nuevo !== confirmar) { App.toast("Los PINs no coinciden", "error"); return; }
       try {
-        const res = await fetch(
-          Config.getUrl() +
-          "?action=cambiarPin&rol=" + encodeURIComponent(rol) +
-          "&pinActual=" + encodeURIComponent(pinActual) +
-          "&pinNuevo=" + encodeURIComponent(nuevo)
-        );
-        const json = await res.json();
-        if (json.ok && json.data && json.data.actualizado) {
+        const data = await API.cambiarPin(rol, pinActual, nuevo);
+        if (data && data.actualizado) {
           App.toast("PIN actualizado correctamente", "ok");
         } else {
           App.toast("Error al actualizar el PIN", "error");
