@@ -142,7 +142,7 @@
         
         <button class="nav-btn jefatura-only" data-view="guardias" id="nav-guardias">
           <span class="nav-icon">🚑</span>
-          <span class="nav-label">Guardias</span>
+          <span class="nav-label">Jefatura</span>
         </button>
         <button class="nav-btn tecnico-only" data-view="protocolos" id="nav-protocolos">
           <span class="nav-icon">📖</span>
@@ -162,7 +162,7 @@
         </button>
         <button class="nav-btn jefatura-only" data-view="bot" id="nav-bot">
           <span class="nav-icon">🤖</span>
-          <span class="nav-label">Bots</span>
+          <span class="nav-label">Bot RIS</span>
         </button>
         <button class="nav-btn jefatura-only" data-view="validaciones" id="nav-validaciones">
           <span class="nav-icon">⚠️</span>
@@ -386,20 +386,20 @@
           <div id="stats-content" style="padding:1rem;overflow-y:auto;flex:1"></div>
         </div>
 
-        <!-- ── VISTA: GUARDIAS ─── -->
+        <!-- ── VISTA: JEFATURA (panel Railway embebido) ─── -->
         <div id="view-guardias" class="view hidden">
           <div class="view-header">
-            <h2>Guardias RMN</h2>
+            <h2>Jefatura</h2>
             <div style="display:flex;gap:.5rem">
               <button id="btn-guardias-reload" class="btn-sm">↺ Recargar</button>
-              <a href="https://script.google.com/macros/s/AKfycbx9pXBVX--LetdHbDsACyXc_WLn1Cu-J_ZTmeUkqEM5xnLaPSI7WfF62dmqZPibwieA/exec" target="_blank" class="btn-sm" style="text-decoration:none">↗ Abrir en pestaña</a>
+              <a href="https://jefatura-rmn-sistema2-production.up.railway.app/" target="_blank" rel="noopener" class="btn-sm" style="text-decoration:none">↗ Abrir en pestaña</a>
             </div>
           </div>
           <div style="flex:1;position:relative">
             <iframe id="iframe-guardias"
-              src="https://script.google.com/macros/s/AKfycbx9pXBVX--LetdHbDsACyXc_WLn1Cu-J_ZTmeUkqEM5xnLaPSI7WfF62dmqZPibwieA/exec"
+              src="https://jefatura-rmn-sistema2-production.up.railway.app/"
               style="width:100%;height:100%;border:none;display:block"
-              title="Guardias RMN">
+              title="Jefatura — Railway">
             </iframe>
           </div>
         </div>
@@ -433,14 +433,24 @@
           <div id="pami-container" style="padding:1rem;overflow-y:auto;flex:1"></div>
         </div>
 
-        <!-- ── VISTA: BOTS (panel Railway embebido) ─── -->
+        <!-- ── VISTA: BOT RIS ─── -->
         <div id="view-bot" class="view hidden">
           <div class="view-header">
-            <h2>Bots</h2>
-            <a href="https://jefatura-rmn-sistema2-production.up.railway.app/" target="_blank" rel="noopener" class="btn-sm">↗ Abrir en pestaña nueva</a>
+            <h2>Monitor Bot RIS</h2>
+            <div style="display:flex;gap:.5rem;align-items:center">
+              <select id="bot-limite" style="padding:5px 8px;border-radius:6px;border:1px solid var(--border);font-size:12px">
+                <option value="10">Últimas 10</option>
+                <option value="20" selected>Últimas 20</option>
+                <option value="50">Últimas 50</option>
+              </select>
+              <button id="btn-bot-recargar" class="btn-sm">↺ Actualizar</button>
+            </div>
           </div>
-          <iframe id="bot-iframe" src="https://jefatura-rmn-sistema2-production.up.railway.app/"
-            style="flex:1;width:100%;border:0" title="Panel de Bots — Jefatura RMN"></iframe>
+          <div id="bot-loading" class="loading-bar hidden">⏳ Cargando log del bot…</div>
+          <div style="padding:1rem;overflow-y:auto;flex:1">
+            <div id="bot-resumen"></div>
+            <div id="bot-log-container" style="display:flex;flex-direction:column;gap:.75rem"></div>
+          </div>
         </div>
 
         <!-- ── VISTA: VALIDACIONES AGENDA ─── -->
