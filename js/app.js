@@ -28,7 +28,6 @@ const App = (() => {
     if (id === "agenda") AgendaView.cargar(true);
     if (id === "lista")  ListaView.cargar();
     if (id === "turno")  { TurnoView.abrirPanel(); return; }
-    if (id === "stats")  StatsView.cargar();
     if (id === "pami")   PamiView.cargar();
     if (id === "config") ConfigView.cargar();
     if (id === "bot")    BotView.cargar();
@@ -304,7 +303,6 @@ const App = (() => {
       else if (_viewActual === "pami")   PamiView.cargar();
       else if (_viewActual === "config") ConfigView.cargar();
       else if (_viewActual === "bot")    BotView.cargar();
-      else if (_viewActual === "stats")  StatsView.cargar();
     });
   }
 
@@ -328,7 +326,6 @@ const App = (() => {
     TurnoView.init();
     BuscarView.init();
     ParteView.init();
-    StatsView.init();
     PamiView.init();
     ConfigView.init();
     BotView.init();
