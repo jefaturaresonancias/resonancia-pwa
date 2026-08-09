@@ -2,7 +2,7 @@ const CACHE = "rmn-v2";
 const ASSETS = [
   "./", "./index.html",
   "./css/app.css",
-  "./js/config.js", "./js/api.js", "./js/app.js",
+  "./js/config.js", "./js/api.js", "./js/railway-api.js", "./js/app.js",
   "./js/views/agenda.js", "./js/views/lista.js", "./js/views/turno.js",
   "./js/views/parte.js", "./js/views/stats.js", "./js/views/pami.js",
   "./js/views/config.js", "./js/views/bot.js", "./js/views/validaciones.js",

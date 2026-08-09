@@ -225,6 +225,11 @@ const API = (() => {
       return get({ action: 'cambiarPin', rol, pinActual, pinNuevo });
     },
 
+    /** Token de sesión para pegarle directo a la API de Railway (sistema2-node). */
+    obtenerTokenRailway() {
+      return get({ action: 'obtenerTokenRailway' });
+    },
+
     /** Validaciones de agenda (reglas.js del bot) — turnos que violan
      *  restricciones operativas fijas (horarios de contraste, cardio, etc). */
     leerValidacionesAgenda() {

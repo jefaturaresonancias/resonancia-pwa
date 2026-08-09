@@ -71,6 +71,7 @@ function _routeGet(action, p) {
     case 'eliminarFilaCardiacas': return _apiEliminarFilaCardiacas(p)
     case 'leerValidacionesAgenda': return _apiLeerValidacionesAgenda()
     case 'leerReglasAgenda': return _apiLeerReglasAgenda()
+    case 'obtenerTokenRailway': return _apiObtenerTokenRailway()
     default:            throw new Error("Acción no reconocida: " + action);
   }
 }
@@ -929,6 +930,44 @@ function _apiCambiarPin(p) {
   if (!/^\d{4}$/.test(p.pinNuevo)) throw new Error("PIN inválido");
   props.setProperty(key, String(p.pinNuevo));
   return { actualizado: true };
+}
+
+// ─────────────────────────────────────────────────────────────
+//  GET obtenerTokenRailway — le da a la PWA un token de sesión válido
+//  para pegarle directo a la API de sistema2-node (Railway), sin que el
+//  PIN de servicio (RAILWAY_PIN, en Script Properties — correr
+//  setPinRailway() una vez) viaje nunca al navegador. El token se
+//  cachea acá mismo y se renueva antes de que venza (dura 30 días del
+//  lado de Railway, ver sistema2-node/rpc/auth.js).
+// ─────────────────────────────────────────────────────────────
+function _apiObtenerTokenRailway() {
+  const RAILWAY_URL = "https://jefatura-rmn-sistema2-production.up.railway.app";
+  const RENOVAR_ANTES_DE_MS = 25 * 24 * 60 * 60 * 1000; // margen contra los 30 días reales
+
+  const props = PropertiesService.getScriptProperties();
+  const tokenGuardado = props.getProperty("RAILWAY_TOKEN");
+  const obtenidoEn    = Number(props.getProperty("RAILWAY_TOKEN_OBTENIDO_EN") || 0);
+  if (tokenGuardado && (Date.now() - obtenidoEn) < RENOVAR_ANTES_DE_MS) {
+    return { token: tokenGuardado };
+  }
+
+  const pin = props.getProperty("RAILWAY_PIN");
+  if (!pin) throw new Error("Falta configurar RAILWAY_PIN en Script Properties — correr setPinRailway() una vez.");
+
+  const resp = UrlFetchApp.fetch(RAILWAY_URL + "/api/rpc/api_login", {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify({ args: [pin] }),
+    muteHttpExceptions: true
+  });
+  const data = JSON.parse(resp.getContentText());
+  if (!data.ok || !data.token) {
+    throw new Error("No se pudo obtener token de Railway: " + (data.error || resp.getContentText()));
+  }
+
+  props.setProperty("RAILWAY_TOKEN", data.token);
+  props.setProperty("RAILWAY_TOKEN_OBTENIDO_EN", String(Date.now()));
+  return { token: data.token };
 }
 
 function normalizarPracticasBDRIS() {

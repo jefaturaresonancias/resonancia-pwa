@@ -1896,6 +1896,15 @@ function setPins() {
   props.setProperty("PIN_ADMIN",    "5678"); // ← elegí el PIN que quieras
 }
 
+// Credencial de servicio para que Apps Script se loguee contra la API de
+// Railway (sistema2-node) en nombre de la PWA — ver _apiObtenerTokenRailway.
+// Es el MISMO PIN con el que entrás a jefatura-rmn-sistema2-production.up.railway.app.
+// Reemplazá el placeholder por el PIN real y corré esta función UNA vez.
+function setPinRailway() {
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty("RAILWAY_PIN", "PEGÁ_ACÁ_EL_PIN_REAL_DE_RAILWAY");
+}
+
 function verPins() {
   const props = PropertiesService.getScriptProperties();
   console.log("JEFATURA:", props.getProperty("PIN_JEFATURA"));
