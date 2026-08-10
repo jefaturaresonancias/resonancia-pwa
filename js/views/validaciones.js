@@ -14,6 +14,7 @@ const ValidacionesView = (() => {
   let _reglasCache = []; // reglas configuradas (leerReglasAgenda) — se usa para
                           // nombres de reglas custom en los badges, y en el modal
   let _colapsado = null; // Set<fecha> — null = todavía sin inicializar (primer render)
+  let _mostrarReportados = false; // por defecto oculta lo ya reportado
 
   function _reglaInfo(id) {
     if (REGLAS[id]) return REGLAS[id];
@@ -30,6 +31,17 @@ const ValidacionesView = (() => {
 
   const DIAS_LABEL_LARGO = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 
+  function _esPasada(dd_mm_yyyy) {
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    return _aFecha(dd_mm_yyyy) < hoy;
+  }
+
+  // Punto de entrada único: oculta lo que ya pasó y (salvo que el toggle
+  // esté prendido) lo que ya se marcó como reportado a administración.
+  function _vigentes() {
+    return _filas.filter(f => !_esPasada(f.fecha) && (_mostrarReportados || !f.reportado));
+  }
+
   function _poblarSelectReglas() {
     const sel = document.getElementById('validaciones-regla');
     if (sel.dataset.poblado) return;
@@ -44,8 +56,9 @@ const ValidacionesView = (() => {
 
   function _porTexto() {
     const busqueda = document.getElementById('validaciones-buscar').value.trim().toLowerCase();
-    if (!busqueda) return _filas;
-    return _filas.filter(f => {
+    const base = _vigentes();
+    if (!busqueda) return base;
+    return base.filter(f => {
       const texto = `${f.paciente} ${f.documento} ${f.practica} ${f.motivo}`.toLowerCase();
       return texto.includes(busqueda);
     });
@@ -152,6 +165,7 @@ const ValidacionesView = (() => {
             display:flex;
             align-items:flex-start;
             gap:1rem;
+            ${f.reportado ? 'opacity:.6' : ''}
           ">
             <div style="font-weight:700;font-size:.95rem;color:var(--navy);min-width:48px">${f.hora}</div>
             <div style="flex:1;min-width:0">
@@ -161,11 +175,15 @@ const ValidacionesView = (() => {
                   background:${info.color}22;color:${info.color}
                 ">${info.label}</span>
                 <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--bg);color:var(--text-3);text-transform:uppercase">${f.origen || '—'}</span>
+                ${f.reportado ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:#2e7d3222;color:#2e7d32">✓ Reportado</span>' : ''}
               </div>
               <div style="font-weight:600;font-size:.9rem;color:var(--text)">${f.motivo}</div>
               <div style="margin-top:.25rem;font-size:.8rem;color:var(--text-2)">${f.practica}</div>
               <div style="margin-top:.25rem;font-size:.75rem;color:var(--text-3)">${f.paciente} — ${f.documento}</div>
             </div>
+            <button type="button" class="btn-sm validaciones-btn-reportar" data-hash="${f.hash}" data-reportado="${f.reportado ? '1' : '0'}" style="white-space:nowrap;flex-shrink:0">
+              ${f.reportado ? '↺ Desmarcar' : '✓ Marcar reportado'}
+            </button>
           </div>`;
       }).join('');
 
@@ -203,6 +221,21 @@ const ValidacionesView = (() => {
       _colapsado = new Set(fechas);
       _renderContainer(_filtradas());
     });
+    cont.querySelectorAll('.validaciones-btn-reportar').forEach(btn => {
+      btn.addEventListener('click', () => _marcarReportado(btn.dataset.hash, btn.dataset.reportado !== '1'));
+    });
+  }
+
+  async function _marcarReportado(hash, reportado) {
+    try {
+      await API.marcarValidacionReportada(hash, reportado);
+      const f = _filas.find(x => x.hash === hash);
+      if (f) f.reportado = reportado;
+      App.toast(reportado ? 'Marcado como reportado' : 'Desmarcado', 'ok');
+      _render();
+    } catch (err) {
+      App.toast('Error: ' + err.message, 'error');
+    }
   }
 
   function _render() {
@@ -484,16 +517,19 @@ const ValidacionesView = (() => {
     ventana.onload = () => ventana.print();
   }
 
+  // Los reportes solo incluyen lo que todavía no se marcó como reportado —
+  // no tiene sentido re-enviar algo que ya se avisó, independientemente de
+  // si el toggle "Mostrar reportados" está prendido en la vista.
   function _reporteDiario() {
     const hoy = API.hoy(); // dd/MM/yyyy
-    const filas = _filas.filter(f => f.fecha === hoy);
+    const filas = _filas.filter(f => f.fecha === hoy && !f.reportado);
     _abrirReporte(_reporteHTML(filas, 'Reporte diario de turnos a corregir', `Turnos con problemas de agenda para hoy, ${hoy}`));
   }
 
   function _reporteSemanal() {
     const inicio = new Date(); inicio.setHours(0, 0, 0, 0);
     const fin = new Date(inicio); fin.setDate(fin.getDate() + 6);
-    const filas = _filas.filter(f => { const d = _aFecha(f.fecha); return d >= inicio && d <= fin; });
+    const filas = _filas.filter(f => { const d = _aFecha(f.fecha); return d >= inicio && d <= fin && !f.reportado; });
     const desdeStr = API.fechaAStr(inicio), hastaStr = API.fechaAStr(fin);
     _abrirReporte(_reporteHTML(filas, 'Reporte semanal de turnos a corregir', `Turnos con problemas de agenda del ${desdeStr} al ${hastaStr}`));
   }
@@ -526,6 +562,10 @@ const ValidacionesView = (() => {
     document.getElementById('btn-reporte-semanal').addEventListener('click', _reporteSemanal);
     document.getElementById('validaciones-regla').addEventListener('change', _render);
     document.getElementById('validaciones-buscar').addEventListener('input', _render);
+    document.getElementById('validaciones-mostrar-reportados').addEventListener('change', (e) => {
+      _mostrarReportados = e.target.checked;
+      _render();
+    });
     document.getElementById('btn-reglas-gestionar').addEventListener('click', _abrirModalReglas);
     document.getElementById('btn-reglas-modal-cerrar').addEventListener('click', _cerrarModalReglas);
     document.getElementById('reglas-modal-overlay').addEventListener('click', (e) => {

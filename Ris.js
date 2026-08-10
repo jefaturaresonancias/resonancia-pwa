@@ -917,20 +917,26 @@ function _apiEliminarFilaCardiacas(p) {
 //  reservados, restricciones de contraste fuera de franja, etc. Solo
 //  registro/consulta — no interactúa con BD_RIS ni con la app del RIS.
 //  Columnas: A=Fecha | B=Hora | C=Documento | D=Paciente | E=Práctica |
-//            F=Regla | G=Motivo | H=Origen | I=Hash
+//            F=Regla | G=Motivo | H=Origen | I=Hash | J=Reportado |
+//            K=FechaReportado
 // ============================================================
 function _getHojaValidacionesAgenda() {
   const ss   = SpreadsheetApp.getActiveSpreadsheet();
   let hoja   = ss.getSheetByName("Validaciones Agenda");
   if (!hoja) {
     hoja = ss.insertSheet("Validaciones Agenda");
-    hoja.getRange(1, 1, 1, 9).setValues([[
-      "FECHA", "HORA", "DOCUMENTO", "PACIENTE", "PRÁCTICA", "REGLA", "MOTIVO", "ORIGEN", "HASH"
+    hoja.getRange(1, 1, 1, 11).setValues([[
+      "FECHA", "HORA", "DOCUMENTO", "PACIENTE", "PRÁCTICA", "REGLA", "MOTIVO", "ORIGEN", "HASH", "REPORTADO", "FECHA REPORTADO"
     ]]);
-    hoja.getRange(1, 1, 1, 9)
+    hoja.getRange(1, 1, 1, 11)
       .setBackground("#7a1f1f").setFontColor("#ffffff")
       .setFontWeight("bold").setHorizontalAlignment("center");
     hoja.setFrozenRows(1);
+  } else if (hoja.getLastColumn() < 11) {
+    // Sheet ya existente de antes de agregar el flag de "reportado" — sumar
+    // los headers que falten sin tocar filas de datos ya cargadas.
+    hoja.getRange(1, 10, 1, 2).setValues([["REPORTADO", "FECHA REPORTADO"]]);
+    hoja.getRange(1, 10, 1, 2).setBackground("#7a1f1f").setFontColor("#ffffff").setFontWeight("bold").setHorizontalAlignment("center");
   }
   return hoja;
 }
@@ -1004,7 +1010,7 @@ function _apiLeerValidacionesAgenda() {
   const tz     = Session.getScriptTimeZone();
   const hoja   = _getHojaValidacionesAgenda();
   const ultima = Math.max(hoja.getLastRow(), 2);
-  const datos  = hoja.getRange(2, 1, ultima - 1, 9).getValues();
+  const datos  = hoja.getRange(2, 1, ultima - 1, 11).getValues();
 
   const filas = [];
   for (const row of datos) {
@@ -1020,11 +1026,40 @@ function _apiLeerValidacionesAgenda() {
       practica:  str(row[4]),
       regla:     str(row[5]),
       motivo:    str(row[6]),
-      origen:    str(row[7])
+      origen:    str(row[7]),
+      hash:      str(row[8]),
+      reportado: str(row[9]) === "Sí"
     });
   }
   filas.reverse();
   return filas;
+}
+
+// ─────────────────────────────────────────────────────────────
+//  POST/GET { action:"marcarValidacionReportada", hash, reportado }
+//  Marca (o desmarca) una fila de "Validaciones Agenda" como reportada
+//  al personal administrativo — no borra nada, solo un flag + fecha,
+//  para poder sacarla de la vista sin perder el historial.
+// ─────────────────────────────────────────────────────────────
+function _apiMarcarValidacionReportada(body) {
+  const { hash, reportado } = body;
+  if (!hash) throw new Error("Falta hash");
+  const marcar = reportado !== false && reportado !== "false";
+
+  const tz     = Session.getScriptTimeZone();
+  const hoja   = _getHojaValidacionesAgenda();
+  const ultima = Math.max(hoja.getLastRow(), 2);
+  const hashes = hoja.getRange(2, 9, ultima - 1, 1).getValues();
+
+  for (let i = 0; i < hashes.length; i++) {
+    if (str(hashes[i][0]) === hash) {
+      const fila = i + 2;
+      hoja.getRange(fila, 10).setValue(marcar ? "Sí" : "");
+      hoja.getRange(fila, 11).setValue(marcar ? Utilities.formatDate(new Date(), tz, "dd/MM/yyyy HH:mm:ss") : "");
+      return { ok: true, marcado: marcar };
+    }
+  }
+  throw new Error("No se encontró la validación (hash: " + hash + ")");
 }
 
 // ============================================================

@@ -250,6 +250,9 @@ const API = (() => {
     },
     eliminarReglaAgenda(id) {
       return get({ action: 'eliminarReglaAgenda', id });
+    },
+    marcarValidacionReportada(hash, reportado = true) {
+      return get({ action: 'marcarValidacionReportada', hash, reportado });
     }
 
   };

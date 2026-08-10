@@ -15,7 +15,7 @@ function doGet(e) {
   try {
     // Intentar como acción GET primero
     // Si es acción de mutación, routear a _routePost con los mismos parámetros
-    const mutaciones = ["asignar","presente","anular","modificar","guardarReglaAgenda","eliminarReglaAgenda"];
+    const mutaciones = ["asignar","presente","anular","modificar","guardarReglaAgenda","eliminarReglaAgenda","marcarValidacionReportada"];
     if (mutaciones.indexOf(action) >= 0) {
       return _jsonOk(_routePost(action, p));
     }
@@ -89,6 +89,7 @@ function _routePost(action, body) {
     case "guardarReglaAgenda": return _apiGuardarReglaAgenda(body);
     case "eliminarReglaAgenda": return _apiEliminarReglaAgenda(body);
     case "actualizarCoberturaRIS": return _apiActualizarCoberturaRIS(body);
+    case "marcarValidacionReportada": return _apiMarcarValidacionReportada(body);
     default: throw new Error("Acción POST no reconocida: " + action);
   }
 }
