@@ -257,7 +257,7 @@ const TurnoView = (() => {
         if (!confirmar) { btn.disabled = false; btn.textContent = "✓ Confirmar turno"; return; }
         const estudioOriginal = document.getElementById("form-turno").dataset.estudioOriginal || "";
         const tipo = estudio !== estudioOriginal ? "Estudio" : "Fecha";
-        await API.modificar(filaOriginal, { tipo, nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs });
+        await RailwayAPI.modificar(filaOriginal, { tipo, nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs });
         document.getElementById("form-turno").dataset.filaOriginal = "";
         document.getElementById("form-turno").dataset.estudioOriginal = "";
       } else {
@@ -486,7 +486,7 @@ const BuscarView = (() => {
           if (!confirm(`¿Anular el turno de ${nombre}?`)) return;
           btn.disabled = true;
           try {
-            await API.anular(fila);
+            await RailwayAPI.anular(fila);
             App.toast(`Turno anulado: ${nombre}`, "ok");
             buscar();
           } catch (err) {

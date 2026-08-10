@@ -71,5 +71,32 @@ const RailwayAPI = (() => {
     return rpc('api_turnos_asignar', [datos]);
   }
 
-  return { rpc, leerRISRango, asignar };
+  // ── Fase 2b: anular/presente/modificar migradas a Railway ──────
+  // `fila` acá sigue siendo el número de fila del Sheet — las lecturas
+  // (agenda/lista/buscar) todavía vienen de Apps Script, así que es lo
+  // único que la PWA tiene en la mano. Railway lo usa como fila_sheet
+  // para ubicar el turno correspondiente (ver rpc/turnos.js).
+
+  /** Anula un turno existente. @param {number} fila Fila en "Base de datos" */
+  async function anular(fila) {
+    sessionStorage.clear();
+    return rpc('api_turnos_anular', [{ filaSheet: fila }]);
+  }
+
+  /** Registra presente de un paciente. @param {number} fila Fila en "Base de datos" */
+  async function presente(fila) {
+    return rpc('api_turnos_presente', [{ filaSheet: fila }]);
+  }
+
+  /**
+   * Reprograma un turno existente (fecha y/o estudio) en una sola operación.
+   * @param {number} fila   Fila original en "Base de datos"
+   * @param {object} datos  { tipo, nombre, apellido, dni, estudio, origen, fecha, hora, observaciones }
+   */
+  async function modificar(fila, datos) {
+    sessionStorage.clear();
+    return rpc('api_turnos_modificar', [{ filaSheet: fila, ...datos }]);
+  }
+
+  return { rpc, leerRISRango, asignar, anular, presente, modificar };
 })();

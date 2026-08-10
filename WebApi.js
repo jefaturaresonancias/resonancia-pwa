@@ -72,6 +72,7 @@ function _routeGet(action, p) {
     case 'leerValidacionesAgenda': return _apiLeerValidacionesAgenda()
     case 'leerReglasAgenda': return _apiLeerReglasAgenda()
     case 'obtenerTokenRailway': return _apiObtenerTokenRailway()
+    case 'exportarTurnosMigracion': return _apiExportarTurnosMigracion()
     default:            throw new Error("Acción no reconocida: " + action);
   }
 }
@@ -968,6 +969,49 @@ function _apiObtenerTokenRailway() {
   props.setProperty("RAILWAY_TOKEN", data.token);
   props.setProperty("RAILWAY_TOKEN_OBTENIDO_EN", String(Date.now()));
   return { token: data.token };
+}
+
+// ─────────────────────────────────────────────────────────────
+//  GET exportarTurnosMigracion — dump de solo lectura de todos los
+//  turnos ACTIVOS de "Base de datos", para el backfill inicial de la
+//  tabla `turnos` en Postgres (Fase 2b de la migración a Railway).
+//  No usa leerTurnosBD a propósito: necesita la columna 18 (turnoId),
+//  que leerTurnosBD no lee, y no vale la pena tocar esa función
+//  compartida solo para este uso puntual de una sola vez.
+// ─────────────────────────────────────────────────────────────
+function _apiExportarTurnosMigracion() {
+  const ss        = SpreadsheetApp.getActiveSpreadsheet();
+  const baseDatos = ss.getSheetByName("Base de datos");
+  const tz        = Session.getScriptTimeZone();
+  const ultimaFila = Math.max(baseDatos.getLastRow(), 2);
+  const bdData     = baseDatos.getRange(2, 1, ultimaFila - 1, 18).getValues();
+
+  const turnos = [];
+  for (let i = 0; i < bdData.length; i++) {
+    const row = bdData[i];
+    if (!row[0] || row[1] === "") continue;
+
+    const tipoMod = str(row[9]);
+    if (tipoMod !== "" && tipoMod !== "0") continue; // solo activos (no anulados/reemplazados)
+
+    const fechaDate = row[0] instanceof Date ? row[0] : new Date(row[0]);
+    fechaDate.setHours(12, 0, 0, 0);
+
+    turnos.push({
+      fila:          i + 2,
+      fecha:         fechaAStr(fechaDate, tz),
+      mins:          parsearMinutos(row[1]),
+      nombre:        str(row[2]),
+      apellido:      str(row[3]),
+      dni:           str(row[4]),
+      estudio:       str(row[5]),
+      origen:        str(row[6]),
+      observaciones: str(row[16]),
+      presente:      str(row[12]),
+      turnoId:       str(row[17])
+    });
+  }
+  return { turnos, total: turnos.length };
 }
 
 function normalizarPracticasBDRIS() {

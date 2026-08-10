@@ -57,7 +57,7 @@ const App = (() => {
     document.getElementById("btn-op-anular").addEventListener("click", async () => {
       if (!confirm(`¿Anular este turno?\n\n${tip}\n\nEsta acción no se puede deshacer.`)) return;
       try {
-        await API.anular(_turnoSeleccionado.fila);
+        await RailwayAPI.anular(_turnoSeleccionado.fila);
         toast("Turno anulado", "ok");
         cerrarOpcionesTurno();
         refrescarAgenda();

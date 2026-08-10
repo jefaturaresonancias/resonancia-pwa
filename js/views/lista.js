@@ -212,7 +212,7 @@ const ListaView = (() => {
             if (!confirm(`¿Dar presente a ${nombre}?`)) return;
             btn.disabled = true; btn.textContent = "Guardando…";
             try {
-              await API.presente(fila);
+              await RailwayAPI.presente(fila);
               App.toast(`Presente: ${nombre}`, "ok");
               await cargar();
             } catch(err) {
@@ -231,7 +231,7 @@ const ListaView = (() => {
 Esta acción no se puede deshacer.`)) return;
             btn.disabled = true;
             try {
-              await API.anular(fila);
+              await RailwayAPI.anular(fila);
               App.toast(`Turno anulado: ${nombre}`, "ok");
               await cargar();
             } catch(err) {
@@ -375,7 +375,7 @@ Esta acción no se puede deshacer.`)) return;
         if (!confirm(`¿Dar presente a ${nombre}?`)) return;
         btn.disabled = true; btn.textContent = "Guardando…";
         try {
-          await API.presente(fila);
+          await RailwayAPI.presente(fila);
           App.toast(`Presente: ${nombre}`, "ok");
           await cargar();
         } catch(err) {
@@ -393,7 +393,7 @@ Esta acción no se puede deshacer.`)) return;
         if (!confirm(`¿Anular el turno de ${nombre}?\n\nEsta acción no se puede deshacer.`)) return;
         btn.disabled = true;
         try {
-          await API.anular(fila);
+          await RailwayAPI.anular(fila);
           App.toast(`Turno anulado: ${nombre}`, "ok");
           await cargar();
         } catch(err) {
