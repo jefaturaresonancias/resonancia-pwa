@@ -135,12 +135,14 @@ const TurnoView = (() => {
 
       // Mostrar directamente el slot elegido sin buscar
       _slotSeleccionado = { hora, mins: _horaAMins(hora) };
-      document.getElementById("slot-hora-label").textContent = `Horario seleccionado: ${hora} hs`;
+      document.getElementById("slot-hora-label").textContent = `Horario seleccionado: ${fecha ? fecha + " · " : ""}${hora} hs`;
       slotSel.classList.remove("hidden");
 
-      // Agregar chip de hora con opción de cambiar
+      // Agregar chip de hora con opción de cambiar — mostramos la fecha explícita
+      // para poder verificarla antes de confirmar (el input de fecha no siempre
+      // queda visible en este flujo de prefill).
       slotsGrid.innerHTML = `<div style="margin-bottom:.5rem;font-size:12px;color:var(--text-2)">
-        Horario pre-seleccionado desde la agenda. 
+        Horario pre-seleccionado desde la agenda: <strong>${fecha || ""} ${hora}</strong>.
         <button type="button" id="btn-cambiar-hora" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;text-decoration:underline;padding:0">Buscar otro horario</button>
       </div>`;
       document.getElementById("btn-cambiar-hora").addEventListener("click", () => {
