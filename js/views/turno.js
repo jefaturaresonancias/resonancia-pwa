@@ -261,7 +261,7 @@ const TurnoView = (() => {
         document.getElementById("form-turno").dataset.filaOriginal = "";
         document.getElementById("form-turno").dataset.estudioOriginal = "";
       } else {
-        await API.asignar({ nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs });
+        await RailwayAPI.asignar({ nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs });
       }
       const result = document.getElementById("turno-result");
       result.className = "turno-result ok";

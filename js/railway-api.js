@@ -58,5 +58,18 @@ const RailwayAPI = (() => {
     return data.porFecha;
   }
 
-  return { rpc, leerRISRango };
+  // ── Fase 2a: alta de turnos migrada a Railway ──────────────────
+
+  /**
+   * Asigna un nuevo turno (incluye sobreturnos sobre un slot de RIS).
+   * Mismo contrato que API.asignar — Railway lo guarda en Postgres y lo
+   * refleja en la hoja "Base de datos" para que Portada lo vea igual.
+   * @param {object} datos  { nombre, apellido, dni, estudio, origen, fecha, hora, observaciones }
+   */
+  async function asignar(datos) {
+    sessionStorage.clear();
+    return rpc('api_turnos_asignar', [datos]);
+  }
+
+  return { rpc, leerRISRango, asignar };
 })();
