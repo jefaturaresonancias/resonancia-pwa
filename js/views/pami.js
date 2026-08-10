@@ -7,7 +7,9 @@ const PamiView = (() => {
   let _filtro = "";
 
   async function _pamiGet(params) {
-    const qs   = new URLSearchParams(params).toString();
+    // Mismo fix que api.js: evita que Google cachee la respuesta de doGet
+    // para una combinación de parámetros ya pedida antes.
+    const qs   = new URLSearchParams({ ...params, _ts: Date.now() }).toString();
     const resp = await fetch(`${PAMI_URL}?${qs}`, { method: "GET" });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const json = await resp.json();
