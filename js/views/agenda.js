@@ -317,7 +317,13 @@ const AgendaView = (() => {
         }
 
         const risActivo       = risActivoCol[di];
-        const risContinuacion = !risNuevo && risActivo && risActivo.mostrado && mins < risActivo.hasta;
+        // Si acá arranca un turno propio, tiene prioridad sobre la barra de
+        // continuación de RIS — de lo contrario el turno queda tapado y,
+        // como esa celda de RIS no lleva rowspan pero activosPorCol[di]
+        // sigue reservando la fila siguiente como "cubierta", esa fila
+        // siguiente termina sin <td> real y corre las columnas de la
+        // derecha una posición a la izquierda.
+        const risContinuacion = !risNuevo && risActivo && risActivo.mostrado && mins < risActivo.hasta && !inicioTurno;
 
         if (risContinuacion) {
           const r     = risActivo.ris;
