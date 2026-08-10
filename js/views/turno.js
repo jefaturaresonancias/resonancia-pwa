@@ -398,7 +398,8 @@ const TurnoView = (() => {
       });
       btnCambiar.remove();
     });
-    document.getElementById("form-turno").insertBefore(btnCambiar, document.getElementById("form-turno").querySelector(".form-group"));
+    const formTurno = document.getElementById("form-turno");
+    formTurno.insertBefore(btnCambiar, formTurno.firstChild);
 
     // Precargar origen
     const selOrigen = document.getElementById("t-origen");
