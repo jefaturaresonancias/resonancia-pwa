@@ -168,22 +168,17 @@ const ValidacionesView = (() => {
             border:1px solid var(--border);
             border-left:4px solid ${info.color};
             border-radius:var(--radius);
-            padding:.85rem 1.1rem;
-            display:flex;align-items:center;gap:1rem;
+            padding:.7rem .85rem;
             ${f.reportado ? 'opacity:.6' : ''}
           ">
-            <div style="font-weight:700;font-size:.9rem;color:var(--navy);min-width:44px;flex-shrink:0">${f.hora}</div>
-            <div style="flex:1;min-width:0">
-              <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem;flex-wrap:wrap">
-                <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:${info.color}22;color:${info.color};white-space:nowrap">${info.label}</span>
-                <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--bg);color:var(--text-3);text-transform:uppercase">${f.origen || '—'}</span>
-                ${f.reportado ? '<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:#2e7d3222;color:#2e7d32">✓ Reportado</span>' : ''}
-              </div>
-              <div style="font-weight:600;font-size:.85rem;color:var(--text)">${f.motivo}</div>
-              <div style="margin-top:.2rem;font-size:.78rem;color:var(--text-2)">${f.practica}</div>
-              <div style="margin-top:.2rem;font-size:.75rem;color:var(--text-3)">${f.paciente} — ${f.documento}</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.3rem">
+              <span style="font-weight:700;font-size:.85rem;color:var(--navy)">${f.hora}</span>
+              <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:${info.color}22;color:${info.color};white-space:nowrap">${info.label}</span>
             </div>
-            <button type="button" class="btn-sm validaciones-btn-reportar" data-hash="${f.hash}" data-reportado="${f.reportado ? '1' : '0'}" style="white-space:nowrap;flex-shrink:0">
+            <div style="font-weight:600;font-size:.8rem;color:var(--text)">${f.motivo}${f.reportado ? ' <span style="color:#2e7d32;font-weight:700">· ✓ Reportado</span>' : ''}</div>
+            <div style="margin-top:.2rem;font-size:.73rem;color:var(--text-2)">${f.practica}</div>
+            <div style="margin-top:.2rem;font-size:.7rem;color:var(--text-3)">${f.paciente} — ${f.documento} · ${f.origen || '—'}</div>
+            <button type="button" class="btn-sm validaciones-btn-reportar" data-hash="${f.hash}" data-reportado="${f.reportado ? '1' : '0'}" style="margin-top:.5rem;width:100%;font-size:11px">
               ${f.reportado ? '↺ Desmarcar' : '✓ Marcar reportado'}
             </button>
           </div>`;
@@ -241,10 +236,10 @@ const ValidacionesView = (() => {
     }
   }
 
-  // ── Históricos: franja al pie, todo colapsado por defecto (solo
-  // referencia — lo accionable vive arriba en "Próximos"). Cada fecha es
-  // una chip compacta; al hacer clic se expande a ancho completo con el
-  // detalle, sin desarmar el resto de la grilla de chips.
+  // ── Históricos: columna izquierda, dos columnas de chips, todo colapsado
+  // por defecto (solo referencia — lo accionable vive en "Próximos" a la
+  // derecha). Al hacer clic una chip se expande a las dos columnas para
+  // mostrar el detalle, sin desarmar el resto de la grilla.
   function _renderHistoricos() {
     const cont  = document.getElementById('validaciones-historicos');
     const filas = _filtradasHist();
@@ -298,7 +293,7 @@ const ValidacionesView = (() => {
         </div>`;
     }).join('');
 
-    cont.innerHTML = header + `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.5rem">${chips}</div>`;
+    cont.innerHTML = header + `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem">${chips}</div>`;
 
     cont.querySelectorAll('.validaciones-hist-chip').forEach(el => {
       el.addEventListener('click', () => {
