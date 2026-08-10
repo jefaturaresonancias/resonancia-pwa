@@ -17,7 +17,10 @@ const API = (() => {
   async function get(params) {
     const url  = Config.getUrl();
     if (!url) throw new Error("URL de API no configurada");
-    const qs   = new URLSearchParams(params).toString();
+    // Google cachea las respuestas de doGet por combinación exacta de parámetros
+    // (independiente de los headers Cache-Control que ponga el propio script) —
+    // un valor único por request evita que sirva una respuesta vieja.
+    const qs   = new URLSearchParams({ ...params, _ts: Date.now() }).toString();
     const resp = await fetch(`${url}?${qs}`, { method: "GET" });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const json = await resp.json();
@@ -35,7 +38,7 @@ const API = (() => {
     for (const [k, v] of Object.entries(body)) {
       params[k] = v !== null && v !== undefined ? String(v) : "";
     }
-    const qs   = new URLSearchParams(params).toString();
+    const qs   = new URLSearchParams({ ...params, _ts: Date.now() }).toString();
     const resp = await fetch(`${url}?${qs}`, { method: "GET" });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const json = await resp.json();
