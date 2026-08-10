@@ -13,6 +13,7 @@ const ValidacionesView = (() => {
   let _filas = [];
   let _reglasCache = []; // reglas configuradas (leerReglasAgenda) — se usa para
                           // nombres de reglas custom en los badges, y en el modal
+  let _colapsado = null; // Set<fecha> — null = todavía sin inicializar (primer render)
 
   function _reglaInfo(id) {
     if (REGLAS[id]) return REGLAS[id];
@@ -126,7 +127,19 @@ const ValidacionesView = (() => {
       porFecha[fecha].sort((a, b) => a.hora.localeCompare(b.hora));
     }
 
-    cont.innerHTML = fechas.map(fecha => {
+    // Primer render: todo colapsado salvo el día más próximo, para no
+    // arrancar con un scroll larguísimo.
+    if (_colapsado === null) {
+      _colapsado = new Set(fechas.slice(1));
+    }
+
+    const controles = `
+      <div style="display:flex;justify-content:flex-end;gap:.75rem;margin-bottom:.75rem">
+        <button type="button" id="btn-validaciones-expandir-todo" class="btn-sm">Expandir todo</button>
+        <button type="button" id="btn-validaciones-colapsar-todo" class="btn-sm">Colapsar todo</button>
+      </div>`;
+
+    cont.innerHTML = controles + fechas.map(fecha => {
       const items = porFecha[fecha].map(f => {
         const info = _reglaInfo(f.regla);
         return `
@@ -156,22 +169,40 @@ const ValidacionesView = (() => {
           </div>`;
       }).join('');
 
-      const n       = porFecha[fecha].length;
-      const diaLbl  = DIAS_LABEL_LARGO[_aFecha(fecha).getDay()];
+      const n         = porFecha[fecha].length;
+      const diaLbl    = DIAS_LABEL_LARGO[_aFecha(fecha).getDay()];
+      const colapsado = _colapsado.has(fecha);
       return `
         <div>
-          <div style="
-            position:sticky;top:0;z-index:1;
+          <div class="validaciones-fecha-header" data-fecha="${fecha}" style="
+            position:sticky;top:0;z-index:1;cursor:pointer;user-select:none;
             display:flex;align-items:baseline;gap:.6rem;
             background:var(--navy);color:#fff;
             padding:.5rem .9rem;border-radius:var(--radius);margin-bottom:.6rem;
           ">
+            <span style="font-size:.75rem;transition:transform .15s;display:inline-block;transform:rotate(${colapsado ? '-90deg' : '0deg'})">▾</span>
             <span style="font-weight:700;font-size:.95rem">${diaLbl} ${fecha}</span>
             <span style="font-size:.75rem;opacity:.75">${n} ${n === 1 ? 'problema' : 'problemas'}</span>
           </div>
-          <div style="display:flex;flex-direction:column;gap:.5rem">${items}</div>
+          <div style="display:${colapsado ? 'none' : 'flex'};flex-direction:column;gap:.5rem">${items}</div>
         </div>`;
     }).join('');
+
+    cont.querySelectorAll('.validaciones-fecha-header').forEach(el => {
+      el.addEventListener('click', () => {
+        const fecha = el.dataset.fecha;
+        if (_colapsado.has(fecha)) _colapsado.delete(fecha); else _colapsado.add(fecha);
+        _renderContainer(_filtradas());
+      });
+    });
+    document.getElementById('btn-validaciones-expandir-todo').addEventListener('click', () => {
+      _colapsado.clear();
+      _renderContainer(_filtradas());
+    });
+    document.getElementById('btn-validaciones-colapsar-todo').addEventListener('click', () => {
+      _colapsado = new Set(fechas);
+      _renderContainer(_filtradas());
+    });
   }
 
   function _render() {
