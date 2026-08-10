@@ -932,7 +932,7 @@ const AgendaView = (() => {
       } else {
         [datos, risMap, cardioMap] = await Promise.all([
           API.agenda(desde, 7, _paso),
-          API.leerRISRango(desde, 7).catch(() => ({})),
+          RailwayAPI.leerRISRango(desde, 7).catch(() => ({})),
           API.leerCardiologia(desde, 7).catch(() => ({}))
         ]);
         try { sessionStorage.setItem(cacheKey, JSON.stringify({ datos, risMap, cardioMap })); } catch(_) {}
@@ -963,7 +963,7 @@ const AgendaView = (() => {
       } else {
         [datosMes, risMes] = await Promise.all([
           API.agenda(desde, 42, _paso),
-          API.leerRISRango(desde, 42).catch(() => ({}))
+          RailwayAPI.leerRISRango(desde, 42).catch(() => ({}))
         ]);
         try { sessionStorage.setItem(cacheKey, JSON.stringify({ datosMes, risMes })); } catch(_) {}
       }

@@ -46,5 +46,17 @@ const RailwayAPI = (() => {
     return json;
   }
 
-  return { rpc };
+  // ── Fase 1: lecturas de agenda migradas a Railway ──────────────
+
+  /**
+   * Turnos RIS de un rango de fechas → { "dd/MM/yyyy": [...] }.
+   * Mismo contrato que API.leerRISRango (que leía BD_RIS vía Apps Script) —
+   * reemplaza esa llamada en js/views/agenda.js.
+   */
+  async function leerRISRango(desde, dias = 7) {
+    const data = await rpc('api_leerRISRango', [desde, dias]);
+    return data.porFecha;
+  }
+
+  return { rpc, leerRISRango };
 })();
