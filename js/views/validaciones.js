@@ -13,7 +13,8 @@ const ValidacionesView = (() => {
   let _filas = [];
   let _reglasCache = []; // reglas configuradas (leerReglasAgenda) — se usa para
                           // nombres de reglas custom en los badges, y en el modal
-  let _colapsado = null; // Set<fecha> — null = todavía sin inicializar (primer render)
+  let _colapsado = null;     // Set<fecha> de "próximos" — null = sin inicializar (primer render)
+  let _colapsadoHist = null; // Set<fecha> de "históricos" — arranca todo colapsado
   let _mostrarReportados = false; // por defecto oculta lo ya reportado
 
   function _reglaInfo(id) {
@@ -36,11 +37,20 @@ const ValidacionesView = (() => {
     return _aFecha(dd_mm_yyyy) < hoy;
   }
 
-  // Punto de entrada único: oculta lo que ya pasó y (salvo que el toggle
-  // esté prendido) lo que ya se marcó como reportado a administración.
-  function _vigentes() {
-    return _filas.filter(f => !_esPasada(f.fecha) && (_mostrarReportados || !f.reportado));
+  // Punto de entrada único: aplica búsqueda de texto y (salvo que el toggle
+  // esté prendido) oculta lo ya marcado como reportado. Todavía sin separar
+  // pasado/futuro — eso lo hacen _proximos()/_historicos() sobre esta base.
+  function _base() {
+    const busqueda = document.getElementById('validaciones-buscar').value.trim().toLowerCase();
+    let arr = _filas.filter(f => _mostrarReportados || !f.reportado);
+    if (busqueda) {
+      arr = arr.filter(f => `${f.paciente} ${f.documento} ${f.practica} ${f.motivo}`.toLowerCase().includes(busqueda));
+    }
+    return arr;
   }
+
+  function _proximos()   { return _base().filter(f => !_esPasada(f.fecha)); }
+  function _historicos() { return _base().filter(f =>  _esPasada(f.fecha)); }
 
   function _poblarSelectReglas() {
     const sel = document.getElementById('validaciones-regla');
@@ -54,28 +64,25 @@ const ValidacionesView = (() => {
     sel.dataset.poblado = '1';
   }
 
-  function _porTexto() {
-    const busqueda = document.getElementById('validaciones-buscar').value.trim().toLowerCase();
-    const base = _vigentes();
-    if (!busqueda) return base;
-    return base.filter(f => {
-      const texto = `${f.paciente} ${f.documento} ${f.practica} ${f.motivo}`.toLowerCase();
-      return texto.includes(busqueda);
-    });
-  }
-
   function _filtradas() {
     const regla = document.getElementById('validaciones-regla').value;
-    const base  = _porTexto();
+    const base  = _proximos();
     return regla ? base.filter(f => f.regla === regla) : base;
   }
 
-  // Las tarjetas siempre muestran el desglose completo (solo respetan la
-  // búsqueda de texto, no el filtro de regla) — si no, al filtrar por una
-  // categoría desaparecerían las demás y no se podría cambiar de categoría
-  // con un clic.
+  function _filtradasHist() {
+    const regla = document.getElementById('validaciones-regla').value;
+    const base  = _historicos();
+    return regla ? base.filter(f => f.regla === regla) : base;
+  }
+
+  // Las tarjetas siempre muestran el desglose completo de PRÓXIMOS (solo
+  // respetan la búsqueda de texto, no el filtro de regla) — si no, al
+  // filtrar por una categoría desaparecerían las demás y no se podría
+  // cambiar de categoría con un clic. No suman lo histórico: son para lo
+  // accionable, no para el archivo.
   function _renderResumen() {
-    const filas       = _porTexto();
+    const filas       = _proximos();
     const reglaActiva = document.getElementById('validaciones-regla').value;
     const porRegla     = {};
     for (const f of filas) porRegla[f.regla] = (porRegla[f.regla] || 0) + 1;
@@ -161,27 +168,17 @@ const ValidacionesView = (() => {
             border:1px solid var(--border);
             border-left:4px solid ${info.color};
             border-radius:var(--radius);
-            padding:1rem 1.25rem;
-            display:flex;
-            align-items:flex-start;
-            gap:1rem;
+            padding:.75rem .9rem;
             ${f.reportado ? 'opacity:.6' : ''}
           ">
-            <div style="font-weight:700;font-size:.95rem;color:var(--navy);min-width:48px">${f.hora}</div>
-            <div style="flex:1;min-width:0">
-              <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem;flex-wrap:wrap">
-                <span style="
-                  font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;
-                  background:${info.color}22;color:${info.color}
-                ">${info.label}</span>
-                <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--bg);color:var(--text-3);text-transform:uppercase">${f.origen || '—'}</span>
-                ${f.reportado ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:#2e7d3222;color:#2e7d32">✓ Reportado</span>' : ''}
-              </div>
-              <div style="font-weight:600;font-size:.9rem;color:var(--text)">${f.motivo}</div>
-              <div style="margin-top:.25rem;font-size:.8rem;color:var(--text-2)">${f.practica}</div>
-              <div style="margin-top:.25rem;font-size:.75rem;color:var(--text-3)">${f.paciente} — ${f.documento}</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.3rem">
+              <span style="font-weight:700;font-size:.85rem;color:var(--navy)">${f.hora}</span>
+              <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:${info.color}22;color:${info.color};white-space:nowrap">${info.label}</span>
             </div>
-            <button type="button" class="btn-sm validaciones-btn-reportar" data-hash="${f.hash}" data-reportado="${f.reportado ? '1' : '0'}" style="white-space:nowrap;flex-shrink:0">
+            <div style="font-weight:600;font-size:.82rem;color:var(--text)">${f.motivo}${f.reportado ? ' <span style="color:#2e7d32;font-weight:700">· ✓ Reportado</span>' : ''}</div>
+            <div style="margin-top:.2rem;font-size:.75rem;color:var(--text-2)">${f.practica}</div>
+            <div style="margin-top:.2rem;font-size:.72rem;color:var(--text-3)">${f.paciente} — ${f.documento} · ${f.origen || '—'}</div>
+            <button type="button" class="btn-sm validaciones-btn-reportar" data-hash="${f.hash}" data-reportado="${f.reportado ? '1' : '0'}" style="margin-top:.5rem;width:100%;font-size:11px">
               ${f.reportado ? '↺ Desmarcar' : '✓ Marcar reportado'}
             </button>
           </div>`;
@@ -191,18 +188,19 @@ const ValidacionesView = (() => {
       const diaLbl    = DIAS_LABEL_LARGO[_aFecha(fecha).getDay()];
       const colapsado = _colapsado.has(fecha);
       return `
-        <div>
+        <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--surface)">
           <div class="validaciones-fecha-header" data-fecha="${fecha}" style="
-            position:sticky;top:0;z-index:1;cursor:pointer;user-select:none;
-            display:flex;align-items:baseline;gap:.6rem;
-            background:var(--navy);color:#fff;
-            padding:.5rem .9rem;border-radius:var(--radius);margin-bottom:.6rem;
+            cursor:pointer;user-select:none;
+            display:flex;align-items:center;justify-content:space-between;gap:.5rem;
+            background:var(--bg);padding:.55rem .8rem;border-bottom:1px solid var(--border);
           ">
-            <span style="font-size:.75rem;transition:transform .15s;display:inline-block;transform:rotate(${colapsado ? '-90deg' : '0deg'})">▾</span>
-            <span style="font-weight:700;font-size:.95rem">${diaLbl} ${fecha}</span>
-            <span style="font-size:.75rem;opacity:.75">${n} ${n === 1 ? 'problema' : 'problemas'}</span>
+            <span style="display:flex;align-items:center;gap:.5rem;min-width:0">
+              <span style="font-size:.7rem;transition:transform .15s;display:inline-block;transform:rotate(${colapsado ? '-90deg' : '0deg'})">▾</span>
+              <span style="font-weight:700;font-size:.82rem;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${diaLbl} ${fecha}</span>
+            </span>
+            <span style="font-size:.68rem;font-weight:700;color:#fff;background:var(--navy);border-radius:20px;padding:2px 8px;flex-shrink:0">${n}</span>
           </div>
-          <div style="display:${colapsado ? 'none' : 'flex'};flex-direction:column;gap:.5rem">${items}</div>
+          <div style="display:${colapsado ? 'none' : 'flex'};flex-direction:column;gap:.5rem;padding:.6rem">${items}</div>
         </div>`;
     }).join('');
 
@@ -238,9 +236,70 @@ const ValidacionesView = (() => {
     }
   }
 
+  // ── Históricos: columna izquierda, compacta, todo colapsado por defecto —
+  // es solo referencia, lo accionable vive en "Próximos" a la derecha.
+  function _renderHistoricos() {
+    const cont  = document.getElementById('validaciones-historicos');
+    const filas = _filtradasHist();
+
+    const porFecha = {};
+    for (const f of filas) {
+      if (!porFecha[f.fecha]) porFecha[f.fecha] = [];
+      porFecha[f.fecha].push(f);
+    }
+    // Más reciente primero — lo último que pasó es lo más probable de revisar.
+    const fechas = Object.keys(porFecha).sort((a, b) => _aFecha(b) - _aFecha(a));
+    for (const fecha of fechas) porFecha[fecha].sort((a, b) => a.hora.localeCompare(b.hora));
+
+    if (_colapsadoHist === null) _colapsadoHist = new Set(fechas);
+
+    const header = `<div style="font-weight:700;font-size:.8rem;color:var(--text-2);text-transform:uppercase;letter-spacing:.03em;margin-bottom:.6rem">📋 Históricos${filas.length ? ` (${filas.length})` : ''}</div>`;
+
+    if (!fechas.length) {
+      cont.innerHTML = header + `<div style="font-size:.75rem;color:var(--text-3)">Sin problemas pasados.</div>`;
+      return;
+    }
+
+    const lista = fechas.map(fecha => {
+      const n         = porFecha[fecha].length;
+      const colapsado = _colapsadoHist.has(fecha);
+      const items = colapsado ? '' : porFecha[fecha].map(f => {
+        const info = _reglaInfo(f.regla);
+        return `
+          <div style="padding:.4rem .5rem;border-left:3px solid ${info.color};background:var(--bg);border-radius:4px;margin-top:.3rem;font-size:.72rem;line-height:1.4">
+            <div style="font-weight:600;color:var(--text)">${f.hora} · ${f.paciente}</div>
+            <div style="color:var(--text-3)">${info.label}</div>
+          </div>`;
+      }).join('');
+      return `
+        <div class="validaciones-hist-header" data-fecha="${fecha}" style="
+          cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;gap:.4rem;
+          padding:.4rem .5rem;border-radius:6px;font-size:.78rem;${colapsado ? '' : 'background:var(--bg)'}
+        ">
+          <span style="display:flex;align-items:center;gap:.4rem;color:var(--text-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            <span style="font-size:.65rem;display:inline-block;transition:transform .15s;transform:rotate(${colapsado ? '-90deg' : '0deg'})">▾</span>
+            ${fecha}
+          </span>
+          <span style="font-size:.68rem;font-weight:700;color:var(--text-3);flex-shrink:0">${n}</span>
+        </div>
+        ${items}`;
+    }).join('');
+
+    cont.innerHTML = header + `<div style="display:flex;flex-direction:column;gap:.15rem">${lista}</div>`;
+
+    cont.querySelectorAll('.validaciones-hist-header').forEach(el => {
+      el.addEventListener('click', () => {
+        const fecha = el.dataset.fecha;
+        if (_colapsadoHist.has(fecha)) _colapsadoHist.delete(fecha); else _colapsadoHist.add(fecha);
+        _renderHistoricos();
+      });
+    });
+  }
+
   function _render() {
     _renderResumen();
     _renderContainer(_filtradas());
+    _renderHistoricos();
   }
 
   // ── Modal: gestionar reglas (lista ↔ formulario, mismo overlay) ────────
