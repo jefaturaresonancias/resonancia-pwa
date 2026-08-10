@@ -421,6 +421,83 @@ const ValidacionesView = (() => {
     }
   }
 
+  // ── Reporte imprimible (diario / semanal) ───────────────────
+  // Abre una pestaña nueva con una tabla lista para imprimir / guardar
+  // como PDF (Ctrl+P → Guardar como PDF) — sin dependencias externas.
+  function _reporteHTML(filas, titulo, subtitulo) {
+    const porFecha = {};
+    for (const f of filas) {
+      if (!porFecha[f.fecha]) porFecha[f.fecha] = [];
+      porFecha[f.fecha].push(f);
+    }
+    const fechas = Object.keys(porFecha).sort((a, b) => _aFecha(a) - _aFecha(b));
+    for (const fecha of fechas) porFecha[fecha].sort((a, b) => a.hora.localeCompare(b.hora));
+
+    const grupos = fechas.map(fecha => {
+      const diaLbl = DIAS_LABEL_LARGO[_aFecha(fecha).getDay()];
+      const filasHtml = porFecha[fecha].map(f => `
+        <tr>
+          <td>${f.hora}</td>
+          <td>${f.paciente}</td>
+          <td>${f.documento}</td>
+          <td>${f.practica}</td>
+          <td>${_reglaInfo(f.regla).label}</td>
+          <td>${f.motivo}</td>
+        </tr>`).join('');
+      return `
+        <h3>${diaLbl} ${fecha} <span class="n">(${porFecha[fecha].length})</span></h3>
+        <table>
+          <thead><tr><th>Hora</th><th>Paciente</th><th>DNI</th><th>Estudio</th><th>Regla</th><th>Motivo</th></tr></thead>
+          <tbody>${filasHtml}</tbody>
+        </table>`;
+    }).join('');
+
+    const ahora = new Date().toLocaleString('es-AR');
+
+    return `<!doctype html><html><head><meta charset="utf-8"><title>${titulo}</title>
+      <style>
+        body{font-family:Arial,Helvetica,sans-serif;color:#222;padding:24px;max-width:900px;margin:0 auto}
+        h1{font-size:20px;margin-bottom:2px}
+        .subtitulo{color:#666;font-size:13px;margin-bottom:2px}
+        .generado{color:#999;font-size:11px;margin-bottom:20px}
+        h3{font-size:14px;background:#1a3a5c;color:#fff;padding:6px 10px;border-radius:4px;margin-top:20px;margin-bottom:6px}
+        h3 .n{font-weight:400;opacity:.8}
+        table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px}
+        th,td{border:1px solid #ccc;padding:5px 7px;text-align:left;vertical-align:top}
+        th{background:#f0f0f0}
+        .vacio{color:#666;padding:20px 0}
+        @media print{ body{padding:0} h3{-webkit-print-color-adjust:exact;print-color-adjust:exact} th{-webkit-print-color-adjust:exact;print-color-adjust:exact} }
+      </style></head>
+      <body>
+        <h1>${titulo}</h1>
+        <div class="subtitulo">${subtitulo}</div>
+        <div class="generado">Generado el ${ahora} — RMN Santojanni</div>
+        ${filas.length ? grupos : '<div class="vacio">Sin problemas de agenda detectados en este período.</div>'}
+      </body></html>`;
+  }
+
+  function _abrirReporte(html) {
+    const ventana = window.open('', '_blank');
+    if (!ventana) { App.toast('El navegador bloqueó la ventana del reporte — habilitá pop-ups para este sitio.', 'error'); return; }
+    ventana.document.write(html);
+    ventana.document.close();
+    ventana.onload = () => ventana.print();
+  }
+
+  function _reporteDiario() {
+    const hoy = API.hoy(); // dd/MM/yyyy
+    const filas = _filas.filter(f => f.fecha === hoy);
+    _abrirReporte(_reporteHTML(filas, 'Reporte diario de turnos a corregir', `Turnos con problemas de agenda para hoy, ${hoy}`));
+  }
+
+  function _reporteSemanal() {
+    const inicio = new Date(); inicio.setHours(0, 0, 0, 0);
+    const fin = new Date(inicio); fin.setDate(fin.getDate() + 6);
+    const filas = _filas.filter(f => { const d = _aFecha(f.fecha); return d >= inicio && d <= fin; });
+    const desdeStr = API.fechaAStr(inicio), hastaStr = API.fechaAStr(fin);
+    _abrirReporte(_reporteHTML(filas, 'Reporte semanal de turnos a corregir', `Turnos con problemas de agenda del ${desdeStr} al ${hastaStr}`));
+  }
+
   async function cargar() {
     const loading = document.getElementById('validaciones-loading');
     const cont    = document.getElementById('validaciones-container');
@@ -445,6 +522,8 @@ const ValidacionesView = (() => {
 
   function init() {
     document.getElementById('btn-validaciones-recargar').addEventListener('click', cargar);
+    document.getElementById('btn-reporte-diario').addEventListener('click', _reporteDiario);
+    document.getElementById('btn-reporte-semanal').addEventListener('click', _reporteSemanal);
     document.getElementById('validaciones-regla').addEventListener('change', _render);
     document.getElementById('validaciones-buscar').addEventListener('input', _render);
     document.getElementById('btn-reglas-gestionar').addEventListener('click', _abrirModalReglas);
