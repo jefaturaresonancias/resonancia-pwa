@@ -864,7 +864,7 @@ function _apiLeerCardiacas(p) {
     resultado.push({
       fila:          i + 1,   // número real de fila (encabezado en fila 1)
       fecha:         fechaStr,
-      hora:          str(row[1]),
+      hora:          _horaDeCelda(row[1]),
       documento:     str(row[2]),
       nombre:        str(row[3]),
       edad:          str(row[4]),
