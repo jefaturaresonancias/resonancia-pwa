@@ -125,9 +125,11 @@ const ValidacionesView = (() => {
   }
 
   function _renderContainer(filas) {
-    const cont = document.getElementById('validaciones-container');
+    const cont       = document.getElementById('validaciones-container');
+    const controles  = document.getElementById('validaciones-controles');
 
     if (!filas.length) {
+      controles.innerHTML = '';
       cont.innerHTML = `
         <div style="text-align:center;padding:3rem;color:var(--text-3)">
           <div style="font-size:3rem">✅</div>
@@ -153,13 +155,11 @@ const ValidacionesView = (() => {
       _colapsado = new Set(fechas.slice(1));
     }
 
-    const controles = `
-      <div style="display:flex;justify-content:flex-end;gap:.75rem;margin-bottom:.75rem">
-        <button type="button" id="btn-validaciones-expandir-todo" class="btn-sm">Expandir todo</button>
-        <button type="button" id="btn-validaciones-colapsar-todo" class="btn-sm">Colapsar todo</button>
-      </div>`;
+    controles.innerHTML = `
+      <button type="button" id="btn-validaciones-expandir-todo" class="btn-sm">Expandir todo</button>
+      <button type="button" id="btn-validaciones-colapsar-todo" class="btn-sm">Colapsar todo</button>`;
 
-    cont.innerHTML = controles + fechas.map(fecha => {
+    cont.innerHTML = fechas.map(fecha => {
       const items = porFecha[fecha].map(f => {
         const info = _reglaInfo(f.regla);
         return `
@@ -168,17 +168,22 @@ const ValidacionesView = (() => {
             border:1px solid var(--border);
             border-left:4px solid ${info.color};
             border-radius:var(--radius);
-            padding:.75rem .9rem;
+            padding:.85rem 1.1rem;
+            display:flex;align-items:center;gap:1rem;
             ${f.reportado ? 'opacity:.6' : ''}
           ">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.3rem">
-              <span style="font-weight:700;font-size:.85rem;color:var(--navy)">${f.hora}</span>
-              <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:${info.color}22;color:${info.color};white-space:nowrap">${info.label}</span>
+            <div style="font-weight:700;font-size:.9rem;color:var(--navy);min-width:44px;flex-shrink:0">${f.hora}</div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem;flex-wrap:wrap">
+                <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:${info.color}22;color:${info.color};white-space:nowrap">${info.label}</span>
+                <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--bg);color:var(--text-3);text-transform:uppercase">${f.origen || '—'}</span>
+                ${f.reportado ? '<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:#2e7d3222;color:#2e7d32">✓ Reportado</span>' : ''}
+              </div>
+              <div style="font-weight:600;font-size:.85rem;color:var(--text)">${f.motivo}</div>
+              <div style="margin-top:.2rem;font-size:.78rem;color:var(--text-2)">${f.practica}</div>
+              <div style="margin-top:.2rem;font-size:.75rem;color:var(--text-3)">${f.paciente} — ${f.documento}</div>
             </div>
-            <div style="font-weight:600;font-size:.82rem;color:var(--text)">${f.motivo}${f.reportado ? ' <span style="color:#2e7d32;font-weight:700">· ✓ Reportado</span>' : ''}</div>
-            <div style="margin-top:.2rem;font-size:.75rem;color:var(--text-2)">${f.practica}</div>
-            <div style="margin-top:.2rem;font-size:.72rem;color:var(--text-3)">${f.paciente} — ${f.documento} · ${f.origen || '—'}</div>
-            <button type="button" class="btn-sm validaciones-btn-reportar" data-hash="${f.hash}" data-reportado="${f.reportado ? '1' : '0'}" style="margin-top:.5rem;width:100%;font-size:11px">
+            <button type="button" class="btn-sm validaciones-btn-reportar" data-hash="${f.hash}" data-reportado="${f.reportado ? '1' : '0'}" style="white-space:nowrap;flex-shrink:0">
               ${f.reportado ? '↺ Desmarcar' : '✓ Marcar reportado'}
             </button>
           </div>`;
@@ -192,15 +197,15 @@ const ValidacionesView = (() => {
           <div class="validaciones-fecha-header" data-fecha="${fecha}" style="
             cursor:pointer;user-select:none;
             display:flex;align-items:center;justify-content:space-between;gap:.5rem;
-            background:var(--bg);padding:.55rem .8rem;border-bottom:1px solid var(--border);
+            background:var(--bg);padding:.6rem 1rem;border-bottom:1px solid var(--border);
           ">
-            <span style="display:flex;align-items:center;gap:.5rem;min-width:0">
+            <span style="display:flex;align-items:center;gap:.6rem;min-width:0">
               <span style="font-size:.7rem;transition:transform .15s;display:inline-block;transform:rotate(${colapsado ? '-90deg' : '0deg'})">▾</span>
-              <span style="font-weight:700;font-size:.82rem;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${diaLbl} ${fecha}</span>
+              <span style="font-weight:700;font-size:.88rem;color:var(--navy)">${diaLbl} ${fecha}</span>
             </span>
-            <span style="font-size:.68rem;font-weight:700;color:#fff;background:var(--navy);border-radius:20px;padding:2px 8px;flex-shrink:0">${n}</span>
+            <span style="font-size:.7rem;font-weight:700;color:#fff;background:var(--navy);border-radius:20px;padding:2px 9px;flex-shrink:0">${n}</span>
           </div>
-          <div style="display:${colapsado ? 'none' : 'flex'};flex-direction:column;gap:.5rem;padding:.6rem">${items}</div>
+          <div style="display:${colapsado ? 'none' : 'flex'};flex-direction:column;gap:.5rem;padding:.75rem">${items}</div>
         </div>`;
     }).join('');
 
@@ -236,8 +241,10 @@ const ValidacionesView = (() => {
     }
   }
 
-  // ── Históricos: columna izquierda, compacta, todo colapsado por defecto —
-  // es solo referencia, lo accionable vive en "Próximos" a la derecha.
+  // ── Históricos: franja al pie, todo colapsado por defecto (solo
+  // referencia — lo accionable vive arriba en "Próximos"). Cada fecha es
+  // una chip compacta; al hacer clic se expande a ancho completo con el
+  // detalle, sin desarmar el resto de la grilla de chips.
   function _renderHistoricos() {
     const cont  = document.getElementById('validaciones-historicos');
     const filas = _filtradasHist();
@@ -256,38 +263,44 @@ const ValidacionesView = (() => {
     const header = `<div style="font-weight:700;font-size:.8rem;color:var(--text-2);text-transform:uppercase;letter-spacing:.03em;margin-bottom:.6rem">📋 Históricos${filas.length ? ` (${filas.length})` : ''}</div>`;
 
     if (!fechas.length) {
-      cont.innerHTML = header + `<div style="font-size:.75rem;color:var(--text-3)">Sin problemas pasados.</div>`;
+      cont.innerHTML = header + `<div style="font-size:.78rem;color:var(--text-3)">Sin problemas pasados.</div>`;
       return;
     }
 
-    const lista = fechas.map(fecha => {
+    const chips = fechas.map(fecha => {
       const n         = porFecha[fecha].length;
       const colapsado = _colapsadoHist.has(fecha);
-      const items = colapsado ? '' : porFecha[fecha].map(f => {
-        const info = _reglaInfo(f.regla);
-        return `
-          <div style="padding:.4rem .5rem;border-left:3px solid ${info.color};background:var(--bg);border-radius:4px;margin-top:.3rem;font-size:.72rem;line-height:1.4">
-            <div style="font-weight:600;color:var(--text)">${f.hora} · ${f.paciente}</div>
-            <div style="color:var(--text-3)">${info.label}</div>
-          </div>`;
-      }).join('');
+      const detalle = colapsado ? '' : `
+        <div style="display:flex;flex-direction:column;gap:.4rem;margin-top:.6rem">
+          ${porFecha[fecha].map(f => {
+            const info = _reglaInfo(f.regla);
+            return `
+              <div style="padding:.4rem .6rem;border-left:3px solid ${info.color};background:var(--surface);border-radius:4px;font-size:.75rem;line-height:1.4;display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap">
+                <span><strong>${f.hora}</strong> · ${f.paciente} — ${f.documento}</span>
+                <span style="color:${info.color};font-weight:700">${info.label}</span>
+              </div>`;
+          }).join('')}
+        </div>`;
       return `
-        <div class="validaciones-hist-header" data-fecha="${fecha}" style="
-          cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;gap:.4rem;
-          padding:.4rem .5rem;border-radius:6px;font-size:.78rem;${colapsado ? '' : 'background:var(--bg)'}
+        <div class="validaciones-hist-chip" data-fecha="${fecha}" style="
+          ${colapsado ? '' : 'grid-column:1/-1;'}
+          background:var(--bg);border:1px solid var(--border);border-radius:6px;
+          padding:.4rem .7rem;cursor:pointer;user-select:none;
         ">
-          <span style="display:flex;align-items:center;gap:.4rem;color:var(--text-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-            <span style="font-size:.65rem;display:inline-block;transition:transform .15s;transform:rotate(${colapsado ? '-90deg' : '0deg'})">▾</span>
-            ${fecha}
-          </span>
-          <span style="font-size:.68rem;font-weight:700;color:var(--text-3);flex-shrink:0">${n}</span>
-        </div>
-        ${items}`;
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem">
+            <span style="display:flex;align-items:center;gap:.4rem;font-size:.78rem;color:var(--text-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+              <span style="font-size:.65rem;display:inline-block;transition:transform .15s;transform:rotate(${colapsado ? '-90deg' : '0deg'})">▾</span>
+              ${fecha}
+            </span>
+            <span style="font-size:.68rem;font-weight:700;color:var(--text-3);flex-shrink:0">${n}</span>
+          </div>
+          ${detalle}
+        </div>`;
     }).join('');
 
-    cont.innerHTML = header + `<div style="display:flex;flex-direction:column;gap:.15rem">${lista}</div>`;
+    cont.innerHTML = header + `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.5rem">${chips}</div>`;
 
-    cont.querySelectorAll('.validaciones-hist-header').forEach(el => {
+    cont.querySelectorAll('.validaciones-hist-chip').forEach(el => {
       el.addEventListener('click', () => {
         const fecha = el.dataset.fecha;
         if (_colapsadoHist.has(fecha)) _colapsadoHist.delete(fecha); else _colapsadoHist.add(fecha);
