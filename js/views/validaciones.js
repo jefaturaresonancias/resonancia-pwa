@@ -27,6 +27,8 @@ const ValidacionesView = (() => {
     return new Date(yyyy || 0, (mm || 1) - 1, dd || 1);
   }
 
+  const DIAS_LABEL_LARGO = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+
   function _poblarSelectReglas() {
     const sel = document.getElementById('validaciones-regla');
     if (sel.dataset.poblado) return;
@@ -39,33 +41,49 @@ const ValidacionesView = (() => {
     sel.dataset.poblado = '1';
   }
 
-  function _filtradas() {
-    const regla    = document.getElementById('validaciones-regla').value;
+  function _porTexto() {
     const busqueda = document.getElementById('validaciones-buscar').value.trim().toLowerCase();
-
+    if (!busqueda) return _filas;
     return _filas.filter(f => {
-      if (regla && f.regla !== regla) return false;
-      if (!busqueda) return true;
       const texto = `${f.paciente} ${f.documento} ${f.practica} ${f.motivo}`.toLowerCase();
       return texto.includes(busqueda);
     });
   }
 
-  function _renderResumen(filas) {
-    const porRegla = {};
+  function _filtradas() {
+    const regla = document.getElementById('validaciones-regla').value;
+    const base  = _porTexto();
+    return regla ? base.filter(f => f.regla === regla) : base;
+  }
+
+  // Las tarjetas siempre muestran el desglose completo (solo respetan la
+  // búsqueda de texto, no el filtro de regla) — si no, al filtrar por una
+  // categoría desaparecerían las demás y no se podría cambiar de categoría
+  // con un clic.
+  function _renderResumen() {
+    const filas       = _porTexto();
+    const reglaActiva = document.getElementById('validaciones-regla').value;
+    const porRegla     = {};
     for (const f of filas) porRegla[f.regla] = (porRegla[f.regla] || 0) + 1;
 
+    function tarjeta(id, n, label, color) {
+      const activa = reglaActiva === id;
+      return `<div class="validaciones-card" data-regla="${id}" style="
+          background:var(--surface);border:1px solid ${activa ? color : 'var(--border)'};
+          border-left:4px solid ${color};border-radius:var(--radius);padding:1rem;text-align:center;
+          cursor:pointer;user-select:none;
+          ${activa ? `box-shadow:0 0 0 2px ${color}55` : ''}
+        " title="${id ? 'Filtrar por ' + label : 'Ver todas'}">
+        <div style="font-size:1.8rem;font-weight:700;color:${color}">${n}</div>
+        <div style="font-size:.75rem;color:var(--text-2);margin-top:.25rem">${label}${activa && id ? ' ✓' : ''}</div>
+      </div>`;
+    }
+
     const tarjetas = [
-      `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;text-align:center">
-        <div style="font-size:1.8rem;font-weight:700;color:var(--navy)">${filas.length}</div>
-        <div style="font-size:.75rem;color:var(--text-2);margin-top:.25rem">Total</div>
-      </div>`,
+      tarjeta('', filas.length, 'Total (ver todas)', 'var(--navy)'),
       ...Object.entries(porRegla).map(([id, n]) => {
         const info = _reglaInfo(id);
-        return `<div style="background:var(--surface);border:1px solid var(--border);border-left:4px solid ${info.color};border-radius:var(--radius);padding:1rem;text-align:center">
-          <div style="font-size:1.8rem;font-weight:700;color:${info.color}">${n}</div>
-          <div style="font-size:.75rem;color:var(--text-2);margin-top:.25rem">${info.label}</div>
-        </div>`;
+        return tarjeta(id, n, info.label, info.color);
       })
     ];
 
@@ -73,6 +91,16 @@ const ValidacionesView = (() => {
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem;margin-bottom:1.5rem">
         ${tarjetas.join('')}
       </div>`;
+
+    document.getElementById('validaciones-resumen').querySelectorAll('[data-regla]').forEach(card => {
+      card.addEventListener('click', () => {
+        const sel = document.getElementById('validaciones-regla');
+        const clickeada = card.dataset.regla;
+        // Clic de nuevo sobre la misma categoría ya activa → vuelve a "Todas"
+        sel.value = (sel.value === clickeada && clickeada !== '') ? '' : clickeada;
+        _render();
+      });
+    });
   }
 
   function _renderContainer(filas) {
@@ -128,18 +156,27 @@ const ValidacionesView = (() => {
           </div>`;
       }).join('');
 
+      const n       = porFecha[fecha].length;
+      const diaLbl  = DIAS_LABEL_LARGO[_aFecha(fecha).getDay()];
       return `
         <div>
-          <div style="font-weight:700;font-size:.85rem;color:var(--text-2);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.03em">${fecha}</div>
+          <div style="
+            position:sticky;top:0;z-index:1;
+            display:flex;align-items:baseline;gap:.6rem;
+            background:var(--navy);color:#fff;
+            padding:.5rem .9rem;border-radius:var(--radius);margin-bottom:.6rem;
+          ">
+            <span style="font-weight:700;font-size:.95rem">${diaLbl} ${fecha}</span>
+            <span style="font-size:.75rem;opacity:.75">${n} ${n === 1 ? 'problema' : 'problemas'}</span>
+          </div>
           <div style="display:flex;flex-direction:column;gap:.5rem">${items}</div>
         </div>`;
     }).join('');
   }
 
   function _render() {
-    const filtradas = _filtradas();
-    _renderResumen(filtradas);
-    _renderContainer(filtradas);
+    _renderResumen();
+    _renderContainer(_filtradas());
   }
 
   // ── Modal: gestionar reglas (lista ↔ formulario, mismo overlay) ────────
