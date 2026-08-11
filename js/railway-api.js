@@ -108,6 +108,33 @@ const RailwayAPI = (() => {
     return rpc('api_turnos_modificar', [{ filaSheet: fila, ...datos }]);
   }
 
+  // ── Etapa 2b (migración de lecturas): grilla semanal ────────────
+
+  /**
+   * Grilla semanal para vista administrativa.
+   * Mismo contrato que API.agenda — reemplaza esa llamada en agenda.js/lista.js/stats.js.
+   * @param {string} desde  dd/MM/yyyy
+   * @param {number} dias   cantidad de días (default 7)
+   * @param {number} paso   minutos por slot (20 / 40 / 60)
+   */
+  async function agenda(desde, dias = 7, paso = 40) {
+    const data = await rpc('api_agenda_grilla', [{ desde, dias, paso }]);
+    return data.dias;
+  }
+
+  // ── Etapa 2c (migración de lecturas): horarios disponibles ──────
+
+  /**
+   * Horarios disponibles para un estudio en una fecha.
+   * Mismo contrato que API.slots — reemplaza esa llamada en js/views/turno.js.
+   * @param {string} fecha   dd/MM/yyyy
+   * @param {string} estudio nombre exacto del estudio (puede ser comma-separated)
+   * @param {string} origen  AMBULATORIO | INTERNACIÓN | etc.
+   */
+  async function slots(fecha, estudio, origen = "AMBULATORIO") {
+    return rpc('api_agenda_slots', [{ fecha, estudio, origen }]);
+  }
+
   // ── Etapa 2a (migración de lecturas): lista del día y búsqueda ──
 
   /**
@@ -129,5 +156,5 @@ const RailwayAPI = (() => {
     return data.turnos;
   }
 
-  return { rpc, leerRISRango, leerCardiologia, asignar, anular, presente, modificar, turnos, buscar };
+  return { rpc, leerRISRango, leerCardiologia, asignar, anular, presente, modificar, turnos, buscar, agenda, slots };
 })();

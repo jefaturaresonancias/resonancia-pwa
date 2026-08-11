@@ -193,7 +193,7 @@ const TurnoView = (() => {
     _slotSeleccionado = null;
 
     try {
-      const result = await API.slots(fecha, estudioStr, origen);
+      const result = await RailwayAPI.slots(fecha, estudioStr, origen);
       if (result.esFeriado) {
         slotsGrid.innerHTML = `<p style="color:#c62828;font-weight:600">🚫 ${fecha} es feriado: ${result.feriado}</p>`;
         return;
