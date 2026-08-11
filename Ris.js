@@ -918,25 +918,26 @@ function _apiEliminarFilaCardiacas(p) {
 //  registro/consulta — no interactúa con BD_RIS ni con la app del RIS.
 //  Columnas: A=Fecha | B=Hora | C=Documento | D=Paciente | E=Práctica |
 //            F=Regla | G=Motivo | H=Origen | I=Hash | J=Reportado |
-//            K=FechaReportado
+//            K=FechaReportado | L=Resuelto | M=FechaResuelto
 // ============================================================
 function _getHojaValidacionesAgenda() {
   const ss   = SpreadsheetApp.getActiveSpreadsheet();
   let hoja   = ss.getSheetByName("Validaciones Agenda");
+  const HEADERS = ["FECHA", "HORA", "DOCUMENTO", "PACIENTE", "PRÁCTICA", "REGLA", "MOTIVO", "ORIGEN", "HASH", "REPORTADO", "FECHA REPORTADO", "RESUELTO", "FECHA RESUELTO"];
   if (!hoja) {
     hoja = ss.insertSheet("Validaciones Agenda");
-    hoja.getRange(1, 1, 1, 11).setValues([[
-      "FECHA", "HORA", "DOCUMENTO", "PACIENTE", "PRÁCTICA", "REGLA", "MOTIVO", "ORIGEN", "HASH", "REPORTADO", "FECHA REPORTADO"
-    ]]);
-    hoja.getRange(1, 1, 1, 11)
+    hoja.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+    hoja.getRange(1, 1, 1, HEADERS.length)
       .setBackground("#7a1f1f").setFontColor("#ffffff")
       .setFontWeight("bold").setHorizontalAlignment("center");
     hoja.setFrozenRows(1);
-  } else if (hoja.getLastColumn() < 11) {
-    // Sheet ya existente de antes de agregar el flag de "reportado" — sumar
-    // los headers que falten sin tocar filas de datos ya cargadas.
-    hoja.getRange(1, 10, 1, 2).setValues([["REPORTADO", "FECHA REPORTADO"]]);
-    hoja.getRange(1, 10, 1, 2).setBackground("#7a1f1f").setFontColor("#ffffff").setFontWeight("bold").setHorizontalAlignment("center");
+  } else if (hoja.getLastColumn() < HEADERS.length) {
+    // Sheet ya existente de antes de agregar reportado/resuelto — sumar los
+    // headers que falten sin tocar filas de datos ya cargadas.
+    const faltantes = HEADERS.slice(hoja.getLastColumn());
+    hoja.getRange(1, hoja.getLastColumn() + 1, 1, faltantes.length).setValues([faltantes]);
+    hoja.getRange(1, hoja.getLastColumn() - faltantes.length + 1, 1, faltantes.length)
+      .setBackground("#7a1f1f").setFontColor("#ffffff").setFontWeight("bold").setHorizontalAlignment("center");
   }
   return hoja;
 }
@@ -945,32 +946,64 @@ function _hashValidacionAgenda(fecha, hora, documento, regla) {
   return `${fecha}|${hora}|${String(documento).trim().toUpperCase()}|${regla}`;
 }
 
+function _fechaDMYaDateValidacion(dmy) {
+  const [d, m, y] = String(dmy || "").split("/").map(Number);
+  return new Date(y || 0, (m || 1) - 1, d || 1);
+}
+
 // ─────────────────────────────────────────────────────────────
 //  POST { action:"registrarValidacionesAgenda", origen, items:[...] }
 //  items: [{ fecha, hora, documento, paciente, practica, regla, motivo }]
 //  Dedup por fecha+hora+documento+regla — mismo criterio que
 //  _apiEscribirRIS: si ya está registrada, no la duplica.
+//
+//  Cada corrida de reglas.js manda TODOS los problemas que encontró para
+//  su alcance (origen) en esta llamada — no solo los nuevos. Eso permite
+//  auto-resolver: cualquier fila previa del MISMO origen, todavía activa
+//  (ni reportada ni ya resuelta), cuya fecha caiga dentro del rango que
+//  este batch cubrió, y que NO esté en los items actuales, es porque el
+//  problema se corrigió → se marca "Resuelto" (se sigue mostrando, en
+//  verde, hasta que la vista lo archive a históricos por su cuenta).
+//  Si un hash que ya estaba marcado "Resuelto" vuelve a aparecer en un
+//  batch, es porque en realidad seguía roto → se reactiva.
 // ─────────────────────────────────────────────────────────────
 function _apiRegistrarValidacionesAgenda(body) {
   const { origen, items } = body;
   if (!items || !Array.isArray(items))
     throw new Error("Faltan campos: items[]");
 
+  const tz     = Session.getScriptTimeZone();
+  const ahora  = Utilities.formatDate(new Date(), tz, "dd/MM/yyyy HH:mm:ss");
   const hoja   = _getHojaValidacionesAgenda();
   const ultima = Math.max(hoja.getLastRow(), 2);
-  const datos  = hoja.getRange(2, 1, ultima - 1, 9).getValues();
+  const datos  = hoja.getRange(2, 1, ultima - 1, 13).getValues();
 
-  const existentes = new Set();
-  for (const row of datos) {
-    if (row[8]) existentes.add(str(row[8]));
+  const porHash = new Map(); // hash -> { fila, origen, reportado, resuelto }
+  for (let i = 0; i < datos.length; i++) {
+    const row = datos[i];
+    if (!row[8]) continue;
+    porHash.set(str(row[8]), { fila: i + 2, origen: str(row[7]), reportado: str(row[9]), resuelto: str(row[11]) });
   }
 
-  let agregadas = 0, descartadas = 0;
+  let agregadas = 0, descartadas = 0, reactivadas = 0;
   const nuevasFilas = [];
+  const hashesDelBatch = new Set();
 
   for (const it of items) {
     const hash = _hashValidacionAgenda(it.fecha, it.hora || "", it.documento || "", it.regla || "");
-    if (existentes.has(hash)) { descartadas++; continue; }
+    hashesDelBatch.add(hash);
+    const existente = porHash.get(hash);
+
+    if (existente) {
+      descartadas++;
+      if (existente.resuelto === "Sí" && existente.reportado !== "Sí") {
+        // Seguía roto — se había marcado resuelto de más, revertir.
+        hoja.getRange(existente.fila, 12, 1, 2).setValues([["", ""]]);
+        reactivadas++;
+      }
+      continue;
+    }
+
     nuevasFilas.push([
       it.fecha     || "",
       it.hora      || "",
@@ -982,7 +1015,6 @@ function _apiRegistrarValidacionesAgenda(body) {
       origen       || "",
       hash
     ]);
-    existentes.add(hash);
     agregadas++;
   }
 
@@ -991,12 +1023,30 @@ function _apiRegistrarValidacionesAgenda(body) {
     hoja.getRange(filaDest, 1, nuevasFilas.length, 9).setValues(nuevasFilas);
   }
 
+  // Auto-resolver: solo si el batch trajo algo (si vino vacío no hay forma
+  // segura de saber qué rango de fechas se re-chequeó, así que no se toca
+  // nada) y solo entre filas del mismo origen, dentro del rango de fechas
+  // que este batch efectivamente cubrió.
+  let resueltas = 0;
+  if (items.length > 0) {
+    const fechasBatch = items.map(it => _fechaDMYaDateValidacion(it.fecha).getTime());
+    const minFecha = Math.min(...fechasBatch);
+    const maxFecha = Math.max(...fechasBatch);
+
+    for (const [hash, info] of porHash.entries()) {
+      if (hashesDelBatch.has(hash)) continue; // ya se procesó arriba
+      if (info.origen !== (origen || "")) continue;
+      if (info.reportado === "Sí" || info.resuelto === "Sí") continue;
+      const fFila = _fechaDMYaDateValidacion(str(datos[info.fila - 2][0])).getTime();
+      if (fFila < minFecha || fFila > maxFecha) continue;
+      hoja.getRange(info.fila, 12, 1, 2).setValues([["Sí", ahora]]);
+      resueltas++;
+    }
+  }
+
   return {
-    agregadas,
-    descartadas,
-    mensaje: agregadas === 0
-      ? "Sin cambios — todas las validaciones ya estaban registradas"
-      : `${agregadas} validaciones nuevas registradas, ${descartadas} ya existían`
+    agregadas, descartadas, reactivadas, resueltas,
+    mensaje: `${agregadas} nuevas, ${descartadas} ya existían, ${resueltas} marcadas resueltas, ${reactivadas} reactivadas`
   };
 }
 
@@ -1010,7 +1060,7 @@ function _apiLeerValidacionesAgenda() {
   const tz     = Session.getScriptTimeZone();
   const hoja   = _getHojaValidacionesAgenda();
   const ultima = Math.max(hoja.getLastRow(), 2);
-  const datos  = hoja.getRange(2, 1, ultima - 1, 11).getValues();
+  const datos  = hoja.getRange(2, 1, ultima - 1, 13).getValues();
 
   const filas = [];
   for (const row of datos) {
@@ -1019,16 +1069,18 @@ function _apiLeerValidacionesAgenda() {
     // escribirlo (aunque _apiRegistrarValidacionesAgenda mande un string
     // plano) — mismo gotcha ya documentado en _apiEliminarFilaRIS.
     filas.push({
-      fecha:     row[0] instanceof Date ? fechaAStr(row[0], tz) : str(row[0]),
-      hora:      row[1] instanceof Date ? minutosAHora(parsearMinutos(row[1])) : str(row[1]),
-      documento: str(row[2]),
-      paciente:  str(row[3]),
-      practica:  str(row[4]),
-      regla:     str(row[5]),
-      motivo:    str(row[6]),
-      origen:    str(row[7]),
-      hash:      str(row[8]),
-      reportado: str(row[9]) === "Sí"
+      fecha:         row[0] instanceof Date ? fechaAStr(row[0], tz) : str(row[0]),
+      hora:          row[1] instanceof Date ? minutosAHora(parsearMinutos(row[1])) : str(row[1]),
+      documento:     str(row[2]),
+      paciente:      str(row[3]),
+      practica:      str(row[4]),
+      regla:         str(row[5]),
+      motivo:        str(row[6]),
+      origen:        str(row[7]),
+      hash:          str(row[8]),
+      reportado:     str(row[9]) === "Sí",
+      resuelto:      str(row[11]) === "Sí",
+      fechaResuelto: row[12] instanceof Date ? Utilities.formatDate(row[12], tz, "dd/MM/yyyy HH:mm:ss") : str(row[12])
     });
   }
   filas.reverse();

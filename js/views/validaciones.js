@@ -37,6 +37,23 @@ const ValidacionesView = (() => {
     return _aFecha(dd_mm_yyyy) < hoy;
   }
 
+  // "dd/MM/yyyy HH:mm:ss" -> Date
+  function _aFechaHora(str) {
+    const [fecha, hora] = String(str || '').split(' ');
+    const d = _aFecha(fecha);
+    const [hh, mm, ss] = (hora || '').split(':').map(Number);
+    d.setHours(hh || 0, mm || 0, ss || 0, 0);
+    return d;
+  }
+
+  const DIAS_ARCHIVO_RESUELTO = 7;
+
+  function _diasDesdeResuelto(f) {
+    if (!f.resuelto || !f.fechaResuelto) return null;
+    const ms = new Date() - _aFechaHora(f.fechaResuelto);
+    return ms / (1000 * 60 * 60 * 24);
+  }
+
   // Punto de entrada único: aplica búsqueda de texto y (salvo que el toggle
   // esté prendido) oculta lo ya marcado como reportado. Todavía sin separar
   // pasado/futuro — eso lo hacen _proximos()/_historicos() sobre esta base.
@@ -49,8 +66,22 @@ const ValidacionesView = (() => {
     return arr;
   }
 
-  function _proximos()   { return _base().filter(f => !_esPasada(f.fecha)); }
-  function _historicos() { return _base().filter(f =>  _esPasada(f.fecha)); }
+  // Lo resuelto se queda en "Próximos" (en verde) hasta DIAS_ARCHIVO_RESUELTO
+  // días después de resuelto, sin importar la fecha del turno en sí —
+  // después pasa a "Históricos". Lo no resuelto sigue el criterio de
+  // siempre: pasado -> históricos, resto -> próximos.
+  function _proximos() {
+    return _base().filter(f => {
+      if (f.resuelto) return _diasDesdeResuelto(f) < DIAS_ARCHIVO_RESUELTO;
+      return !_esPasada(f.fecha);
+    });
+  }
+  function _historicos() {
+    return _base().filter(f => {
+      if (f.resuelto) return _diasDesdeResuelto(f) >= DIAS_ARCHIVO_RESUELTO;
+      return _esPasada(f.fecha);
+    });
+  }
 
   function _poblarSelectReglas() {
     const sel = document.getElementById('validaciones-regla');
@@ -79,10 +110,11 @@ const ValidacionesView = (() => {
   // Las tarjetas siempre muestran el desglose completo de PRÓXIMOS (solo
   // respetan la búsqueda de texto, no el filtro de regla) — si no, al
   // filtrar por una categoría desaparecerían las demás y no se podría
-  // cambiar de categoría con un clic. No suman lo histórico: son para lo
-  // accionable, no para el archivo.
+  // cambiar de categoría con un clic. No suman lo histórico, ni lo ya
+  // resuelto: son para lo que todavía necesita atención, no para lo
+  // archivado ni lo verde.
   function _renderResumen() {
-    const filas       = _proximos();
+    const filas       = _proximos().filter(f => !f.resuelto);
     const reglaActiva = document.getElementById('validaciones-regla').value;
     const porRegla     = {};
     for (const f of filas) porRegla[f.regla] = (porRegla[f.regla] || 0) + 1;
@@ -162,22 +194,29 @@ const ValidacionesView = (() => {
     cont.innerHTML = fechas.map(fecha => {
       const items = porFecha[fecha].map(f => {
         const info = _reglaInfo(f.regla);
+        const RESUELTO = '#2e7d32';
+        const borde = f.resuelto ? RESUELTO : info.color;
+        const diasFaltan = f.resuelto ? Math.max(0, Math.ceil(DIAS_ARCHIVO_RESUELTO - _diasDesdeResuelto(f))) : null;
         return `
           <div style="
-            background:var(--surface);
-            border:1px solid var(--border);
-            border-left:4px solid ${info.color};
+            background:${f.resuelto ? RESUELTO + '11' : 'var(--surface)'};
+            border:1px solid ${f.resuelto ? RESUELTO + '55' : 'var(--border)'};
+            border-left:4px solid ${borde};
             border-radius:var(--radius);
             padding:.7rem .85rem;
             ${f.reportado ? 'opacity:.6' : ''}
           ">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.3rem">
               <span style="font-weight:700;font-size:.85rem;color:var(--navy)">${f.hora}</span>
-              <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:${info.color}22;color:${info.color};white-space:nowrap">${info.label}</span>
+              ${f.resuelto
+                ? `<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:${RESUELTO}22;color:${RESUELTO};white-space:nowrap">✓ Resuelto</span>`
+                : `<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:${info.color}22;color:${info.color};white-space:nowrap">${info.label}</span>`
+              }
             </div>
             <div style="font-weight:600;font-size:.8rem;color:var(--text)">${f.motivo}${f.reportado ? ' <span style="color:#2e7d32;font-weight:700">· ✓ Reportado</span>' : ''}</div>
             <div style="margin-top:.2rem;font-size:.73rem;color:var(--text-2)">${f.practica}</div>
             <div style="margin-top:.2rem;font-size:.7rem;color:var(--text-3)">${f.paciente} — ${f.documento} · ${f.origen || '—'}</div>
+            ${f.resuelto ? `<div style="margin-top:.3rem;font-size:.68rem;color:${RESUELTO}">Se archiva a históricos en ${diasFaltan} ${diasFaltan === 1 ? 'día' : 'días'}</div>` : ''}
             <button type="button" class="btn-sm validaciones-btn-reportar" data-hash="${f.hash}" data-reportado="${f.reportado ? '1' : '0'}" style="margin-top:.5rem;width:100%;font-size:11px">
               ${f.reportado ? '↺ Desmarcar' : '✓ Marcar reportado'}
             </button>
