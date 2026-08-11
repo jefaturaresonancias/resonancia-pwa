@@ -895,6 +895,7 @@ function _apiEscribirConfig(p) {
       config.getRange(3, 10, filas.length, 4).setValues(filas);
     }
     _invalidarCacheConfig();
+    _reflejarEnRailway("api_agendaConfig_sincronizar", {});
     return { escritos: bloqueos.length };
   }
 
@@ -909,7 +910,32 @@ function _apiEscribirConfig(p) {
       config.getRange(3, 15, filas.length, 9).setValues(filas);
     }
     _invalidarCacheConfig();
+    _reflejarEnRailway("api_agendaConfig_sincronizar", {});
     return { escritos: franjas.length };
+  }
+
+  if (tipo === "estudios") {
+    const estudios = datos || (typeof p.estudios === "string" ? JSON.parse(p.estudios) : (p.estudios || []));
+    config.getRange("A2:D500").clearContent();
+    if (estudios.length > 0) {
+      const filas = estudios.map(e => [e.nombre, e.estadistica || "", e.restriccion || "", e.duracion]);
+      config.getRange(2, 1, filas.length, 4).setValues(filas);
+    }
+    _invalidarCacheConfig();
+    _reflejarEnRailway("api_agendaConfig_sincronizar", {});
+    return { escritos: estudios.length };
+  }
+
+  if (tipo === "feriados") {
+    const feriados = datos || (typeof p.feriados === "string" ? JSON.parse(p.feriados) : (p.feriados || []));
+    config.getRange("F2:G500").clearContent();
+    if (feriados.length > 0) {
+      const filas = feriados.map(f => [f.fecha, f.concepto || ""]);
+      config.getRange(2, 6, filas.length, 2).setValues(filas);
+    }
+    _invalidarCacheConfig();
+    _reflejarEnRailway("api_agendaConfig_sincronizar", {});
+    return { escritos: feriados.length };
   }
 
   return { error: "Tipo no reconocido" };
