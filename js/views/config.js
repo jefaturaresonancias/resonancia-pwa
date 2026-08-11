@@ -397,7 +397,7 @@ const ConfigView = (() => {
   async function _guardarEstudios() {
     try {
       App.toast("Guardando estudios...", "ok");
-      await API.escribirConfig("estudios", _datos.estudios);
+      await API.escribirEstudios(_datos.estudios);
       App.toast("Estudios guardados", "ok");
       _render();
     } catch(err) { App.toast("Error: "+err.message, "error"); }

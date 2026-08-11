@@ -194,6 +194,55 @@ const API = (() => {
       return get({ action: "escribirConfig", seccion, datos: JSON.stringify(datos) });
     },
 
+    /**
+     * Escribe la lista completa de estudios. A diferencia de escribirConfig,
+     * va en chunks: con ~130 estudios el JSON no entra en una sola URL
+     * (todo viaja como querystring, no hay body real — mismo motivo por el
+     * que escribirRIS ya chunkea). El primer chunk limpia el rango entero
+     * en el servidor; los siguientes agregan a partir de `offset`.
+     *
+     * Cada chunk reintenta con backoff: el rango ya quedó limpio desde el
+     * primer chunk, así que un chunk que falla a mitad de camino (ej. un
+     * bloqueo temporal de tráfico automatizado de Google) deja la hoja con
+     * MENOS estudios de los que había — no es un error cosmético, hay que
+     * insistir en vez de devolver un resultado parcial silencioso.
+     */
+    async escribirEstudios(estudios) {
+      const CHUNK = 25;
+      const REINTENTOS = 3;
+      const ESPERA_MS = 3000;
+
+      async function escribirChunk(offset, datos) {
+        let ultimoError;
+        for (let intento = 1; intento <= REINTENTOS; intento++) {
+          try {
+            return await get({ action: "escribirConfig", seccion: "estudios", offset, datos: JSON.stringify(datos) });
+          } catch (err) {
+            ultimoError = err;
+            if (intento < REINTENTOS) await new Promise(r => setTimeout(r, ESPERA_MS * intento));
+          }
+        }
+        throw new Error(`No se pudo guardar el bloque de estudios en la fila ${2 + offset} tras ${REINTENTOS} intentos: ${ultimoError.message}. Revisá la hoja Config antes de reintentar — puede haber quedado con menos estudios de los que había.`);
+      }
+
+      let escritos = 0;
+      if (estudios.length === 0) {
+        // Sin chunks que disparen el offset=0 — mandar uno vacío igual,
+        // para que el servidor limpie el rango.
+        await escribirChunk(0, []);
+        return { escritos: 0 };
+      }
+      for (let i = 0; i < estudios.length; i += CHUNK) {
+        const chunk = estudios.slice(i, i + CHUNK);
+        const res = await escribirChunk(i, chunk);
+        escritos += res.escritos || 0;
+      }
+      // El rango se limpia una sola vez en el primer chunk (offset=0); si
+      // la lista quedó más corta que antes, no queda basura residual porque
+      // clearContent ya borró todo el rango A2:D500 al principio.
+      return { escritos };
+    },
+
     async escribirRIS(fecha, filas) {
       // Dividir en chunks de 10 para no superar el límite de URL
       const CHUNK = 10;

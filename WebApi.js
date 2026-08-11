@@ -915,11 +915,16 @@ function _apiEscribirConfig(p) {
   }
 
   if (tipo === "estudios") {
+    // ~130 estudios no entran en una sola URL (todo viaja como querystring)
+    // — el cliente (API.escribirEstudios) manda esto en chunks. El primer
+    // chunk (offset=0) limpia todo el rango antes de escribir; los
+    // siguientes solo agregan a partir de esa fila, sin volver a limpiar.
     const estudios = datos || (typeof p.estudios === "string" ? JSON.parse(p.estudios) : (p.estudios || []));
-    config.getRange("A2:D500").clearContent();
+    const offset   = parseInt(p.offset || "0", 10) || 0;
+    if (offset === 0) config.getRange("A2:D500").clearContent();
     if (estudios.length > 0) {
       const filas = estudios.map(e => [e.nombre, e.estadistica || "", e.restriccion || "", e.duracion]);
-      config.getRange(2, 1, filas.length, 4).setValues(filas);
+      config.getRange(2 + offset, 1, filas.length, 4).setValues(filas);
     }
     _invalidarCacheConfig();
     _reflejarEnRailway("api_agendaConfig_sincronizar", {});
