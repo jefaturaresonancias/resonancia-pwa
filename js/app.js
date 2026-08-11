@@ -34,7 +34,6 @@ const App = (() => {
     if (id === "turno")  { TurnoView.abrirPanel(); return; }
     if (id === "pami")   PamiView.cargar();
     if (id === "config") ConfigView.cargar();
-    if (id === "bot")    BotView.cargar();
     if (id === "validaciones") ValidacionesView.cargar();
   }
 
@@ -309,7 +308,10 @@ const App = (() => {
       else if (_viewActual === "lista")  ListaView.cargar();
       else if (_viewActual === "pami")   PamiView.cargar();
       else if (_viewActual === "config") ConfigView.cargar();
-      else if (_viewActual === "bot")    BotView.cargar();
+      else if (_viewActual === "bot") {
+        const iframe = document.getElementById("iframe-bot");
+        if (iframe) iframe.src = iframe.src;
+      }
     });
   }
 
@@ -335,7 +337,6 @@ const App = (() => {
     ParteView.init();
     PamiView.init();
     ConfigView.init();
-    BotView.init();
     ValidacionesView.init();
     _initPin();
 
