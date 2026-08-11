@@ -23,11 +23,10 @@ const App = (() => {
     if (view) view.classList.remove("hidden");
     if (btn)  btn.classList.add("active");
     _viewActual = id;
-    // "Nuevo turno" es una acción/modal, no una vista para volver a
-    // aterrizar después de un refresh — no se recuerda.
-    if (id !== "turno") {
-      try { sessionStorage.setItem("ultimaVista", id); } catch (e) {}
-    }
+    // "Nuevo turno" es una acción/modal, no una vista real — si refrescan
+    // estando ahí, que caiga en Agenda (no en lo que estaban viendo antes
+    // de abrirla).
+    try { sessionStorage.setItem("ultimaVista", id === "turno" ? "agenda" : id); } catch (e) {}
 
     // Cargar datos de la vista al activarla
     if (id === "agenda") AgendaView.cargar(true);
