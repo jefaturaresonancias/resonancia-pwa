@@ -414,7 +414,7 @@ Esta acción no se puede deshacer.`)) return;
       const fechaStr = API.fechaAStr(_fecha);
       const [agendaArr, turnos, risDelDia] = await Promise.all([
         API.agenda(fechaStr, 1, 20),
-        API.turnos(fechaStr),
+        RailwayAPI.turnos(fechaStr),
         API.leerRIS(fechaStr).catch(() => [])
       ]);
       const agendaDia = agendaArr && agendaArr[0] ? agendaArr[0] : null;

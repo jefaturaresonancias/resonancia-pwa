@@ -456,7 +456,7 @@ const BuscarView = (() => {
     div.innerHTML = '<p style="color:#666;padding:1rem">Buscando…</p>';
 
     try {
-      const turnos = await API.buscar(apellido, dni);
+      const turnos = await RailwayAPI.buscar(apellido, dni);
       if (turnos.length === 0) {
         div.innerHTML = '<div class="empty-state">Sin resultados.</div>'; return;
       }

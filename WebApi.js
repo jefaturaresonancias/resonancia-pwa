@@ -1009,7 +1009,14 @@ function _apiExportarTurnosMigracion() {
       origen:        str(row[6]),
       observaciones: str(row[16]),
       presente:      str(row[12]),
-      turnoId:       str(row[17])
+      tsPresente:    str(row[13]),
+      // Filas viejas (de antes de que confirmarTurno empezara a escribir la
+      // columna R) tienen turnoId vacío — sin esto, la reconciliación de
+      // Railway (api_turnos_reconciliar) las descarta (`if (!t.turnoId) continue`)
+      // y nunca puede corregir un registro legado que haya quedado desactualizado
+      // respecto al Sheet. Mismo esquema "legacy_fila_N" que usó el backfill
+      // histórico original, para que calcen con esos turno_id ya existentes.
+      turnoId: str(row[17]) || ("legacy_fila_" + (i + 2))
     });
   }
   return { turnos, total: turnos.length };

@@ -108,5 +108,26 @@ const RailwayAPI = (() => {
     return rpc('api_turnos_modificar', [{ filaSheet: fila, ...datos }]);
   }
 
-  return { rpc, leerRISRango, leerCardiologia, asignar, anular, presente, modificar };
+  // ── Etapa 2a (migración de lecturas): lista del día y búsqueda ──
+
+  /**
+   * Lista de turnos del día para técnicos.
+   * Mismo contrato que API.turnos — reemplaza esa llamada en js/views/lista.js.
+   * @param {string} fecha dd/MM/yyyy
+   */
+  async function turnos(fecha) {
+    const data = await rpc('api_agenda_turnos', [fecha]);
+    return data.turnos;
+  }
+
+  /**
+   * Busca turnos por apellido y/o DNI.
+   * Mismo contrato que API.buscar — reemplaza esa llamada en js/views/turno.js.
+   */
+  async function buscar(apellido, dni) {
+    const data = await rpc('api_agenda_buscar', [{ apellido, dni }]);
+    return data.turnos;
+  }
+
+  return { rpc, leerRISRango, leerCardiologia, asignar, anular, presente, modificar, turnos, buscar };
 })();
