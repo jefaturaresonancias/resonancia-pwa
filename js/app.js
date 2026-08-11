@@ -23,6 +23,11 @@ const App = (() => {
     if (view) view.classList.remove("hidden");
     if (btn)  btn.classList.add("active");
     _viewActual = id;
+    // "Nuevo turno" es una acción/modal, no una vista para volver a
+    // aterrizar después de un refresh — no se recuerda.
+    if (id !== "turno") {
+      try { sessionStorage.setItem("ultimaVista", id); } catch (e) {}
+    }
 
     // Cargar datos de la vista al activarla
     if (id === "agenda") AgendaView.cargar(true);
@@ -87,16 +92,13 @@ const App = (() => {
   }
 
   // ── Actualizar label del rol en topbar ───────────────────
-  function _actualizarRolUI() {
+  function _actualizarRolUI(vistaRestaurar) {
     const rol = Config.getRol();
     const badge = document.getElementById("topbar-rol-label");
     badge.textContent = rol === "tecnico" ? "Técnico"
                       : rol === "jefatura" ? "Jefatura"
                       : rol === "admin"    ? "Admin"
                       : "Administrativo";
-
-    // Vista default según rol
-    const defaultView = "agenda";
 
     // Mostrar/ocultar items según rol
     document.querySelectorAll(".admin-only").forEach(el => {
@@ -123,6 +125,12 @@ const App = (() => {
       navLista.style.order  = "2";
     }
     document.getElementById("nav-cambiar-pin").style.order = "99";
+
+    // Vista a restaurar: la que se pide (última vista antes de refrescar),
+    // pero solo si sigue siendo accesible para este rol — si no, a Agenda.
+    let defaultView = vistaRestaurar || "agenda";
+    const navBtn = document.getElementById("nav-" + defaultView);
+    if (!navBtn || navBtn.style.display === "none") defaultView = "agenda";
 
     showView(defaultView);
   }
@@ -339,12 +347,15 @@ const App = (() => {
         toast("⚠️ No se pudo conectar con el servidor. Verificá la conexión.", "error");
       });
 
-      // Si tiene rol guardado, ir directo a la app
+      // Si tiene rol guardado, ir directo a la app — restaurando la vista
+      // en la que estaba antes de refrescar, en vez de mandar siempre a Agenda.
       if (Config.getRol()) {
         document.getElementById("screen-setup").classList.add("hidden");
         document.getElementById("screen-rol").classList.add("hidden");
         document.getElementById("app").classList.remove("hidden");
-        _actualizarRolUI();
+        let ultimaVista = null;
+        try { ultimaVista = sessionStorage.getItem("ultimaVista"); } catch (e) {}
+        _actualizarRolUI(ultimaVista);
       } else {
         _irARol();
       }
