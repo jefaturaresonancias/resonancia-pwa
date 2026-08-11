@@ -1037,7 +1037,10 @@ function _apiRegistrarValidacionesAgenda(body) {
       if (hashesDelBatch.has(hash)) continue; // ya se procesó arriba
       if (info.origen !== (origen || "")) continue;
       if (info.reportado === "Sí" || info.resuelto === "Sí") continue;
-      const fFila = _fechaDMYaDateValidacion(str(datos[info.fila - 2][0])).getTime();
+      const celdaFecha = datos[info.fila - 2][0];
+      // Mismo gotcha de siempre: Sheets autoconvierte "dd/MM/yyyy" a Date real.
+      const fechaStr = celdaFecha instanceof Date ? fechaAStr(celdaFecha, tz) : str(celdaFecha);
+      const fFila = _fechaDMYaDateValidacion(fechaStr).getTime();
       if (fFila < minFecha || fFila > maxFecha) continue;
       hoja.getRange(info.fila, 12, 1, 2).setValues([["Sí", ahora]]);
       resueltas++;
