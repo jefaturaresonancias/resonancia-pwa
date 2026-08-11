@@ -937,7 +937,7 @@ const AgendaView = (() => {
         ({ datos, risMap, cardioMap } = JSON.parse(cached));
       } else {
         [datos, risMap, cardioMap] = await Promise.all([
-          API.agenda(desde, 7, _paso),
+          RailwayAPI.agenda(desde, 7, _paso),
           RailwayAPI.leerRISRango(desde, 7).catch(() => ({})),
           RailwayAPI.leerCardiologia(desde, 7).catch(() => ({}))
         ]);
@@ -968,7 +968,7 @@ const AgendaView = (() => {
         ({ datosMes, risMes } = JSON.parse(cached));
       } else {
         [datosMes, risMes] = await Promise.all([
-          API.agenda(desde, 42, _paso),
+          RailwayAPI.agenda(desde, 42, _paso),
           RailwayAPI.leerRISRango(desde, 42).catch(() => ({}))
         ]);
         try { sessionStorage.setItem(cacheKey, JSON.stringify({ datosMes, risMes })); } catch(_) {}

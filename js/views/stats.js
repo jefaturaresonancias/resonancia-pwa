@@ -195,7 +195,7 @@ const StatsView = (() => {
       // Pedir los días del mes completo
       const diasMes = new Date(year, mes, 0).getDate();
       const desde   = `01/${String(mes).padStart(2,"0")}/${year}`;
-      const agendaArr = await API.agenda(desde, diasMes, 20);
+      const agendaArr = await RailwayAPI.agenda(desde, diasMes, 20);
 
       // Extraer todos los turnos únicos del mes
       const turnosMap = {};
