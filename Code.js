@@ -975,6 +975,17 @@ function confirmarTurno(filaAgendaC) {
   const turnoId = "t_" + new Date().getTime();
   baseDatos.getRange(ultimaFila, 18).setValue(turnoId);
 
+  // Reflejar en Railway (Postgres) — este turno se originó en Portada,
+  // no en la PWA, así que Postgres no se entera solo.
+  _reflejarEnRailway("api_turnos_reflejarAsignar", {
+    filaSheet: ultimaFila,
+    turnoId: turnoId,
+    nombre: nombre, apellido: apellido, dni: dni, estudio: estudio, origen: origen,
+    fecha: fechaAStr(fechaObj, tz), hora: minutosAHora(mins),
+    observaciones: observaciones,
+    modId: modId !== "" ? modId : null
+  });
+
   // Escribir en BD central
   try {
     const bdC     = _bdCentral();
@@ -1459,6 +1470,8 @@ function modificarTurno() {
     baseDatos.getRange(elegido.fila, 10).setValue(accion);
     baseDatos.getRange(elegido.fila, 11).setValue(ahora);
 
+    _reflejarEnRailway("api_turnos_reflejarDesactivar", { filaSheet: elegido.fila, tipoMod: "Anular" });
+
     // Borrar de BD central si existe
     try {
       const turnoIdAnul = str(baseDatos.getRange(elegido.fila, 18).getValue());
@@ -1484,6 +1497,9 @@ function modificarTurno() {
   baseDatos.getRange(elegido.fila, 10).setValue(accion);
   baseDatos.getRange(elegido.fila, 11).setValue(ahora);
   baseDatos.getRange(elegido.fila, 12).setValue(modId);
+
+  _reflejarEnRailway("api_turnos_reflejarDesactivar", { filaSheet: elegido.fila, tipoMod: accion, modId: modId });
+
   PropertiesService.getScriptProperties().setProperties({
     "p_mod_id":   modId,
     "p_mod_fila": String(elegido.fila)
@@ -1654,6 +1670,8 @@ if (darPresente === ui.Button.YES) {
     // ── BD local
     baseDatos.getRange(turnoHoy.fila, 13).setValue("Presente");
     baseDatos.getRange(turnoHoy.fila, 14).setValue(ahoraPresente);
+
+    _reflejarEnRailway("api_turnos_reflejarPresente", { filaSheet: turnoHoy.fila, timestamp: ahoraPresente });
 
     // ── BD central: buscar por turnoId (columna R = col 18) y sincronizar presente
     try {
@@ -1903,6 +1921,34 @@ function setPins() {
 function setPinRailway() {
   const props = PropertiesService.getScriptProperties();
   props.setProperty("RAILWAY_PIN", "PEGÁ_ACÁ_EL_PIN_REAL_DE_RAILWAY");
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Reflejo Portada → Railway (Etapa 0 de la migración de lecturas).
+//  Cuando un turno se asigna/anula/modifica/marca presente desde Portada
+//  (no desde la PWA), Postgres se queda desactualizado salvo que alguien
+//  se lo diga — este helper hace esa llamada puntual. Mismo nivel de
+//  tolerancia que el sync existente a _bdCentral(): nunca bloquea ni
+//  interrumpe el flujo de Portada, solo loguea si falla.
+// ─────────────────────────────────────────────────────────────
+function _reflejarEnRailway(fn, payload) {
+  try {
+    const token = _apiObtenerTokenRailway().token;
+    const resp = UrlFetchApp.fetch(
+      "https://jefatura-rmn-sistema2-production.up.railway.app/api/rpc/" + fn,
+      {
+        method: "post",
+        contentType: "application/json",
+        headers: { Authorization: "Bearer " + token },
+        payload: JSON.stringify({ args: [payload] }),
+        muteHttpExceptions: true
+      }
+    );
+    const data = JSON.parse(resp.getContentText());
+    if (!data.ok) Logger.log("Reflejo a Railway falló (" + fn + "): " + (data.error || resp.getContentText()));
+  } catch (err) {
+    Logger.log("Error reflejando a Railway (" + fn + "): " + err);
+  }
 }
 
 function verPins() {
