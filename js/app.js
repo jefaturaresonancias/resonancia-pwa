@@ -108,6 +108,10 @@ const App = (() => {
     document.querySelectorAll(".jefatura-only").forEach(el => {
       el.style.display = (rol === "jefatura" || rol === "admin") ? "" : "none";
     });
+    // Solo jefatura (no admin): Jefatura y Estadísticas quedan afuera del rol admin.
+    document.querySelectorAll(".jefatura-exclusivo").forEach(el => {
+      el.style.display = (rol === "jefatura") ? "" : "none";
+    });
     document.querySelectorAll(".admin-jefatura-only").forEach(el => {
       el.style.display = (rol === "admin" || rol === "jefatura") ? "" : "none";
     });
