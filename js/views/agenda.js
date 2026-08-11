@@ -939,7 +939,7 @@ const AgendaView = (() => {
         [datos, risMap, cardioMap] = await Promise.all([
           API.agenda(desde, 7, _paso),
           RailwayAPI.leerRISRango(desde, 7).catch(() => ({})),
-          API.leerCardiologia(desde, 7).catch(() => ({}))
+          RailwayAPI.leerCardiologia(desde, 7).catch(() => ({}))
         ]);
         try { sessionStorage.setItem(cacheKey, JSON.stringify({ datos, risMap, cardioMap })); } catch(_) {}
       }

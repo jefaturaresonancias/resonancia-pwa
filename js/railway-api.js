@@ -58,6 +58,16 @@ const RailwayAPI = (() => {
     return data.porFecha;
   }
 
+  /**
+   * Turnos de Cardiología (franja 08-14hs) de un rango de fechas.
+   * Mismo contrato que API.leerCardiologia (que leía la planilla externa
+   * vía Apps Script) — reemplaza esa llamada en js/views/agenda.js.
+   */
+  async function leerCardiologia(desde, dias = 7) {
+    const data = await rpc('api_leerCardiologiaRango', [desde, dias]);
+    return data.porFecha;
+  }
+
   // ── Fase 2a: alta de turnos migrada a Railway ──────────────────
 
   /**
@@ -98,5 +108,5 @@ const RailwayAPI = (() => {
     return rpc('api_turnos_modificar', [{ filaSheet: fila, ...datos }]);
   }
 
-  return { rpc, leerRISRango, asignar, anular, presente, modificar };
+  return { rpc, leerRISRango, leerCardiologia, asignar, anular, presente, modificar };
 })();
