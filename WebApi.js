@@ -805,8 +805,8 @@ function _apiLeerConfig(p) {
       bloqueos.push({
         fila:      i + 3,
         fecha:     fecha instanceof Date ? fechaAStr(fecha, tz) : str(fecha),
-        horaD:     str(data[i][1]),
-        horaH:     str(data[i][2]),
+        horaD:     horaAStr(data[i][1], tz),
+        horaH:     horaAStr(data[i][2], tz),
         concepto:  str(data[i][3])
       });
     }
@@ -826,8 +826,8 @@ function _apiLeerConfig(p) {
         dia2:     str(data[i][2]),
         func2:    str(data[i][3]),
         dia3:     str(data[i][4]),
-        horaD:    str(data[i][5]),
-        horaH:    str(data[i][6]),
+        horaD:    horaAStr(data[i][5], tz),
+        horaH:    horaAStr(data[i][6], tz),
         concepto: str(data[i][7]),
         color:    str(data[i][8]) || "#e06666"
       });

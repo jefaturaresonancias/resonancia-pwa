@@ -58,6 +58,16 @@ function capitalizar(s) {
 function fechaAStr(fecha, tz) {
   return Utilities.formatDate(fecha instanceof Date ? fecha : new Date(fecha), tz || Session.getScriptTimeZone(), "dd/MM/yyyy");
 }
+
+/** Convierte una celda de hora (Date u otro) a "HH:mm". Las celdas con
+ *  formato Hora vuelven de getValues() como Date (epoch 30/12/1899) —
+ *  pasarlas por str() directo tira el Date.toString() completo
+ *  ("Sat Dec 30 1899 08:00:00 GMT..."), que después se reescribe tal
+ *  cual en la hoja y rompe la columna. */
+function horaAStr(val, tz) {
+  if (val instanceof Date) return Utilities.formatDate(val, tz || Session.getScriptTimeZone(), "HH:mm");
+  return str(val);
+}
 /** Abre la BD central y devuelve la hoja. */
 function _bdCentral() {
   const ss = SpreadsheetApp.openById("1WwSvS1ymkl7RJ6MHOnNGE0mkvt5q5JJcvA9XUZ0ZvKg");
