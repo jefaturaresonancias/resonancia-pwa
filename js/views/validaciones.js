@@ -265,7 +265,7 @@ const ValidacionesView = (() => {
 
   async function _marcarReportado(hash, reportado) {
     try {
-      await API.marcarValidacionReportada(hash, reportado);
+      await RailwayAPI.marcarValidacionReportada(hash, reportado);
       const f = _filas.find(x => x.hash === hash);
       if (f) f.reportado = reportado;
       App.toast(reportado ? 'Marcado como reportado' : 'Desmarcado', 'ok');
@@ -649,7 +649,7 @@ const ValidacionesView = (() => {
     try {
       _poblarSelectReglas();
       const [filas, reglas] = await Promise.all([
-        API.leerValidacionesAgenda(),
+        RailwayAPI.leerValidacionesAgenda(),
         API.leerReglasAgenda().catch(() => _reglasCache), // no romper la vista si esto falla
       ]);
       _filas = filas;

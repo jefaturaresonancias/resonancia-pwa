@@ -156,5 +156,26 @@ const RailwayAPI = (() => {
     return data.turnos;
   }
 
-  return { rpc, leerRISRango, leerCardiologia, asignar, anular, presente, modificar, turnos, buscar, agenda, slots };
+  // ── Migración de Validaciones Agenda ────────────────────────────
+
+  /**
+   * Lista completa de validaciones de agenda (histórico + activas).
+   * Mismo contrato que API.leerValidacionesAgenda (que leía la pestaña
+   * "Validaciones Agenda" vía Apps Script) — reemplaza esa llamada en
+   * js/views/validaciones.js.
+   */
+  async function leerValidacionesAgenda() {
+    const data = await rpc('api_validacionesAgenda_leer');
+    return data.filas;
+  }
+
+  /**
+   * Marca (o desmarca) una validación como reportada. Railway-first: graba
+   * en Postgres y refleja hacia la Sheet (ver rpc/validacionesAgenda.js).
+   */
+  async function marcarValidacionReportada(hash, reportado = true) {
+    return rpc('api_validacionesAgenda_marcarReportada', [{ hash, reportado }]);
+  }
+
+  return { rpc, leerRISRango, leerCardiologia, asignar, anular, presente, modificar, turnos, buscar, agenda, slots, leerValidacionesAgenda, marcarValidacionReportada };
 })();

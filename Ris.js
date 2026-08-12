@@ -988,6 +988,8 @@ function _apiRegistrarValidacionesAgenda(body) {
   let agregadas = 0, descartadas = 0, reactivadas = 0;
   const nuevasFilas = [];
   const hashesDelBatch = new Set();
+  const itemsAgregados = [];
+  const hashesReactivados = [];
 
   for (const it of items) {
     const hash = _hashValidacionAgenda(it.fecha, it.hora || "", it.documento || "", it.regla || "");
@@ -1000,6 +1002,7 @@ function _apiRegistrarValidacionesAgenda(body) {
         // Seguía roto — se había marcado resuelto de más, revertir.
         hoja.getRange(existente.fila, 12, 1, 2).setValues([["", ""]]);
         reactivadas++;
+        hashesReactivados.push(hash);
       }
       continue;
     }
@@ -1015,6 +1018,11 @@ function _apiRegistrarValidacionesAgenda(body) {
       origen       || "",
       hash
     ]);
+    itemsAgregados.push({
+      fecha: it.fecha || "", hora: it.hora || "", documento: it.documento || "",
+      paciente: it.paciente || "", practica: it.practica || "", regla: it.regla || "",
+      motivo: it.motivo || "", origen: origen || "", hash
+    });
     agregadas++;
   }
 
@@ -1028,6 +1036,7 @@ function _apiRegistrarValidacionesAgenda(body) {
   // nada) y solo entre filas del mismo origen, dentro del rango de fechas
   // que este batch efectivamente cubrió.
   let resueltas = 0;
+  const hashesResueltos = [];
   if (items.length > 0) {
     const fechasBatch = items.map(it => _fechaDMYaDateValidacion(it.fecha).getTime());
     const minFecha = Math.min(...fechasBatch);
@@ -1044,7 +1053,14 @@ function _apiRegistrarValidacionesAgenda(body) {
       if (fFila < minFecha || fFila > maxFecha) continue;
       hoja.getRange(info.fila, 12, 1, 2).setValues([["Sí", ahora]]);
       resueltas++;
+      hashesResueltos.push(hash);
     }
+  }
+
+  if (itemsAgregados.length > 0 || hashesResueltos.length > 0 || hashesReactivados.length > 0) {
+    _reflejarEnRailway("api_validacionesAgenda_reflejarRegistro", {
+      agregadas: itemsAgregados, resueltos: hashesResueltos, reactivados: hashesReactivados
+    });
   }
 
   return {
