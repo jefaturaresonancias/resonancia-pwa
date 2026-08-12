@@ -375,7 +375,7 @@ const ValidacionesView = (() => {
       '<div style="text-align:center;padding:2rem;color:var(--text-3)">⏳ Cargando…</div>';
     document.getElementById('reglas-modal-footer').innerHTML = '';
     try {
-      _reglasCache = await API.leerReglasAgenda();
+      _reglasCache = await RailwayAPI.leerReglasAgenda();
       _renderListaReglas();
     } catch (err) {
       document.getElementById('reglas-modal-body').innerHTML = `<div style="color:#c62828">Error: ${err.message}</div>`;
@@ -424,7 +424,7 @@ const ValidacionesView = (() => {
     const regla = _reglasCache.find(r => r.id === id);
     if (!confirm(`¿Eliminar la regla "${regla ? regla.nombre : id}"? Esta acción no se puede deshacer.`)) return;
     try {
-      await API.eliminarReglaAgenda(id);
+      await RailwayAPI.eliminarReglaAgenda(id);
       App.toast('Regla eliminada', 'ok');
       _cargarReglasModal();
     } catch (err) {
@@ -552,7 +552,7 @@ const ValidacionesView = (() => {
     const regla = { id: _idEditando || undefined, nombre, modo, palabraClave: palabra, motivo, activa, ventanas };
 
     try {
-      await API.guardarReglaAgenda(regla);
+      await RailwayAPI.guardarReglaAgenda(regla);
       App.toast('Regla guardada', 'ok');
       await _cargarReglasModal();
     } catch (err) {
@@ -650,7 +650,7 @@ const ValidacionesView = (() => {
       _poblarSelectReglas();
       const [filas, reglas] = await Promise.all([
         RailwayAPI.leerValidacionesAgenda(),
-        API.leerReglasAgenda().catch(() => _reglasCache), // no romper la vista si esto falla
+        RailwayAPI.leerReglasAgenda().catch(() => _reglasCache), // no romper la vista si esto falla
       ]);
       _filas = filas;
       _reglasCache = reglas;

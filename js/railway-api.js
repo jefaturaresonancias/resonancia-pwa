@@ -177,5 +177,28 @@ const RailwayAPI = (() => {
     return rpc('api_validacionesAgenda_marcarReportada', [{ hash, reportado }]);
   }
 
-  return { rpc, leerRISRango, leerCardiologia, asignar, anular, presente, modificar, turnos, buscar, agenda, slots, leerValidacionesAgenda, marcarValidacionReportada };
+  // ── Migración de Reglas Agenda ──────────────────────────────────
+  // Acá Railway sí es la fuente de verdad (a diferencia de Config): esta
+  // pestaña del Sheet solo se edita desde este modal, nunca a mano.
+
+  /** Mismo contrato que API.leerReglasAgenda. */
+  async function leerReglasAgenda() {
+    const data = await rpc('api_reglasAgenda_leer');
+    return data.reglas;
+  }
+
+  /** Upsert de una regla. Mismo contrato que API.guardarReglaAgenda. */
+  async function guardarReglaAgenda(regla) {
+    return rpc('api_reglasAgenda_guardar', [regla]);
+  }
+
+  /** Mismo contrato que API.eliminarReglaAgenda. */
+  async function eliminarReglaAgenda(id) {
+    return rpc('api_reglasAgenda_eliminar', [{ id }]);
+  }
+
+  return {
+    rpc, leerRISRango, leerCardiologia, asignar, anular, presente, modificar, turnos, buscar, agenda, slots,
+    leerValidacionesAgenda, marcarValidacionReportada, leerReglasAgenda, guardarReglaAgenda, eliminarReglaAgenda
+  };
 })();
