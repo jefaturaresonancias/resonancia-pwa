@@ -139,7 +139,11 @@
           <span class="nav-icon">📋</span>
           <span class="nav-label">Reclamos</span>
         </button>
-        
+        <button class="nav-btn admin-only" data-view="turnos-informes" id="nav-turnos-informes">
+          <span class="nav-icon">🗂️</span>
+          <span class="nav-label">Turnos/Informes</span>
+        </button>
+
         <button class="nav-btn jefatura-exclusivo" data-view="guardias" id="nav-guardias">
           <span class="nav-icon">🚑</span>
           <span class="nav-label">Jefatura</span>
@@ -424,6 +428,25 @@
           </div>
         </div>
 
+        <!-- ── VISTA: TURNOS/INFORMES (panel Railway embebido) ─── -->
+        <div id="view-turnos-informes" class="view hidden">
+          <div class="view-header">
+            <h2>Turnos / Informes</h2>
+            <div style="display:flex;gap:.5rem;align-items:center">
+              <button id="btn-turnos-informes-reload" class="btn-sm">↺ Recargar</button>
+              <a href="https://turnos-informes-backend-production.up.railway.app/" target="_blank" rel="noopener" class="btn-sm" style="text-decoration:none">↗ Abrir en pestaña</a>
+            </div>
+          </div>
+          <div style="flex:1;position:relative;">
+            <iframe
+              id="iframe-turnos-informes"
+              src="https://turnos-informes-backend-production.up.railway.app/"
+              style="width:100%;height:100%;border:none;display:block;"
+              title="Panel Turnos/Informes">
+            </iframe>
+          </div>
+        </div>
+
         <!-- ── VISTA: PAMI ─── -->
         <div id="view-pami" class="view hidden">
           <div class="view-header">
@@ -622,6 +645,10 @@
   });
   document.getElementById('btn-bot-reload')?.addEventListener('click', () => {
     const iframe = document.getElementById('iframe-bot');
+    if (iframe) iframe.src = iframe.src;
+  });
+  document.getElementById('btn-turnos-informes-reload')?.addEventListener('click', () => {
+    const iframe = document.getElementById('iframe-turnos-informes');
     if (iframe) iframe.src = iframe.src;
   });
 </script>
