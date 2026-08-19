@@ -1083,6 +1083,10 @@ function onOpen() {
     .addItem("Instalar Trigger", "instalarTrigger")
     .addSeparator()
     .addItem("🔄 Invalidar cache de Config", "invalidarCache")
+    .addSeparator()
+    .addSubMenu(SpreadsheetApp.getUi().createMenu("🚫 Límites de sobreturno")
+      .addItem("➕ Nuevo límite", "nuevoLimiteSobreturno")
+      .addItem("✏️ Editar / eliminar límite", "editarLimiteSobreturno"))
     .addToUi();
 }
 
@@ -2009,6 +2013,200 @@ function _verificarLimiteSobreturnoRailway(fecha, hora, dni, estudio) {
     Logger.log("Error chequeando límite de sobreturno (se deja pasar): " + err);
     return { ok: true };
   }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Menú "🚫 Límites de sobreturno" — alta/edición/baja guiada por
+//  prompts desde Portada, para no tener que escribir la fila a mano en
+//  la pestaña "Límites Sobreturno" (ver Ris.js#_apiGuardarLimiteSobreturno
+//  para el formato crudo, por si alguien prefiere editar directo).
+//  Postgres (Railway) sigue siendo la fuente de verdad: esto llama a
+//  api_limitesSobreturno_guardar/_eliminar igual que hace la PWA, y
+//  Railway refleja el cambio a esta misma pestaña. Si Railway no
+//  responde, se guarda igual en la Sheet como respaldo — la
+//  reconciliación automática (cada 20 min, server.js) lo sube solo.
+// ─────────────────────────────────────────────────────────────
+const LIMITES_SOBRETURNO_AMBITOS = { "1": "paciente", "2": "region", "3": "estudio", "4": "global_dia" };
+// Copia de EST_REGIONES (sistema2-node/lib/clasificacion.js) — si se
+// agrega/renombra una región allá, actualizar acá también.
+const LIMITES_SOBRETURNO_REGIONES = [
+  "Cerebro", "Angio Cerebral", "Angio Vasos Cuello", "Órbitas", "Macizo Facial", "Peñasco", "Hipófisis", "Cuello",
+  "Tórax", "Abdomen", "Colangioresonancia", "Pelvis", "Pelvis Ginecológica", "Caderas", "Otras Regiones",
+  "Rodillas", "Tobillo/Pie", "Hombro", "Codo", "Muñeca", "Mano",
+  "Columna Cervical", "Columna Dorsal", "Columna Lumbar",
+  "Cardíaca", "Espectro", "Funcional", "Mamaria", "Fetal/Obstétrica"
+];
+
+function _llamarRailwayBloqueante(fn, payload) {
+  const token = _apiObtenerTokenRailway().token;
+  const resp = UrlFetchApp.fetch(
+    "https://jefatura-rmn-sistema2-production.up.railway.app/api/rpc/" + fn,
+    {
+      method: "post",
+      contentType: "application/json",
+      headers: { Authorization: "Bearer " + token },
+      payload: JSON.stringify({ args: [payload] }),
+      muteHttpExceptions: true
+    }
+  );
+  return JSON.parse(resp.getContentText());
+}
+
+// Pide todos los campos de una regla por prompts encadenados. Si
+// `existente` viene, cada prompt muestra el valor actual y lo conserva
+// si se deja vacío (los prompts de Apps Script no soportan texto
+// prellenado). Devuelve null si el usuario cancela en cualquier paso.
+function _pedirDatosLimiteSobreturno(ui, existente) {
+  const nombreResp = ui.prompt(
+    (existente ? `Nombre actual: "${existente.nombre}"\n\n` : "") + "Nombre del límite:",
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (nombreResp.getSelectedButton() !== ui.Button.OK) return null;
+  const nombre = nombreResp.getResponseText().trim() || (existente && existente.nombre) || "";
+  if (!nombre) { ui.alert("El nombre es obligatorio."); return null; }
+
+  const ambitoResp = ui.prompt(
+    (existente ? `Ámbito actual: ${existente.ambito}\n\n` : "") +
+    "Ámbito del límite — escribí el número:\n" +
+    "1 = Por paciente (mismo DNI) por día\n" +
+    "2 = Por región por día\n" +
+    "3 = Por estudio (palabra clave) + día\n" +
+    "4 = Tope diario global de regiones" +
+    (existente ? "\n\n(dejá vacío para no cambiarlo)" : ""),
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (ambitoResp.getSelectedButton() !== ui.Button.OK) return null;
+  const ambitoNum = ambitoResp.getResponseText().trim();
+  const ambito = LIMITES_SOBRETURNO_AMBITOS[ambitoNum] || (existente && existente.ambito);
+  if (!ambito) { ui.alert("Opción inválida — tenía que ser 1, 2, 3 o 4."); return null; }
+
+  let valor = "";
+  if (ambito === "region") {
+    const regResp = ui.prompt(
+      "Región (tiene que coincidir EXACTO con una de estas):\n\n" + LIMITES_SOBRETURNO_REGIONES.join(", ") +
+      (existente && existente.valor ? `\n\nValor actual: "${existente.valor}"` : ""),
+      ui.ButtonSet.OK_CANCEL
+    );
+    if (regResp.getSelectedButton() !== ui.Button.OK) return null;
+    valor = regResp.getResponseText().trim() || (existente && existente.valor) || "";
+    if (LIMITES_SOBRETURNO_REGIONES.indexOf(valor) === -1) {
+      ui.alert('Esa región no existe. Tiene que coincidir exacto con la lista (mayúsculas y tildes incluidos).');
+      return null;
+    }
+  } else if (ambito === "estudio") {
+    const estResp = ui.prompt(
+      "Palabra(s) clave en el estudio (separadas por coma si son varias):" +
+      (existente && existente.valor ? `\n\nValor actual: "${existente.valor}"` : ""),
+      ui.ButtonSet.OK_CANCEL
+    );
+    if (estResp.getSelectedButton() !== ui.Button.OK) return null;
+    valor = estResp.getResponseText().trim() || (existente && existente.valor) || "";
+    if (!valor) { ui.alert("Este ámbito necesita al menos una palabra clave."); return null; }
+  }
+
+  const limiteResp = ui.prompt(
+    (existente ? `Límite actual: ${existente.limite}\n\n` : "") + "Límite (máximo de sobreturnos, número entero mayor a 0):",
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (limiteResp.getSelectedButton() !== ui.Button.OK) return null;
+  const limiteTxt = limiteResp.getResponseText().trim();
+  const limite = limiteTxt ? parseInt(limiteTxt, 10) : (existente && existente.limite);
+  if (!Number.isInteger(limite) || limite <= 0) { ui.alert("El límite tiene que ser un número entero mayor a 0."); return null; }
+
+  const diasResp = ui.prompt(
+    "Días de la semana en que aplica — números separados por coma (0=domingo … 6=sábado). Dejá vacío para TODOS los días." +
+    (existente ? `\n\nDías actuales: ${(existente.dias && existente.dias.length) ? existente.dias.join(",") : "todos"}` : ""),
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (diasResp.getSelectedButton() !== ui.Button.OK) return null;
+  const diasTxt = diasResp.getResponseText().trim();
+  const dias = diasTxt
+    ? diasTxt.split(",").map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n >= 0 && n <= 6)
+    : (existente ? (existente.dias || []) : []);
+
+  const motivoResp = ui.prompt(
+    "Motivo (opcional):" + (existente && existente.motivo ? `\n\nActual: "${existente.motivo}"` : ""),
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (motivoResp.getSelectedButton() !== ui.Button.OK) return null;
+  const motivo = motivoResp.getResponseText().trim() || (existente && existente.motivo) || "";
+
+  return {
+    id: existente ? existente.id : undefined,
+    nombre, ambito, valor, dias, limite,
+    activa: existente ? existente.activa : true,
+    motivo
+  };
+}
+
+function _guardarLimiteSobreturnoDesdePortada(regla) {
+  const ui = SpreadsheetApp.getUi();
+  try {
+    const data = _llamarRailwayBloqueante("api_limitesSobreturno_guardar", regla);
+    if (!data.ok) { ui.alert("⛔ " + (data.error || "No se pudo guardar el límite.")); return; }
+    ui.alert('✅ Límite "' + regla.nombre + '" guardado. Ya está activo.');
+  } catch (err) {
+    // Railway no respondió — no se pierde la carga: se guarda directo en
+    // la Sheet y la reconciliación automática la sube a Postgres sola.
+    try {
+      _apiGuardarLimiteSobreturno({ regla: JSON.stringify(regla) });
+      ui.alert("⚠️ No se pudo contactar a Railway ahora mismo. El límite quedó guardado en esta pestaña y se va a activar solo en los próximos minutos.");
+    } catch (err2) {
+      ui.alert("⛔ No se pudo guardar el límite: " + err2.message);
+    }
+  }
+}
+
+function nuevoLimiteSobreturno() {
+  const ui = SpreadsheetApp.getUi();
+  const regla = _pedirDatosLimiteSobreturno(ui, null);
+  if (!regla) return;
+  _guardarLimiteSobreturnoDesdePortada(regla);
+}
+
+function editarLimiteSobreturno() {
+  const ui = SpreadsheetApp.getUi();
+  const limites = _apiLeerLimitesSobreturno();
+  if (limites.length === 0) { ui.alert("No hay límites configurados todavía. Usá \"➕ Nuevo límite\" para crear el primero."); return; }
+
+  let msg = "Límites configurados. Ingresá el número:\n\n";
+  limites.forEach((l, i) => {
+    msg += (i + 1) + ". " + l.nombre + (l.activa ? "" : " (inactivo)") +
+      " — " + l.ambito + (l.valor ? ' "' + l.valor + '"' : "") + " — máx " + l.limite + "\n";
+  });
+  const resp = ui.prompt(msg, ui.ButtonSet.OK_CANCEL);
+  if (resp.getSelectedButton() !== ui.Button.OK) return;
+  const num = parseInt(resp.getResponseText().trim(), 10);
+  if (isNaN(num) || num < 1 || num > limites.length) { ui.alert("Número inválido."); return; }
+  const elegido = limites[num - 1];
+
+  const accion = ui.alert(
+    '¿Qué querés hacer con "' + elegido.nombre + '"?\n\nSí = Editar   No = Eliminar   Cancelar = no hacer nada',
+    ui.ButtonSet.YES_NO_CANCEL
+  );
+  if (accion === ui.Button.CANCEL || accion === ui.Button.CLOSE) return;
+
+  if (accion === ui.Button.NO) {
+    const confirmar = ui.alert('¿Eliminar el límite "' + elegido.nombre + '"? Esta acción no se puede deshacer.', ui.ButtonSet.YES_NO);
+    if (confirmar !== ui.Button.YES) return;
+    try {
+      const data = _llamarRailwayBloqueante("api_limitesSobreturno_eliminar", { id: elegido.id });
+      if (!data.ok) { ui.alert("⛔ " + (data.error || "No se pudo eliminar.")); return; }
+      ui.alert("✅ Límite eliminado.");
+    } catch (err) {
+      try {
+        _apiEliminarLimiteSobreturno({ id: elegido.id });
+        ui.alert("⚠️ No se pudo contactar a Railway ahora mismo. Se eliminó de esta pestaña y se va a reflejar solo en los próximos minutos.");
+      } catch (err2) {
+        ui.alert("⛔ No se pudo eliminar: " + err2.message);
+      }
+    }
+    return;
+  }
+
+  const reglaEditada = _pedirDatosLimiteSobreturno(ui, elegido);
+  if (!reglaEditada) return;
+  _guardarLimiteSobreturnoDesdePortada(reglaEditada);
 }
 
 function verPins() {
