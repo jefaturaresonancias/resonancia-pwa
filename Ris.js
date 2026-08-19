@@ -1297,6 +1297,138 @@ function _apiEliminarReglaAgenda(body) {
   return { eliminada: true };
 }
 
+// ============================================================
+//  Límites Sobreturno — pestaña nueva en el mismo Sheet BD_RIS. Espejo de
+//  la tabla limites_sobreturno de Railway (rpc/limitesSobreturno.js) —
+//  Postgres es la fuente de verdad, esto es para que jefatura también
+//  pueda ver/editar las reglas desde Portada. Una fila por regla (a
+//  diferencia de Reglas Agenda no hay "ventanas" anidadas, así que no
+//  hace falta agrupar por ID).
+//  Columnas: A=ID | B=Nombre | C=Ambito | D=Valor | E=Dias (separados por
+//            ";") | F=Limite | G=Activa | H=Motivo
+// ============================================================
+function _getHojaLimitesSobreturno() {
+  const ss   = SpreadsheetApp.getActiveSpreadsheet();
+  let hoja   = ss.getSheetByName("Límites Sobreturno");
+  if (!hoja) {
+    hoja = ss.insertSheet("Límites Sobreturno");
+    hoja.getRange(1, 1, 1, 8).setValues([[
+      "ID", "NOMBRE", "AMBITO", "VALOR", "DIAS", "LIMITE", "ACTIVA", "MOTIVO"
+    ]]);
+    hoja.getRange(1, 1, 1, 8)
+      .setBackground("#4a2c1f").setFontColor("#ffffff")
+      .setFontWeight("bold").setHorizontalAlignment("center");
+    hoja.setFrozenRows(1);
+  }
+  return hoja;
+}
+
+function _slugLimite(nombre) {
+  return String(nombre || "limite")
+    .toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40) || "limite";
+}
+
+function _leerFilasLimitesSobreturno() {
+  const hoja   = _getHojaLimitesSobreturno();
+  const ultima = Math.max(hoja.getLastRow(), 2);
+  const datos  = hoja.getRange(2, 1, ultima - 1, 8).getValues();
+  return { hoja, datos };
+}
+
+function _filaALimite(row) {
+  return {
+    id:     str(row[0]),
+    nombre: str(row[1]),
+    ambito: str(row[2]),
+    valor:  str(row[3]),
+    // separador ";" — mismo motivo que Reglas Agenda: con "," el locale
+    // es-AR de Sheets puede autoconvertir "1,2" al número decimal 1.2
+    dias:   String(row[4] || "").split(";").map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n)),
+    limite: parseInt(row[5], 10) || 0,
+    activa: str(row[6]).toUpperCase() !== "FALSE",
+    motivo: str(row[7])
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+//  GET ?action=leerLimitesSobreturno
+// ─────────────────────────────────────────────────────────────
+function _apiLeerLimitesSobreturno() {
+  const { datos } = _leerFilasLimitesSobreturno();
+  return datos.filter(r => r[0]).map(_filaALimite);
+}
+
+// ─────────────────────────────────────────────────────────────
+//  POST { action:"guardarLimiteSobreturno", regla }
+//  regla: { id?, nombre, ambito, valor?, dias?:[0-6], limite, activa,
+//           motivo? }
+//  Upsert: si id no viene, se genera del nombre. Reescribe TODA la
+//  pestaña con un solo setValues, mismo criterio que Reglas Agenda.
+// ─────────────────────────────────────────────────────────────
+function _apiGuardarLimiteSobreturno(body) {
+  const regla = typeof body.regla === "string" ? JSON.parse(body.regla) : body.regla;
+  if (!regla || !regla.nombre || !regla.ambito || !regla.limite) {
+    throw new Error("Faltan campos: nombre, ambito, limite");
+  }
+
+  const { hoja, datos } = _leerFilasLimitesSobreturno();
+  const idsExistentes = new Set(datos.map(r => str(r[0])).filter(Boolean));
+
+  let id = regla.id;
+  if (!id) {
+    const base = _slugLimite(regla.nombre);
+    id = base;
+    let n = 2;
+    while (idsExistentes.has(id)) { id = `${base}_${n}`; n++; }
+  }
+
+  const filasOtras = datos.filter(r => str(r[0]) !== id);
+  const filaNueva = [
+    id,
+    regla.nombre,
+    regla.ambito,
+    regla.valor || "",
+    (regla.dias || []).join(";"),
+    regla.limite,
+    regla.activa === false ? "FALSE" : "TRUE",
+    regla.motivo || ""
+  ];
+
+  const todas = filasOtras.concat([filaNueva]);
+
+  hoja.getRange(2, 1, Math.max(hoja.getLastRow() - 1, 1), 8).clearContent();
+  if (todas.length > 0) {
+    hoja.getRange(2, 1, todas.length, 8).setValues(todas);
+  }
+
+  return { id, mensaje: `Límite "${regla.nombre}" guardado` };
+}
+
+// ─────────────────────────────────────────────────────────────
+//  POST { action:"eliminarLimiteSobreturno", id }
+// ─────────────────────────────────────────────────────────────
+function _apiEliminarLimiteSobreturno(body) {
+  if (!body.id) throw new Error("Falta id");
+
+  const { hoja, datos } = _leerFilasLimitesSobreturno();
+  const quedan = datos.filter(r => str(r[0]) !== body.id);
+
+  if (quedan.length === datos.length) {
+    return { eliminada: false, motivo: "No se encontró ese límite (¿ya se borró antes?)" };
+  }
+
+  hoja.getRange(2, 1, Math.max(hoja.getLastRow() - 1, 1), 8).clearContent();
+  if (quedan.length > 0) {
+    hoja.getRange(2, 1, quedan.length, 8).setValues(quedan);
+  }
+
+  return { eliminada: true };
+}
+
 // ─────────────────────────────────────────────────────────────
 //  POST { action:"actualizarCoberturaRIS", fecha, items:[...] }
 //  Actualiza la columna COBERTURA (col G) de registros existentes.

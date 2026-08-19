@@ -971,6 +971,19 @@ function confirmarTurno(filaAgendaC) {
     return;
   }
 
+  // Chequeo de límites de sobreturno — este turno se está por escribir
+  // directo en la Sheet (no pasa por Railway hasta después, ver
+  // _reflejarEnRailway más abajo), así que si no se valida ACÁ, un
+  // sobreturno cargado desde Portada se cuela sin respetar los límites
+  // configurados en Config (PWA). Bloqueante a propósito, a diferencia de
+  // _reflejarEnRailway — ver _verificarLimiteSobreturnoRailway.
+  const limite = _verificarLimiteSobreturnoRailway(fechaAStr(fechaObj, tz), minutosAHora(mins), dni, estudio);
+  if (!limite.ok) {
+    SpreadsheetApp.getUi().alert("⛔ " + limite.error);
+    agendaC.getRange(filaAgendaC, 8).clearContent();
+    return;
+  }
+
   const otorgado   = Utilities.formatDate(new Date(), tz, "dd/MM/yyyy HH:mm:ss");
   const ultimaFila = Math.max(baseDatos.getLastRow() + 1, 2);
 
@@ -1958,6 +1971,43 @@ function _reflejarEnRailway(fn, payload) {
     if (!data.ok) Logger.log("Reflejo a Railway falló (" + fn + "): " + (data.error || resp.getContentText()));
   } catch (err) {
     Logger.log("Error reflejando a Railway (" + fn + "): " + err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Chequeo de límites de sobreturno contra Railway, desde confirmarTurno
+//  (Portada). A diferencia de _reflejarEnRailway (arriba), esta llamada
+//  SÍ bloquea el flujo cuando Railway confirma que se supera un límite —
+//  ese es el propósito. Si Railway está caído o la llamada falla por
+//  cualquier otro motivo, se deja pasar (fail-open, con log) para no
+//  frenar toda la agenda de Portada por un problema de red — mismo
+//  criterio de tolerancia que ya usa _reflejarEnRailway para el resto de
+//  las llamadas puntuales.
+// ─────────────────────────────────────────────────────────────
+function _verificarLimiteSobreturnoRailway(fecha, hora, dni, estudio) {
+  try {
+    const token = _apiObtenerTokenRailway().token;
+    const resp = UrlFetchApp.fetch(
+      "https://jefatura-rmn-sistema2-production.up.railway.app/api/rpc/api_limitesSobreturno_verificar",
+      {
+        method: "post",
+        contentType: "application/json",
+        headers: { Authorization: "Bearer " + token },
+        payload: JSON.stringify({ args: [{ fecha, hora, dni, estudio }] }),
+        muteHttpExceptions: true
+      }
+    );
+    const data = JSON.parse(resp.getContentText());
+    if (data.ok === false && !data.error) {
+      // Railway respondió pero sin un mensaje de error claro — no hay
+      // nada específico para mostrarle al usuario, se deja pasar.
+      Logger.log("Chequeo de límite de sobreturno: respuesta sin error claro, se deja pasar: " + resp.getContentText());
+      return { ok: true };
+    }
+    return data; // { ok: true } o { ok: false, error: "..." }
+  } catch (err) {
+    Logger.log("Error chequeando límite de sobreturno (se deja pasar): " + err);
+    return { ok: true };
   }
 }
 

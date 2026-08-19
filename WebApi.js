@@ -15,7 +15,7 @@ function doGet(e) {
   try {
     // Intentar como acción GET primero
     // Si es acción de mutación, routear a _routePost con los mismos parámetros
-    const mutaciones = ["asignar","presente","anular","modificar","guardarReglaAgenda","eliminarReglaAgenda","marcarValidacionReportada"];
+    const mutaciones = ["asignar","presente","anular","modificar","guardarReglaAgenda","eliminarReglaAgenda","marcarValidacionReportada","guardarLimiteSobreturno","eliminarLimiteSobreturno"];
     if (mutaciones.indexOf(action) >= 0) {
       return _jsonOk(_routePost(action, p));
     }
@@ -71,6 +71,7 @@ function _routeGet(action, p) {
     case 'eliminarFilaCardiacas': return _apiEliminarFilaCardiacas(p)
     case 'leerValidacionesAgenda': return _apiLeerValidacionesAgenda()
     case 'leerReglasAgenda': return _apiLeerReglasAgenda()
+    case 'leerLimitesSobreturno': return _apiLeerLimitesSobreturno()
     case 'obtenerTokenRailway': return _apiObtenerTokenRailway()
     case 'exportarTurnosMigracion': return _apiExportarTurnosMigracion()
     default:            throw new Error("Acción no reconocida: " + action);
@@ -88,6 +89,8 @@ function _routePost(action, body) {
     case "registrarValidacionesAgenda": return _apiRegistrarValidacionesAgenda(body);
     case "guardarReglaAgenda": return _apiGuardarReglaAgenda(body);
     case "eliminarReglaAgenda": return _apiEliminarReglaAgenda(body);
+    case "guardarLimiteSobreturno": return _apiGuardarLimiteSobreturno(body);
+    case "eliminarLimiteSobreturno": return _apiEliminarLimiteSobreturno(body);
     case "actualizarCoberturaRIS": return _apiActualizarCoberturaRIS(body);
     case "marcarValidacionReportada": return _apiMarcarValidacionReportada(body);
     default: throw new Error("Acción POST no reconocida: " + action);
