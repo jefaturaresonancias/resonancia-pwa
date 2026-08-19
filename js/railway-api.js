@@ -197,8 +197,28 @@ const RailwayAPI = (() => {
     return rpc('api_reglasAgenda_eliminar', [{ id }]);
   }
 
+  // ── Límites de sobreturno ────────────────────────────────────────
+  // Igual que Reglas Agenda, Railway es la fuente de verdad acá (no hay
+  // pestaña de Sheet equivalente) — panel "Límites de sobreturno" en
+  // Config. El rechazo real ocurre server-side dentro de asignar/modificar
+  // de arriba (llega como error de rpc()).
+
+  async function leerLimitesSobreturno() {
+    const data = await rpc('api_limitesSobreturno_leer');
+    return data.limites;
+  }
+
+  async function guardarLimiteSobreturno(limite) {
+    return rpc('api_limitesSobreturno_guardar', [limite]);
+  }
+
+  async function eliminarLimiteSobreturno(id) {
+    return rpc('api_limitesSobreturno_eliminar', [{ id }]);
+  }
+
   return {
     rpc, leerRISRango, leerCardiologia, asignar, anular, presente, modificar, turnos, buscar, agenda, slots,
-    leerValidacionesAgenda, marcarValidacionReportada, leerReglasAgenda, guardarReglaAgenda, eliminarReglaAgenda
+    leerValidacionesAgenda, marcarValidacionReportada, leerReglasAgenda, guardarReglaAgenda, eliminarReglaAgenda,
+    leerLimitesSobreturno, guardarLimiteSobreturno, eliminarLimiteSobreturno
   };
 })();

@@ -3,13 +3,21 @@
 const ConfigView = (() => {
   let _datos = null;
   let _estudiosEditados = [];
+  let _limitesCount = 0;
 
   // ── Cargar datos ──────────────────────────────────────────
   async function cargar() {
     const container = document.getElementById("config-container");
     container.innerHTML = '<div class="empty-state">Cargando configuración...</div>';
     try {
-      _datos = await API.leerConfig("all");
+      const [datos, limites] = await Promise.all([
+        API.leerConfig("all"),
+        // Límites vive en Railway (como Reglas Agenda), no en el Sheet —
+        // si falla no debe tumbar el resto de Config, solo el contador.
+        RailwayAPI.leerLimitesSobreturno().catch(() => [])
+      ]);
+      _datos = datos;
+      _limitesCount = limites.length;
       _render();
     } catch(err) {
       container.innerHTML = `<div class="empty-state">Error: ${err.message}</div>`;
@@ -35,6 +43,7 @@ const ConfigView = (() => {
           ${_seccionBloqueos(d.bloqueos)}
         </div>
         ${_seccionRestricciones(d.restricciones, d.restriccionesOrigen||[])}
+        ${_seccionLimites()}
       </div>`;
     _bindEvents();
   }
@@ -188,6 +197,23 @@ const ConfigView = (() => {
     </div>`;
   }
 
+  // ── Sección Límites de sobreturno ─────────────────────────
+  // A diferencia de las demás secciones, esto vive en Railway (Postgres),
+  // no en el Sheet — mismo criterio que Reglas Agenda en Validaciones: se
+  // gestiona desde un modal propio, no con prompt() encadenados, porque
+  // acá hay campos estructurados (ámbito, valor, días, límite).
+  function _seccionLimites() {
+    return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <span style="font-weight:500;font-size:15px">🚫 Límites de sobreturno</span>
+          <div style="font-size:12px;color:var(--text-2);margin-top:2px">${_limitesCount} regla${_limitesCount === 1 ? "" : "s"} configurada${_limitesCount === 1 ? "" : "s"} — bloquean la carga real, no son solo un aviso</div>
+        </div>
+        <button id="cfg-btn-limites-gestionar" style="font-size:12px">⚙️ Gestionar límites</button>
+      </div>
+    </div>`;
+  }
+
   // ── Eventos ───────────────────────────────────────────────
   function _bindEvents() {
     const container = document.getElementById("config-container");
@@ -323,6 +349,9 @@ const ConfigView = (() => {
       App.toast("Restricción agregada — guardá desde el sheet Config para hacerla permanente", "ok");
       _render();
     });
+
+    // Límites de sobreturno
+    document.getElementById("cfg-btn-limites-gestionar").addEventListener("click", _abrirModalLimites);
   }
 
   // ── Editar estudio ────────────────────────────────────────
@@ -419,5 +448,208 @@ const ConfigView = (() => {
     } catch(err) { App.toast("Error: "+err.message, "error"); }
   }
 
-  return { init() {}, cargar };
+  // ── Modal: gestionar límites de sobreturno (lista ↔ formulario) ────
+  const DIAS_LABEL = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const AMBITOS = {
+    paciente:   'Por paciente (mismo DNI) por día',
+    region:     'Por región por día',
+    estudio:    'Por estudio (palabra clave) + día',
+    global_dia: 'Tope diario global de regiones'
+  };
+  // Copia de EST_REGIONES (sistema2-node/lib/clasificacion.js) para el
+  // dropdown — si se agrega/renombra una región allá, actualizar acá.
+  const EST_REGIONES = [
+    'Cerebro', 'Angio Cerebral', 'Angio Vasos Cuello', 'Órbitas', 'Macizo Facial', 'Peñasco', 'Hipófisis', 'Cuello',
+    'Tórax', 'Abdomen', 'Colangioresonancia', 'Pelvis', 'Pelvis Ginecológica', 'Caderas', 'Otras Regiones',
+    'Rodillas', 'Tobillo/Pie', 'Hombro', 'Codo', 'Muñeca', 'Mano',
+    'Columna Cervical', 'Columna Dorsal', 'Columna Lumbar',
+    'Cardíaca', 'Espectro', 'Funcional', 'Mamaria', 'Fetal/Obstétrica'
+  ];
+
+  let _limitesCache = [];
+  let _idLimiteEditando = null; // null = límite nuevo
+
+  function _abrirModalLimites() {
+    document.getElementById('limites-modal-overlay').classList.remove('hidden');
+    _cargarLimitesModal();
+  }
+
+  function _cerrarModalLimites() {
+    document.getElementById('limites-modal-overlay').classList.add('hidden');
+  }
+
+  async function _cargarLimitesModal() {
+    document.getElementById('limites-modal-titulo').textContent = 'Límites de sobreturno';
+    document.getElementById('limites-modal-body').innerHTML =
+      '<div style="text-align:center;padding:2rem;color:var(--text-3)">⏳ Cargando…</div>';
+    document.getElementById('limites-modal-footer').innerHTML = '';
+    try {
+      _limitesCache = await RailwayAPI.leerLimitesSobreturno();
+      _limitesCount = _limitesCache.length;
+      _renderListaLimites();
+    } catch (err) {
+      document.getElementById('limites-modal-body').innerHTML = `<div style="color:#c62828">Error: ${err.message}</div>`;
+    }
+  }
+
+  function _resumenLimite(r) {
+    const dias = (r.dias && r.dias.length) ? r.dias.map(d => DIAS_LABEL[d]).join('/') : 'todos los días';
+    const valor = r.valor ? ` "${r.valor}"` : '';
+    return `Máx ${r.limite} sobreturno(s)${valor} — ${dias}`;
+  }
+
+  function _renderListaLimites() {
+    document.getElementById('limites-modal-titulo').textContent = 'Límites de sobreturno';
+
+    const filas = _limitesCache.map(r => `
+      <div style="display:flex;align-items:center;gap:.75rem;padding:.75rem;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:.5rem;${r.activa === false ? 'opacity:.55' : ''}">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:.9rem">${r.nombre}${r.activa === false ? ' <span style="font-weight:400;color:var(--text-3)">(inactiva)</span>' : ''}</div>
+          <div style="font-size:.78rem;color:var(--text-2);margin-top:.15rem">${AMBITOS[r.ambito] || r.ambito}</div>
+          <div style="font-size:.75rem;color:var(--text-3);margin-top:.15rem">${_resumenLimite(r)}</div>
+        </div>
+        <button class="btn-sm" data-editar="${r.id}">✏️</button>
+        <button class="btn-sm" data-eliminar="${r.id}" style="color:var(--danger)">🗑</button>
+      </div>`).join('');
+
+    document.getElementById('limites-modal-body').innerHTML = filas ||
+      '<div style="text-align:center;padding:2rem;color:var(--text-3)">Sin límites configurados todavía — los sobreturnos se cargan sin restricción</div>';
+
+    document.getElementById('limites-modal-footer').innerHTML = `
+      <button class="btn-sm" id="btn-limites-cancelar-lista">Cerrar</button>
+      <button class="btn-primary" id="btn-limites-nuevo">+ Nuevo límite</button>`;
+
+    document.getElementById('limites-modal-body').querySelectorAll('[data-editar]').forEach(btn => {
+      btn.addEventListener('click', () => _abrirFormularioLimite(_limitesCache.find(r => r.id === btn.dataset.editar)));
+    });
+    document.getElementById('limites-modal-body').querySelectorAll('[data-eliminar]').forEach(btn => {
+      btn.addEventListener('click', () => _eliminarLimite(btn.dataset.eliminar));
+    });
+    document.getElementById('btn-limites-cancelar-lista').addEventListener('click', () => { _cerrarModalLimites(); _render(); });
+    document.getElementById('btn-limites-nuevo').addEventListener('click', () => _abrirFormularioLimite(null));
+  }
+
+  async function _eliminarLimite(id) {
+    const regla = _limitesCache.find(r => r.id === id);
+    if (!confirm(`¿Eliminar el límite "${regla ? regla.nombre : id}"? Esta acción no se puede deshacer.`)) return;
+    try {
+      await RailwayAPI.eliminarLimiteSobreturno(id);
+      App.toast('Límite eliminado', 'ok');
+      _cargarLimitesModal();
+    } catch (err) {
+      App.toast('Error: ' + err.message, 'error');
+    }
+  }
+
+  function _htmlCampoValor(ambito, valorActual) {
+    if (ambito === 'region') {
+      return `<div class="form-group" id="limites-form-valor-wrap" style="margin-bottom:.75rem">
+        <label>Región</label>
+        <select id="limites-form-valor">
+          ${EST_REGIONES.map(r => `<option value="${r}" ${r === valorActual ? 'selected' : ''}>${r}</option>`).join('')}
+        </select>
+      </div>`;
+    }
+    if (ambito === 'estudio') {
+      return `<div class="form-group" id="limites-form-valor-wrap" style="margin-bottom:.75rem">
+        <label>Palabra(s) clave en el estudio</label>
+        <input type="text" id="limites-form-valor" value="${(valorActual || '').replace(/"/g,'&quot;')}" placeholder="Ej: pelvis alta resolución — o varias separadas por coma">
+      </div>`;
+    }
+    return `<div id="limites-form-valor-wrap"></div>`;
+  }
+
+  function _abrirFormularioLimite(regla) {
+    _idLimiteEditando = regla ? regla.id : null;
+    const diasActuales = regla ? (regla.dias || []) : [];
+
+    document.getElementById('limites-modal-titulo').textContent = regla ? 'Editar límite' : 'Nuevo límite';
+
+    document.getElementById('limites-modal-body').innerHTML = `
+      <div class="form-group" style="margin-bottom:.75rem">
+        <label>Nombre</label>
+        <input type="text" id="limites-form-nombre" value="${regla ? regla.nombre.replace(/"/g,'&quot;') : ''}" placeholder="Ej: Pelvis alta resolución — lunes">
+      </div>
+      <div class="form-group" style="margin-bottom:.75rem">
+        <label>Ámbito</label>
+        <select id="limites-form-ambito">
+          ${Object.entries(AMBITOS).map(([v, lbl]) => `<option value="${v}" ${regla && regla.ambito === v ? 'selected' : ''}>${lbl}</option>`).join('')}
+        </select>
+      </div>
+      ${_htmlCampoValor(regla ? regla.ambito : 'paciente', regla ? regla.valor : '')}
+      <div class="form-group" style="margin-bottom:.75rem">
+        <label>Límite (máximo de sobreturnos)</label>
+        <input type="number" id="limites-form-limite" min="1" step="1" value="${regla ? regla.limite : 1}">
+      </div>
+      <div style="margin-bottom:.75rem">
+        <label style="font-size:.85rem;display:block;margin-bottom:4px">Días de la semana (vacío = todos los días)</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${DIAS_LABEL.map((lbl, d) => `
+            <label style="display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--text-2);cursor:pointer">
+              <input type="checkbox" class="limite-dia" value="${d}" ${diasActuales.includes(d) ? 'checked' : ''}>
+              ${lbl}
+            </label>`).join('')}
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:.75rem">
+        <label>Motivo (opcional)</label>
+        <input type="text" id="limites-form-motivo" value="${regla ? (regla.motivo || '').replace(/"/g,'&quot;') : ''}" placeholder="Nota interna">
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;margin-bottom:1rem;cursor:pointer">
+        <input type="checkbox" id="limites-form-activa" ${!regla || regla.activa !== false ? 'checked' : ''}> Límite activo
+      </label>
+      <div id="limites-form-error" style="color:#c62828;font-size:.8rem;margin-top:.5rem"></div>
+    `;
+
+    document.getElementById('limites-form-ambito').addEventListener('change', (e) => {
+      document.getElementById('limites-form-valor-wrap').outerHTML = _htmlCampoValor(e.target.value, '');
+    });
+
+    document.getElementById('limites-modal-footer').innerHTML = `
+      <button class="btn-sm" id="btn-limites-cancelar-form">Cancelar</button>
+      <button class="btn-primary" id="btn-limites-guardar">Guardar</button>`;
+
+    document.getElementById('btn-limites-cancelar-form').addEventListener('click', _renderListaLimites);
+    document.getElementById('btn-limites-guardar').addEventListener('click', _guardarFormularioLimite);
+  }
+
+  async function _guardarFormularioLimite() {
+    const errorEl = document.getElementById('limites-form-error');
+    errorEl.textContent = '';
+
+    const nombre = document.getElementById('limites-form-nombre').value.trim();
+    const ambito = document.getElementById('limites-form-ambito').value;
+    const valorEl = document.getElementById('limites-form-valor');
+    const valor = valorEl ? valorEl.value.trim() : '';
+    const limite = parseInt(document.getElementById('limites-form-limite').value, 10);
+    const motivo = document.getElementById('limites-form-motivo').value.trim();
+    const activa = document.getElementById('limites-form-activa').checked;
+    const dias = [...document.querySelectorAll('.limite-dia:checked')].map(cb => parseInt(cb.value, 10));
+
+    if (!nombre) { errorEl.textContent = 'Completá el nombre.'; return; }
+    if (!Number.isInteger(limite) || limite <= 0) { errorEl.textContent = 'El límite tiene que ser un número entero mayor a 0.'; return; }
+    if ((ambito === 'region' || ambito === 'estudio') && !valor) {
+      errorEl.textContent = 'Este ámbito necesita completar el valor (región o palabra clave).';
+      return;
+    }
+
+    const regla = { id: _idLimiteEditando || undefined, nombre, ambito, valor, dias, limite, activa, motivo };
+
+    try {
+      await RailwayAPI.guardarLimiteSobreturno(regla);
+      App.toast('Límite guardado', 'ok');
+      await _cargarLimitesModal();
+    } catch (err) {
+      errorEl.textContent = 'Error: ' + err.message;
+    }
+  }
+
+  function _initModalLimites() {
+    document.getElementById('btn-limites-modal-cerrar').addEventListener('click', () => { _cerrarModalLimites(); _render(); });
+    document.getElementById('limites-modal-overlay').addEventListener('click', (e) => {
+      if (e.target.id === 'limites-modal-overlay') { _cerrarModalLimites(); _render(); }
+    });
+  }
+
+  return { init: _initModalLimites, cargar };
 })();
