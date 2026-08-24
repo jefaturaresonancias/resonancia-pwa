@@ -216,9 +216,32 @@ const RailwayAPI = (() => {
     return rpc('api_limitesSobreturno_eliminar', [{ id }]);
   }
 
+  // ── Sugeridor de horario de sobreturno ──────────────────────────
+  // Recomendación, no bloqueo: reusa el mismo verificarLimite/reglas que
+  // ya corren server-side, más una heurística de "no encadenar dos
+  // estudios pesados seguidos" (ver rpc/sobreturnoSugerir.js).
+
+  /**
+   * @param {object} datos { estudio, dni?, fecha? (dd/MM/yyyy), dias? }
+   */
+  async function sugerirSobreturno(datos) {
+    return rpc('api_sobreturno_sugerir', [datos]);
+  }
+
+  /** Parámetros de la heurística del sugeridor — panel Config → "Reglas de asignación de sobreturno". */
+  async function leerConfigSugerirSobreturno() {
+    const data = await rpc('api_sobreturnoSugerir_leerConfig');
+    return data.config;
+  }
+
+  async function guardarConfigSugerirSobreturno(config) {
+    return rpc('api_sobreturnoSugerir_guardarConfig', [config]);
+  }
+
   return {
     rpc, leerRISRango, leerCardiologia, asignar, anular, presente, modificar, turnos, buscar, agenda, slots,
     leerValidacionesAgenda, marcarValidacionReportada, leerReglasAgenda, guardarReglaAgenda, eliminarReglaAgenda,
-    leerLimitesSobreturno, guardarLimiteSobreturno, eliminarLimiteSobreturno
+    leerLimitesSobreturno, guardarLimiteSobreturno, eliminarLimiteSobreturno, sugerirSobreturno,
+    leerConfigSugerirSobreturno, guardarConfigSugerirSobreturno
   };
 })();

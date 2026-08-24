@@ -44,6 +44,7 @@ const ConfigView = (() => {
         </div>
         ${_seccionRestricciones(d.restricciones, d.restriccionesOrigen||[])}
         ${_seccionLimites()}
+        ${_seccionSugerirSobreturno()}
       </div>`;
     _bindEvents();
   }
@@ -214,6 +215,19 @@ const ConfigView = (() => {
     </div>`;
   }
 
+  // ── Sección Reglas de asignación de sobreturno ─────────────
+  function _seccionSugerirSobreturno() {
+    return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <span style="font-weight:500;font-size:15px">💡 Reglas de asignación de sobreturno</span>
+          <div style="font-size:12px;color:var(--text-2);margin-top:2px">Parámetros del sugeridor de horario (botón en el panel de turno) — es solo una recomendación, no bloquea nada</div>
+        </div>
+        <button id="cfg-btn-sugerir-gestionar" style="font-size:12px">⚙️ Ajustar parámetros</button>
+      </div>
+    </div>`;
+  }
+
   // ── Eventos ───────────────────────────────────────────────
   function _bindEvents() {
     const container = document.getElementById("config-container");
@@ -352,6 +366,9 @@ const ConfigView = (() => {
 
     // Límites de sobreturno
     document.getElementById("cfg-btn-limites-gestionar").addEventListener("click", _abrirModalLimites);
+
+    // Reglas de asignación de sobreturno
+    document.getElementById("cfg-btn-sugerir-gestionar").addEventListener("click", _abrirModalSugerir);
   }
 
   // ── Editar estudio ────────────────────────────────────────
@@ -651,5 +668,91 @@ const ConfigView = (() => {
     });
   }
 
-  return { init: _initModalLimites, cargar };
+  // ── Modal: reglas de asignación de sobreturno (formulario único) ───
+  // A diferencia de Límites/Reglas Agenda, no es una lista de reglas —
+  // son 5 parámetros sueltos de la heurística del sugeridor (ver
+  // rpc/sobreturnoSugerir.js en sistema2-node), guardados como un blob
+  // JSON en Railway. Un solo formulario, sin paso de "lista".
+
+  async function _abrirModalSugerir() {
+    document.getElementById('sugerir-modal-overlay').classList.remove('hidden');
+    document.getElementById('sugerir-modal-titulo').textContent = 'Reglas de asignación de sobreturno';
+    document.getElementById('sugerir-modal-body').innerHTML =
+      '<div style="text-align:center;padding:2rem;color:var(--text-3)">⏳ Cargando…</div>';
+    document.getElementById('sugerir-modal-footer').innerHTML = '';
+    try {
+      const cfg = await RailwayAPI.leerConfigSugerirSobreturno();
+      _renderFormularioSugerir(cfg);
+    } catch (err) {
+      document.getElementById('sugerir-modal-body').innerHTML = `<div style="color:#c62828">Error: ${err.message}</div>`;
+    }
+  }
+
+  function _cerrarModalSugerir() {
+    document.getElementById('sugerir-modal-overlay').classList.add('hidden');
+  }
+
+  function _renderFormularioSugerir(cfg) {
+    document.getElementById('sugerir-modal-body').innerHTML = `
+      <p style="font-size:.8rem;color:var(--text-2);margin-bottom:1rem">
+        Ajustan qué recomienda el botón "💡 Sugerir horario de sobreturno" del panel de turno — nunca bloquean la carga, solo cambian el orden/motivo de las sugerencias.
+      </p>
+      <div class="form-group" style="margin-bottom:.75rem">
+        <label>Umbral de estudio "pesado" (minutos)</label>
+        <input type="number" id="sugerir-form-umbral" min="0" step="1" value="${cfg.umbralPesadoMin}">
+        <div style="font-size:.72rem;color:var(--text-3);margin-top:2px">Un estudio con contraste siempre cuenta como pesado, dure lo que dure.</div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Bonus por amortiguar</label><input type="number" id="sugerir-form-bonus" min="0" step="0.5" value="${cfg.bonusAmortigua}"></div>
+        <div class="form-group"><label>Penalización dos pesados seguidos</label><input type="number" id="sugerir-form-penalizacion" min="0" step="0.5" value="${cfg.penalizacionDosPesados}"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Días hacia adelante que busca</label><input type="number" id="sugerir-form-dias" min="1" step="1" value="${cfg.diasBusqueda}"></div>
+        <div class="form-group"><label>Cantidad de sugerencias</label><input type="number" id="sugerir-form-max" min="1" step="1" value="${cfg.maxSugerencias}"></div>
+      </div>
+      <div id="sugerir-form-error" style="color:#c62828;font-size:.8rem;margin-top:.5rem"></div>
+    `;
+
+    document.getElementById('sugerir-modal-footer').innerHTML = `
+      <button class="btn-sm" id="btn-sugerir-cancelar">Cerrar</button>
+      <button class="btn-primary" id="btn-sugerir-guardar">Guardar</button>`;
+
+    document.getElementById('btn-sugerir-cancelar').addEventListener('click', _cerrarModalSugerir);
+    document.getElementById('btn-sugerir-guardar').addEventListener('click', _guardarFormularioSugerir);
+  }
+
+  async function _guardarFormularioSugerir() {
+    const errorEl = document.getElementById('sugerir-form-error');
+    errorEl.textContent = '';
+
+    const cfg = {
+      umbralPesadoMin: parseFloat(document.getElementById('sugerir-form-umbral').value),
+      bonusAmortigua: parseFloat(document.getElementById('sugerir-form-bonus').value),
+      penalizacionDosPesados: parseFloat(document.getElementById('sugerir-form-penalizacion').value),
+      diasBusqueda: parseInt(document.getElementById('sugerir-form-dias').value, 10),
+      maxSugerencias: parseInt(document.getElementById('sugerir-form-max').value, 10)
+    };
+
+    try {
+      await RailwayAPI.guardarConfigSugerirSobreturno(cfg);
+      App.toast('Parámetros guardados', 'ok');
+      _cerrarModalSugerir();
+    } catch (err) {
+      errorEl.textContent = 'Error: ' + err.message;
+    }
+  }
+
+  function _initModalSugerir() {
+    document.getElementById('btn-sugerir-modal-cerrar').addEventListener('click', _cerrarModalSugerir);
+    document.getElementById('sugerir-modal-overlay').addEventListener('click', (e) => {
+      if (e.target.id === 'sugerir-modal-overlay') _cerrarModalSugerir();
+    });
+  }
+
+  function _init() {
+    _initModalLimites();
+    _initModalSugerir();
+  }
+
+  return { init: _init, cargar };
 })();

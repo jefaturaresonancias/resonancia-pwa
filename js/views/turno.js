@@ -168,6 +168,88 @@ const TurnoView = (() => {
     sel.style.borderColor = "#f0c040";
   }
 
+  // ── Sugerir sobreturno ─────────────────────────────────────
+  // Recomendación (RailwayAPI.sugerirSobreturno / rpc/sobreturnoSugerir.js
+  // en sistema2-node): nunca reemplaza la búsqueda manual de horarios de
+  // abajo, solo propone franjas ya ocupadas por el RIS que pasan los
+  // límites/reglas configurados y minimizan encadenar estudios pesados.
+  async function _sugerirSobreturno() {
+    if (_estudiosElegidos.length === 0) { App.toast("Agregá al menos un estudio.", "error"); return; }
+
+    const dni      = document.getElementById("t-dni").value.trim();
+    const fechaRaw = document.getElementById("t-fecha").value;
+    let fecha;
+    if (fechaRaw) {
+      const [y, m, d] = fechaRaw.split("-");
+      fecha = `${d}/${m}/${y}`;
+    }
+    const estudio = _estudiosElegidos.join(", ");
+
+    const cont = document.getElementById("sugerencias-sobreturno");
+    const btn  = document.getElementById("btn-sugerir-sobreturno");
+    btn.disabled = true; btn.textContent = "Buscando…";
+    cont.classList.remove("hidden");
+    cont.innerHTML = '<p style="color:#666;font-size:.8rem">⏳ Buscando franjas…</p>';
+
+    try {
+      const result = await RailwayAPI.sugerirSobreturno({ estudio, dni, fecha });
+      _renderSugerencias(result.sugerencias || []);
+    } catch (err) {
+      cont.innerHTML = `<p style="color:#c62828;font-size:.8rem">Error: ${err.message}</p>`;
+    } finally {
+      btn.disabled = false; btn.textContent = "💡 Sugerir horario de sobreturno";
+    }
+  }
+
+  function _renderSugerencias(sugerencias) {
+    const cont = document.getElementById("sugerencias-sobreturno");
+    if (sugerencias.length === 0) {
+      cont.innerHTML = '<p class="sugerencias-aviso">Sin franjas recomendables en los próximos días — probá "Ver horarios disponibles" para elegir a mano.</p>';
+      return;
+    }
+    cont.innerHTML = '<p class="sugerencias-aviso">Recomendación automática — no reemplaza tu criterio, podés elegir otro horario más abajo.</p>' +
+      sugerencias.map((s, i) => {
+        const cls = s.score > 0 ? "buena" : s.score < 0 ? "alerta" : "";
+        return `
+        <div class="sugerencia-card ${cls}">
+          <div class="sugerencia-info">
+            <div class="sugerencia-fecha">📅 ${s.fecha} · 🕐 ${s.hora} hs</div>
+            <div class="sugerencia-motivo">${s.motivo}</div>
+          </div>
+          <button type="button" class="btn-sm btn-usar-sugerencia" data-idx="${i}">Usar</button>
+        </div>`;
+      }).join("");
+    cont.querySelectorAll(".btn-usar-sugerencia").forEach(b => {
+      b.addEventListener("click", () => _usarSugerencia(sugerencias[parseInt(b.dataset.idx, 10)]));
+    });
+  }
+
+  function _usarSugerencia(s) {
+    const [d, m, y] = s.fecha.split("/");
+    document.getElementById("t-fecha").value = `${y}-${m}-${d}`;
+
+    const slotsContainer = document.getElementById("slots-container");
+    const slotSel        = document.getElementById("slot-seleccionado");
+    const slotsGrid       = document.getElementById("slots-grid");
+
+    slotsContainer.classList.remove("hidden");
+    slotsGrid.innerHTML = `<div style="margin-bottom:.5rem;font-size:12px;color:var(--text-2)">
+      Horario sugerido: <strong>${s.fecha} ${s.hora}</strong>.
+      <button type="button" id="btn-cambiar-hora-sug" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;text-decoration:underline;padding:0">Buscar otro horario</button>
+    </div>`;
+    document.getElementById("btn-cambiar-hora-sug").addEventListener("click", () => {
+      _slotSeleccionado = null;
+      slotSel.classList.add("hidden");
+      slotsGrid.innerHTML = "";
+      slotsContainer.classList.add("hidden");
+    });
+
+    _slotSeleccionado = { hora: s.hora, mins: _horaAMins(s.hora) };
+    document.getElementById("slot-hora-label").textContent = `Horario seleccionado: ${s.fecha} · ${s.hora} hs`;
+    slotSel.classList.remove("hidden");
+    App.toast(`Sugerencia aplicada: ${s.fecha} ${s.hora} hs — podés confirmarla o buscar otra`, "ok");
+  }
+
   // ── Buscar slots ──────────────────────────────────────────
   async function _buscarSlots() {
     if (_estudiosElegidos.length === 0) {
@@ -290,6 +372,9 @@ const TurnoView = (() => {
     _actualizarTiempo();
     _poblarSelect();
     _limpiarSlots();
+    const sug = document.getElementById("sugerencias-sobreturno");
+    sug.classList.add("hidden");
+    sug.innerHTML = "";
     _fechaPrefill = null;
     _horaPrefill  = null;
   }
@@ -308,6 +393,7 @@ const TurnoView = (() => {
       _poblarSelect(e.target.value);
     });
     document.getElementById("btn-ver-slots").onclick = _buscarSlots;
+    document.getElementById("btn-sugerir-sobreturno").onclick = _sugerirSobreturno;
     document.getElementById("form-turno").addEventListener("submit", _confirmar);
   }
 

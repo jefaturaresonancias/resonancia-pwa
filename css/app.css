@@ -463,6 +463,23 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 .turno-result.ok      { background: var(--success-bg); color: var(--success); }
 .turno-result.error   { background: var(--danger-bg);  color: var(--danger);  }
 
+/* ── SUGERENCIAS DE SOBRETURNO ───────────────────────────────*/
+#sugerencias-sobreturno { margin-top: .75rem; }
+.sugerencias-aviso {
+  font-size: .75rem; color: var(--text-3); font-style: italic;
+  margin-bottom: .5rem;
+}
+.sugerencia-card {
+  background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent);
+  border-radius: var(--radius); padding: .6rem .9rem; margin-bottom: .5rem;
+  display: flex; justify-content: space-between; align-items: center; gap: .75rem;
+}
+.sugerencia-card.buena     { border-left-color: var(--success); }
+.sugerencia-card.alerta    { border-left-color: var(--warn); }
+.sugerencia-info { min-width: 0; }
+.sugerencia-fecha { font-weight: 700; color: var(--navy); font-size: .88rem; }
+.sugerencia-motivo { font-size: .76rem; color: var(--text-2); margin-top: 2px; }
+
 /* ── BUSCAR ──────────────────────────────────────────────────*/
 .buscar-form { padding: 1.25rem; background: var(--surface); border-bottom: 1px solid var(--border); }
 .buscar-form .form-row { align-items: flex-end; }
