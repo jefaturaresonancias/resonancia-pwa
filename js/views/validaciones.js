@@ -356,6 +356,8 @@ const ValidacionesView = (() => {
     reservado_en_ventana: 'Reservado en este horario (todo lo demás, prohibido)',
     solo_en_ventanas:     'Solo permitido en estos horarios',
   };
+  // Mismas opciones que el select de origen en el panel de turno (t-origen).
+  const ORIGENES = ['AMBULATORIO', 'INTERNACIÓN', 'GUARDIA', 'DIRECCIÓN', 'TRASLADO'];
 
   let _idEditando  = null; // null = nueva regla
   let _formVentanas = [];
@@ -396,7 +398,7 @@ const ValidacionesView = (() => {
       <div style="display:flex;align-items:center;gap:.75rem;padding:.75rem;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:.5rem;${r.activa === false ? 'opacity:.55' : ''}">
         <div style="flex:1;min-width:0">
           <div style="font-weight:600;font-size:.9rem">${r.nombre}${r.activa === false ? ' <span style="font-weight:400;color:var(--text-3)">(inactiva)</span>' : ''}</div>
-          <div style="font-size:.78rem;color:var(--text-2);margin-top:.15rem">${MODOS[r.modo] || r.modo} — ${r.palabraClave}</div>
+          <div style="font-size:.78rem;color:var(--text-2);margin-top:.15rem">${MODOS[r.modo] || r.modo} — ${[r.palabraClave, r.origen].filter(Boolean).join(' · ') || '—'}</div>
           <div style="font-size:.75rem;color:var(--text-3);margin-top:.15rem">${_resumenVentanas(r.ventanas)}</div>
         </div>
         <button class="btn-sm" data-editar="${r.id}">✏️</button>
@@ -484,8 +486,18 @@ const ValidacionesView = (() => {
         </select>
       </div>
       <div class="form-group" style="margin-bottom:.75rem">
-        <label>Palabra(s) clave en la práctica</label>
+        <label>Palabra(s) clave en la práctica (opcional si elegís origen)</label>
         <input type="text" id="reglas-form-palabra" value="${regla ? regla.palabraClave.replace(/"/g,'&quot;') : ''}" placeholder="Ej: CARDIACA — o varias separadas por coma">
+      </div>
+      <div style="margin-bottom:.75rem">
+        <label style="font-size:.85rem;display:block;margin-bottom:4px">Origen(es) (opcional si completás palabra clave — vacío = cualquier origen)</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${ORIGENES.map(o => `
+            <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-2);cursor:pointer">
+              <input type="checkbox" class="regla-origen" value="${o}" ${regla && (regla.origen || '').split(',').map(s => s.trim().toUpperCase()).includes(o) ? 'checked' : ''}>
+              ${o}
+            </label>`).join('')}
+        </div>
       </div>
       <div class="form-group" style="margin-bottom:.75rem">
         <label>Motivo (se muestra cuando se detecta el problema)</label>
@@ -524,11 +536,16 @@ const ValidacionesView = (() => {
     const nombre  = document.getElementById('reglas-form-nombre').value.trim();
     const modo    = document.getElementById('reglas-form-modo').value;
     const palabra = document.getElementById('reglas-form-palabra').value.trim();
+    const origen  = [...document.querySelectorAll('.regla-origen:checked')].map(cb => cb.value).join(', ');
     const motivo  = document.getElementById('reglas-form-motivo').value.trim();
     const activa  = document.getElementById('reglas-form-activa').checked;
 
-    if (!nombre || !palabra || !motivo) {
-      errorEl.textContent = 'Completá nombre, palabra clave y motivo.';
+    if (!nombre || !motivo) {
+      errorEl.textContent = 'Completá nombre y motivo.';
+      return;
+    }
+    if (!palabra && !origen) {
+      errorEl.textContent = 'Completá palabra clave y/o origen — la regla necesita algo para filtrar.';
       return;
     }
 
@@ -549,7 +566,7 @@ const ValidacionesView = (() => {
       ventanas.push({ dias, horaDesde, horaHasta });
     }
 
-    const regla = { id: _idEditando || undefined, nombre, modo, palabraClave: palabra, motivo, activa, ventanas };
+    const regla = { id: _idEditando || undefined, nombre, modo, palabraClave: palabra, origen, motivo, activa, ventanas };
 
     try {
       await RailwayAPI.guardarReglaAgenda(regla);

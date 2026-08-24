@@ -177,6 +177,7 @@ const TurnoView = (() => {
     if (_estudiosElegidos.length === 0) { App.toast("Agregá al menos un estudio.", "error"); return; }
 
     const dni      = document.getElementById("t-dni").value.trim();
+    const origen   = document.getElementById("t-origen").value;
     const fechaRaw = document.getElementById("t-fecha").value;
     let fecha;
     if (fechaRaw) {
@@ -192,7 +193,7 @@ const TurnoView = (() => {
     cont.innerHTML = '<p style="color:#666;font-size:.8rem">⏳ Buscando franjas…</p>';
 
     try {
-      const result = await RailwayAPI.sugerirSobreturno({ estudio, dni, fecha });
+      const result = await RailwayAPI.sugerirSobreturno({ estudio, dni, origen, fecha });
       _renderSugerencias(result.sugerencias || []);
     } catch (err) {
       cont.innerHTML = `<p style="color:#c62828;font-size:.8rem">Error: ${err.message}</p>`;
@@ -257,7 +258,9 @@ const TurnoView = (() => {
     }
     const origen   = document.getElementById("t-origen").value;
     const fechaRaw = document.getElementById("t-fecha").value;
-    if (!fechaRaw) { App.toast("Ingresá una fecha.", "error"); return; }
+    // Fecha en blanco = "recomendame vos" — mismo criterio que el botón
+    // "Sugerir horario de sobreturno", que ya sabe manejar fecha vacía.
+    if (!fechaRaw) { _sugerirSobreturno(); return; }
 
     const [y, m, d] = fechaRaw.split("-");
     const fecha = `${d}/${m}/${y}`;
@@ -322,6 +325,7 @@ const TurnoView = (() => {
     const origen   = document.getElementById("t-origen").value;
     const obs      = document.getElementById("t-obs").value.trim();
     const fechaRaw = document.getElementById("t-fecha").value;
+    if (!fechaRaw) { App.toast("Falta la fecha del turno.", "error"); return; }
 
     if (!nombre || !apellido || !dni) { App.toast("Completá nombre, apellido y DNI.", "error"); return; }
 
