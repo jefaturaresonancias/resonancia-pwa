@@ -128,15 +128,19 @@ const App = (() => {
     }
     document.getElementById("nav-cambiar-pin").style.order = "99";
 
-    // A pedido (25/8/2026): administrativo ve solo Agenda arriba de todo y
-    // Buscar debajo — el resto del menú queda oculto por ahora (temporal,
-    // se revierte sacando este bloque).
-    if (rol === "administrativo") {
+    // A pedido (25/8/2026): administrativo y técnico ven un menú acotado
+    // por ahora — el resto queda oculto (temporal, se revierte sacando
+    // este bloque). Orden explícito por rol.
+    const MENU_ACOTADO = {
+      administrativo: ["nav-agenda", "nav-buscar", "nav-reclamos", "nav-turnos-informes"],
+      tecnico:        ["nav-agenda", "nav-reclamos", "nav-buscar"],
+    };
+    if (MENU_ACOTADO[rol]) {
+      const visibles = MENU_ACOTADO[rol];
       document.querySelectorAll("#sidebar .nav-btn").forEach(el => {
-        if (el.id !== "nav-agenda" && el.id !== "nav-buscar") el.style.display = "none";
+        if (!visibles.includes(el.id)) el.style.display = "none";
       });
-      navAgenda.style.order = "1";
-      document.getElementById("nav-buscar").style.order = "2";
+      visibles.forEach((id, i) => { document.getElementById(id).style.display = ""; document.getElementById(id).style.order = String(i + 1); });
     }
 
     // Vista a restaurar: la que se pide (última vista antes de refrescar),
