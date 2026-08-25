@@ -435,6 +435,7 @@ const AgendaView = (() => {
     // Cardiología no es RIS (otra planilla) — no se toca con este toggle.
     const esCardio = tieneRIS && risSlot[0] && risSlot[0]._cardio;
     if (_ocultarRIS && !esCardio) {
+      if (!slot) return `<td${rowspanAttr}></td>`;
       return _renderSlot(slot, fecha, mins, risDelDia || [], rowspan);
     }
 
