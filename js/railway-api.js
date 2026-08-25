@@ -257,12 +257,26 @@ const RailwayAPI = (() => {
     return rpc('api_agendaConfig_obtener');
   }
 
+  // ── Quién asigna el turno ────────────────────────────────────────
+  // Lista editable de personas que pueden figurar como "quién está dando
+  // el turno" — obligatorio en el panel de turno, mismo criterio que ya
+  // usa Portada. Separada de la tabla de técnicos de guardias.
+
+  async function leerAsignadoresTurno() {
+    const data = await rpc('api_asignadoresTurno_leer');
+    return data.nombres;
+  }
+
+  async function guardarAsignadoresTurno(nombres) {
+    return rpc('api_asignadoresTurno_guardar', [{ nombres }]);
+  }
+
   return {
     rpc, leerRISRango, leerCardiologia, asignar, anular, presente, modificar, turnos, buscar, agenda, slots,
     leerValidacionesAgenda, marcarValidacionReportada, leerReglasAgenda, guardarReglaAgenda, eliminarReglaAgenda,
     leerLimitesSobreturno, guardarLimiteSobreturno, eliminarLimiteSobreturno, sugerirSobreturno,
     leerConfigSugerirSobreturno, guardarConfigSugerirSobreturno,
     leerReglasSugerirSobreturno, guardarReglaSugerirSobreturno, eliminarReglaSugerirSobreturno,
-    obtenerAgendaConfig
+    obtenerAgendaConfig, leerAsignadoresTurno, guardarAsignadoresTurno
   };
 })();

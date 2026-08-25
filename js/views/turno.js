@@ -6,6 +6,7 @@ const TurnoView = (() => {
   let _horaPrefill      = null;
   let _estudiosConfig   = {};        // { nombre: { duracion, restriccion } }
   let _estudiosElegidos = [];        // array de nombres elegidos
+  let _asignadoresCache = null;      // [nombre, ...] — quién puede figurar como "quién asigna"
 
   // ── Cargar estudios ───────────────────────────────────────
   async function cargarEstudios() {
@@ -16,6 +17,19 @@ const TurnoView = (() => {
       _poblarSelect();
     } catch (err) {
       App.toast("Error cargando estudios: " + err.message, "error");
+    }
+  }
+
+  // ── Cargar "quién asigna" ──────────────────────────────────
+  async function cargarAsignadores() {
+    if (_asignadoresCache) return;
+    try {
+      _asignadoresCache = await RailwayAPI.leerAsignadoresTurno();
+      const sel = document.getElementById("t-tecnico-asigna");
+      sel.innerHTML = '<option value="">— Seleccionar —</option>' +
+        _asignadoresCache.map(n => `<option value="${n}">${n}</option>`).join("");
+    } catch (err) {
+      App.toast("Error cargando la lista de asignadores: " + err.message, "error");
     }
   }
 
@@ -173,7 +187,16 @@ const TurnoView = (() => {
   // en sistema2-node): nunca reemplaza la búsqueda manual de horarios de
   // abajo, solo propone franjas ya ocupadas por el RIS que pasan los
   // límites/reglas configurados y minimizan encadenar estudios pesados.
+  // Obligatorio antes de mostrar cualquier horario — mismo criterio que
+  // ya usa Portada: sin saber quién carga el turno, no se buscan slots.
+  function _tecnicoAsignaOk() {
+    if (document.getElementById("t-tecnico-asigna").value) return true;
+    App.toast("Indicá quién está dando el turno antes de buscar horarios.", "error");
+    return false;
+  }
+
   async function _sugerirSobreturno() {
+    if (!_tecnicoAsignaOk()) return;
     if (_estudiosElegidos.length === 0) { App.toast("Agregá al menos un estudio.", "error"); return; }
 
     const dni      = document.getElementById("t-dni").value.trim();
@@ -253,6 +276,7 @@ const TurnoView = (() => {
 
   // ── Buscar slots ──────────────────────────────────────────
   async function _buscarSlots() {
+    if (!_tecnicoAsignaOk()) return;
     if (_estudiosElegidos.length === 0) {
       App.toast("Agregá al menos un estudio.", "error"); return;
     }
@@ -316,15 +340,17 @@ const TurnoView = (() => {
   // ── Confirmar turno ───────────────────────────────────────
   async function _confirmar(e) {
     e.preventDefault();
+    if (!_tecnicoAsignaOk())            return;
     if (_estudiosElegidos.length === 0) { App.toast("Agregá al menos un estudio.", "error"); return; }
     if (!_slotSeleccionado)             { App.toast("Seleccioná un horario.", "error"); return; }
 
-    const nombre   = document.getElementById("t-nombre").value.trim();
-    const apellido = document.getElementById("t-apellido").value.trim();
-    const dni      = document.getElementById("t-dni").value.trim();
-    const origen   = document.getElementById("t-origen").value;
-    const obs      = document.getElementById("t-obs").value.trim();
-    const fechaRaw = document.getElementById("t-fecha").value;
+    const nombre        = document.getElementById("t-nombre").value.trim();
+    const apellido      = document.getElementById("t-apellido").value.trim();
+    const dni           = document.getElementById("t-dni").value.trim();
+    const origen        = document.getElementById("t-origen").value;
+    const obs           = document.getElementById("t-obs").value.trim();
+    const tecnicoAsigno = document.getElementById("t-tecnico-asigna").value;
+    const fechaRaw       = document.getElementById("t-fecha").value;
     if (!fechaRaw) { App.toast("Falta la fecha del turno.", "error"); return; }
 
     if (!nombre || !apellido || !dni) { App.toast("Completá nombre, apellido y DNI.", "error"); return; }
@@ -345,11 +371,11 @@ const TurnoView = (() => {
         if (!confirmar) { btn.disabled = false; btn.textContent = "✓ Confirmar turno"; return; }
         const estudioOriginal = document.getElementById("form-turno").dataset.estudioOriginal || "";
         const tipo = estudio !== estudioOriginal ? "Estudio" : "Fecha";
-        await RailwayAPI.modificar(filaOriginal, { tipo, nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs });
+        await RailwayAPI.modificar(filaOriginal, { tipo, nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs, tecnicoAsigno });
         document.getElementById("form-turno").dataset.filaOriginal = "";
         document.getElementById("form-turno").dataset.estudioOriginal = "";
       } else {
-        await RailwayAPI.asignar({ nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs });
+        await RailwayAPI.asignar({ nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs, tecnicoAsigno });
       }
       const result = document.getElementById("turno-result");
       result.className = "turno-result ok";
@@ -427,6 +453,7 @@ const TurnoView = (() => {
     const overlay = document.getElementById("panel-overlay");
     panel.style.display   = "flex";
     overlay.style.display = "block";
+    cargarAsignadores();
     cargarEstudios().then(() => {
       prefill(fecha, hora, condicion);
       if (ris) mostrarAvisoRIS(ris.nombre, ris.practica);

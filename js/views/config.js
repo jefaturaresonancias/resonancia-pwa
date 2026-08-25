@@ -4,20 +4,23 @@ const ConfigView = (() => {
   let _datos = null;
   let _estudiosEditados = [];
   let _limitesCount = 0;
+  let _asignadoresTurno = [];
 
   // ── Cargar datos ──────────────────────────────────────────
   async function cargar() {
     const container = document.getElementById("config-container");
     container.innerHTML = '<div class="empty-state">Cargando configuración...</div>';
     try {
-      const [datos, limites] = await Promise.all([
+      const [datos, limites, asignadores] = await Promise.all([
         API.leerConfig("all"),
         // Límites vive en Railway (como Reglas Agenda), no en el Sheet —
         // si falla no debe tumbar el resto de Config, solo el contador.
-        RailwayAPI.leerLimitesSobreturno().catch(() => [])
+        RailwayAPI.leerLimitesSobreturno().catch(() => []),
+        RailwayAPI.leerAsignadoresTurno().catch(() => [])
       ]);
       _datos = datos;
       _limitesCount = limites.length;
+      _asignadoresTurno = asignadores;
       _render();
     } catch(err) {
       container.innerHTML = `<div class="empty-state">Error: ${err.message}</div>`;
@@ -45,6 +48,7 @@ const ConfigView = (() => {
         ${_seccionRestricciones(d.restricciones, d.restriccionesOrigen||[])}
         ${_seccionLimites()}
         ${_seccionSugerirSobreturno()}
+        ${_seccionAsignadoresTurno()}
       </div>`;
     _bindEvents();
   }
@@ -231,6 +235,38 @@ const ConfigView = (() => {
     </div>`;
   }
 
+  // ── Sección Quién asigna el turno ───────────────────────────
+  // Lista propia, separada de la tabla de técnicos de guardias — obligatoria
+  // desde el panel de turno (25/8/2026, mismo criterio que ya usa Portada).
+  function _seccionAsignadoresTurno() {
+    const items = _asignadoresTurno.map((n, i) => `
+      <span class="estudio-chip">
+        ${n}
+        <button type="button" class="cfg-btn-del-asignador" data-idx="${i}" title="Quitar">×</button>
+      </span>`).join("");
+
+    return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div>
+          <span style="font-weight:500;font-size:15px">🧑‍⚕️ Quién asigna el turno</span>
+          <div style="font-size:12px;color:var(--text-2);margin-top:2px">Lista obligatoria a elegir en el panel de turno antes de buscar horarios</div>
+        </div>
+        <button id="cfg-btn-nuevo-asignador" style="font-size:12px">+ Agregar</button>
+      </div>
+      <div id="cfg-chips-asignadores" class="estudios-chips-wrap">
+        ${items || '<span style="color:var(--text-3);font-size:12px;font-style:italic">Sin nombres cargados todavía</span>'}
+      </div>
+    </div>`;
+  }
+
+  async function _guardarAsignadoresTurno() {
+    try {
+      await RailwayAPI.guardarAsignadoresTurno(_asignadoresTurno);
+      App.toast("Lista guardada", "ok");
+      _render();
+    } catch (err) { App.toast("Error: " + err.message, "error"); }
+  }
+
   // ── Eventos ───────────────────────────────────────────────
   function _bindEvents() {
     const container = document.getElementById("config-container");
@@ -373,6 +409,22 @@ const ConfigView = (() => {
     // Reglas de asignación de sobreturno
     document.getElementById("cfg-btn-sugerir-gestionar").addEventListener("click", _abrirModalSugerir);
     document.getElementById("cfg-btn-sugerir-reglas").addEventListener("click", _abrirModalSugerirReglas);
+
+    // Quién asigna el turno
+    document.getElementById("cfg-btn-nuevo-asignador").addEventListener("click", () => {
+      const nombre = prompt("Nombre de la persona:");
+      if (!nombre || !nombre.trim()) return;
+      _asignadoresTurno.push(nombre.trim());
+      _guardarAsignadoresTurno();
+    });
+    container.querySelectorAll(".cfg-btn-del-asignador").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const i = parseInt(btn.dataset.idx, 10);
+        if (!confirm(`¿Quitar a "${_asignadoresTurno[i]}" de la lista?`)) return;
+        _asignadoresTurno.splice(i, 1);
+        _guardarAsignadoresTurno();
+      });
+    });
   }
 
   // ── Editar estudio ────────────────────────────────────────
