@@ -443,7 +443,7 @@ const AgendaView = (() => {
     if (tipo === "turno" && tieneRIS) {
       const col = _coloresOrigen(slot.origen);
       const pres = slot.presente === "Presente" ? "✅" : "";
-      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}`;
+      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${slot.tecnicoAsigno?"\n🧑‍⚕️ Asignó: "+slot.tecnicoAsigno:""}`;
       let horaFinBadge = "";
       if (rowspan > 1) {
         const hasta = mins + (slot.duracion || _paso);
@@ -571,7 +571,7 @@ const AgendaView = (() => {
     if (tipo === "turno") {
       const col  = _coloresOrigen(slot.origen);
       const pres = slot.presente === "Presente" ? "✅" : "";
-      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${pres?"\n✅ Presente":""}`;
+      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${slot.tecnicoAsigno?"\n🧑‍⚕️ Asignó: "+slot.tecnicoAsigno:""}${pres?"\n✅ Presente":""}`;
 
       // Buscar en RIS por DNI para mostrar estado y badge
       const dniLimpio = String(slot.dni||"").trim().replace(/^0+/,"");
