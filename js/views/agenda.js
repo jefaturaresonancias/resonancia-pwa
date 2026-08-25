@@ -364,6 +364,7 @@ const AgendaView = (() => {
             data-fecha="${dia.fecha}" data-mins="${mins}"
             data-ris-nombre="${encodeURIComponent(r.apellido_nombre)}"
             data-ris-practica="${encodeURIComponent(r.practica)}"
+            data-franja-label="${esFranjaAqui ? encodeURIComponent(sFranja.label) : ''}"
             title="${esFranjaAqui ? sFranja.label + ' — ' : ''}${r.apellido_nombre} · ${r.practica} — hasta ${horaF} — clic para sobreturno">
             <div style="height:100%;display:flex;align-items:center;justify-content:space-between;pointer-events:none">
               <div style="height:1px;flex:1;background:${esFranjaAqui ? bgFila : '#bbb'};border-top:1px dashed ${esFranjaAqui ? bgFila : '#ccc'}"></div>
@@ -530,6 +531,7 @@ const AgendaView = (() => {
             data-fecha="${fecha}" data-mins="${mins}"
             data-ris-nombre="${encodeURIComponent(ris.apellido_nombre)}"
             data-ris-practica="${encodeURIComponent(ris.practica)}"
+            data-franja-label="${encodeURIComponent(label)}"
             title="RIS: ${ris.apellido_nombre} — ${ris.practica}\nClic para sobreturno">
             <div style="display:flex;gap:2px;align-items:center">${estadoBadge}<span style="background:#888;color:#fff;border-radius:3px;padding:0 3px;font-size:7px;font-weight:700">RIS</span></div>
             <span class="slot-nombre" style="color:#555;font-style:italic;font-size:10px">${ris.apellido_nombre}</span>
@@ -655,6 +657,11 @@ const AgendaView = (() => {
 
     container.querySelectorAll(".slot-ris-clickable").forEach(td => {
       td.addEventListener("click", () => {
+        const franjaLabel = td.dataset.franjaLabel ? decodeURIComponent(td.dataset.franjaLabel) : "";
+        if (/descompres/i.test(franjaLabel)) {
+          App.toast(`"${franjaLabel}" — horario bloqueado, no se puede cargar nada ahí`, "error");
+          return;
+        }
         const mins     = parseInt(td.dataset.mins);
         const nombre   = decodeURIComponent(td.dataset.risNombre || "");
         const practica = decodeURIComponent(td.dataset.risPractica || "");
@@ -666,6 +673,16 @@ const AgendaView = (() => {
 
     container.querySelectorAll(".slot-ris-side").forEach(div => {
       div.addEventListener("click", () => {
+        // Franjas con bloqueo total (ej. descompresión): ningún estudio
+        // real puede entrar ahí, así que ni siquiera vale la pena abrir el
+        // panel — el resto de las franjas (mamarias, internación, etc.)
+        // son reservas por código/origen, no bloqueos absolutos, y siguen
+        // dejando abrir el panel normalmente (el backend valida al confirmar).
+        const franjaLabel = div.dataset.franjaLabel ? decodeURIComponent(div.dataset.franjaLabel) : "";
+        if (/descompres/i.test(franjaLabel)) {
+          App.toast(`"${franjaLabel}" — horario bloqueado, no se puede cargar nada ahí`, "error");
+          return;
+        }
         const mins     = parseInt(div.dataset.mins);
         const nombre   = decodeURIComponent(div.dataset.risNombre || "");
         const practica = decodeURIComponent(div.dataset.risPractica || "");
