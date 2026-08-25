@@ -228,6 +228,7 @@ const ConfigView = (() => {
           <div style="font-size:12px;color:var(--text-2);margin-top:2px">Parámetros del sugeridor de horario (botón en el panel de turno) — es solo una recomendación, no bloquea nada</div>
         </div>
         <div style="display:flex;gap:8px">
+          <button id="cfg-btn-sugerir-franjas" style="font-size:12px">🎯 Franjas preferidas</button>
           <button id="cfg-btn-sugerir-reglas" style="font-size:12px">📋 Reglas específicas</button>
           <button id="cfg-btn-sugerir-gestionar" style="font-size:12px">⚙️ Ajustar parámetros</button>
         </div>
@@ -409,6 +410,7 @@ const ConfigView = (() => {
     // Reglas de asignación de sobreturno
     document.getElementById("cfg-btn-sugerir-gestionar").addEventListener("click", _abrirModalSugerir);
     document.getElementById("cfg-btn-sugerir-reglas").addEventListener("click", _abrirModalSugerirReglas);
+    document.getElementById("cfg-btn-sugerir-franjas").addEventListener("click", _abrirModalFranjasPreferidas);
 
     // Quién asigna el turno
     document.getElementById("cfg-btn-nuevo-asignador").addEventListener("click", () => {
@@ -1082,6 +1084,140 @@ const ConfigView = (() => {
       await RailwayAPI.guardarReglaSugerirSobreturno(regla);
       App.toast('Regla guardada', 'ok');
       await _abrirModalSugerirReglas();
+    } catch (err) {
+      errorEl.textContent = 'Error: ' + err.message;
+    }
+  }
+
+  // ── Modal: franjas preferidas por estudio (lista ↔ formulario) ─────
+  // Mismo overlay que arriba. A diferencia de "Reglas específicas" (que
+  // bloquea/reserva), esto no filtra nada — solo cambia el reparto de las
+  // sugerencias que ya pasaron todos los filtros: hasta "cupo preferido"
+  // dentro de la franja horaria, y hasta "cupo resto" fuera de ella, en
+  // días distintos entre sí.
+  let _franjasPreferidasCache = [];
+  let _idFranjaPreferidaEditando = null;
+
+  async function _abrirModalFranjasPreferidas() {
+    document.getElementById('sugerir-modal-overlay').classList.remove('hidden');
+    document.getElementById('sugerir-modal-titulo').textContent = 'Franjas preferidas por estudio';
+    document.getElementById('sugerir-modal-body').innerHTML =
+      '<div style="text-align:center;padding:2rem;color:var(--text-3)">⏳ Cargando…</div>';
+    document.getElementById('sugerir-modal-footer').innerHTML = '';
+    try {
+      _franjasPreferidasCache = await RailwayAPI.leerFranjasPreferidasSugerir();
+      _renderListaFranjasPreferidas();
+    } catch (err) {
+      document.getElementById('sugerir-modal-body').innerHTML = `<div style="color:#c62828">Error: ${err.message}</div>`;
+    }
+  }
+
+  function _renderListaFranjasPreferidas() {
+    document.getElementById('sugerir-modal-titulo').textContent = 'Franjas preferidas por estudio';
+
+    const filas = _franjasPreferidasCache.map(f => `
+      <div style="display:flex;align-items:center;gap:.75rem;padding:.75rem;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:.5rem;${f.activa === false ? 'opacity:.55' : ''}">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:.9rem">${f.nombre}${f.activa === false ? ' <span style="font-weight:400;color:var(--text-3)">(inactiva)</span>' : ''}</div>
+          <div style="font-size:.78rem;color:var(--text-2);margin-top:.15rem">${f.palabraClave}</div>
+          <div style="font-size:.75rem;color:var(--text-3);margin-top:.15rem">${f.horaDesde}-${f.horaHasta}: hasta ${f.cupoPreferido} ahí + hasta ${f.cupoResto} fuera (días distintos)</div>
+        </div>
+        <button class="btn-sm" data-editar-franja="${f.id}">✏️</button>
+        <button class="btn-sm" data-eliminar-franja="${f.id}" style="color:var(--danger)">🗑</button>
+      </div>`).join('');
+
+    document.getElementById('sugerir-modal-body').innerHTML = filas ||
+      '<div style="text-align:center;padding:2rem;color:var(--text-3)">Sin franjas preferidas todavía</div>';
+
+    document.getElementById('sugerir-modal-footer').innerHTML = `
+      <button class="btn-sm" id="btn-sugerir-franjas-cancelar-lista">Cerrar</button>
+      <button class="btn-primary" id="btn-sugerir-franjas-nueva">+ Nueva franja</button>`;
+
+    document.getElementById('sugerir-modal-body').querySelectorAll('[data-editar-franja]').forEach(btn => {
+      btn.addEventListener('click', () => _abrirFormularioFranjaPreferida(_franjasPreferidasCache.find(f => f.id === btn.dataset.editarFranja)));
+    });
+    document.getElementById('sugerir-modal-body').querySelectorAll('[data-eliminar-franja]').forEach(btn => {
+      btn.addEventListener('click', () => _eliminarFranjaPreferida(btn.dataset.eliminarFranja));
+    });
+    document.getElementById('btn-sugerir-franjas-cancelar-lista').addEventListener('click', _cerrarModalSugerir);
+    document.getElementById('btn-sugerir-franjas-nueva').addEventListener('click', () => _abrirFormularioFranjaPreferida(null));
+  }
+
+  async function _eliminarFranjaPreferida(id) {
+    const franja = _franjasPreferidasCache.find(f => f.id === id);
+    if (!confirm(`¿Eliminar la franja "${franja ? franja.nombre : id}"? Esta acción no se puede deshacer.`)) return;
+    try {
+      await RailwayAPI.eliminarFranjaPreferidaSugerir(id);
+      App.toast('Franja eliminada', 'ok');
+      _abrirModalFranjasPreferidas();
+    } catch (err) {
+      App.toast('Error: ' + err.message, 'error');
+    }
+  }
+
+  function _abrirFormularioFranjaPreferida(franja) {
+    _idFranjaPreferidaEditando = franja ? franja.id : null;
+
+    document.getElementById('sugerir-modal-titulo').textContent = franja ? 'Editar franja preferida' : 'Nueva franja preferida';
+
+    document.getElementById('sugerir-modal-body').innerHTML = `
+      <div class="form-group" style="margin-bottom:.75rem">
+        <label>Nombre</label>
+        <input type="text" id="sugerir-franja-form-nombre" value="${franja ? franja.nombre.replace(/"/g,'&quot;') : ''}" placeholder="Ej: Lumbar/MSK sin contraste — madrugada">
+      </div>
+      <div class="form-group" style="margin-bottom:.75rem">
+        <label>Palabra(s) clave del estudio</label>
+        <input type="text" id="sugerir-franja-form-palabra" value="${franja ? franja.palabraClave.replace(/"/g,'&quot;') : ''}" placeholder="Ej: lumbar, msk sin contraste">
+      </div>
+      <div class="form-row" style="margin-bottom:.75rem">
+        <div class="form-group"><label>Franja preferida desde</label><input type="time" id="sugerir-franja-form-desde" value="${franja ? franja.horaDesde : '00:00'}"></div>
+        <div class="form-group"><label>hasta</label><input type="time" id="sugerir-franja-form-hasta" value="${franja ? franja.horaHasta : '04:00'}"></div>
+      </div>
+      <div class="form-row" style="margin-bottom:.75rem">
+        <div class="form-group"><label>Cupo dentro de la franja</label><input type="number" id="sugerir-franja-form-cupo-pref" min="1" step="1" value="${franja ? franja.cupoPreferido : 2}"></div>
+        <div class="form-group"><label>Cupo fuera (días distintos)</label><input type="number" id="sugerir-franja-form-cupo-resto" min="0" step="1" value="${franja ? franja.cupoResto : 3}"></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;margin-bottom:1rem;cursor:pointer">
+        <input type="checkbox" id="sugerir-franja-form-activa" ${!franja || franja.activa !== false ? 'checked' : ''}> Franja activa
+      </label>
+      <div id="sugerir-franja-form-error" style="color:#c62828;font-size:.8rem;margin-top:.5rem"></div>
+    `;
+
+    document.getElementById('sugerir-modal-footer').innerHTML = `
+      <button class="btn-sm" id="btn-sugerir-franjas-cancelar-form">Cancelar</button>
+      <button class="btn-primary" id="btn-sugerir-franjas-guardar">Guardar</button>`;
+
+    document.getElementById('btn-sugerir-franjas-cancelar-form').addEventListener('click', _renderListaFranjasPreferidas);
+    document.getElementById('btn-sugerir-franjas-guardar').addEventListener('click', _guardarFormularioFranjaPreferida);
+  }
+
+  async function _guardarFormularioFranjaPreferida() {
+    const errorEl = document.getElementById('sugerir-franja-form-error');
+    errorEl.textContent = '';
+
+    const nombre = document.getElementById('sugerir-franja-form-nombre').value.trim();
+    const palabraClave = document.getElementById('sugerir-franja-form-palabra').value.trim();
+    const horaDesde = document.getElementById('sugerir-franja-form-desde').value;
+    const horaHasta = document.getElementById('sugerir-franja-form-hasta').value;
+    const cupoPreferido = parseInt(document.getElementById('sugerir-franja-form-cupo-pref').value, 10);
+    const cupoResto = parseInt(document.getElementById('sugerir-franja-form-cupo-resto').value, 10);
+    const activa = document.getElementById('sugerir-franja-form-activa').checked;
+
+    if (!nombre || !palabraClave) {
+      errorEl.textContent = 'Completá nombre y palabra(s) clave.';
+      return;
+    }
+    if (!horaDesde || !horaHasta || horaHasta <= horaDesde) {
+      errorEl.textContent = `Franja inválida (${horaDesde}-${horaHasta}): la hora hasta tiene que ser mayor a la hora desde.`;
+      return;
+    }
+
+    const franja = { id: _idFranjaPreferidaEditando || undefined, nombre, palabraClave, horaDesde, horaHasta, cupoPreferido, cupoResto, activa };
+
+    try {
+      await RailwayAPI.guardarFranjaPreferidaSugerir(franja);
+      App.toast('Franja guardada', 'ok');
+      await _abrirModalFranjasPreferidas();
     } catch (err) {
       errorEl.textContent = 'Error: ' + err.message;
     }

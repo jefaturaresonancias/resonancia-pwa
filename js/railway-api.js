@@ -257,6 +257,20 @@ const RailwayAPI = (() => {
     return rpc('api_agendaConfig_obtener');
   }
 
+  // ── Franjas preferidas por estudio (sugeridor) ──────────────────
+  async function leerFranjasPreferidasSugerir() {
+    const data = await rpc('api_sobreturnoSugerir_leerFranjasPreferidas');
+    return data.franjas;
+  }
+
+  async function guardarFranjaPreferidaSugerir(franja) {
+    return rpc('api_sobreturnoSugerir_guardarFranjaPreferida', [franja]);
+  }
+
+  async function eliminarFranjaPreferidaSugerir(id) {
+    return rpc('api_sobreturnoSugerir_eliminarFranjaPreferida', [{ id }]);
+  }
+
   // ── Quién asigna el turno ────────────────────────────────────────
   // Lista editable de personas que pueden figurar como "quién está dando
   // el turno" — obligatorio en el panel de turno, mismo criterio que ya
@@ -277,6 +291,7 @@ const RailwayAPI = (() => {
     leerLimitesSobreturno, guardarLimiteSobreturno, eliminarLimiteSobreturno, sugerirSobreturno,
     leerConfigSugerirSobreturno, guardarConfigSugerirSobreturno,
     leerReglasSugerirSobreturno, guardarReglaSugerirSobreturno, eliminarReglaSugerirSobreturno,
-    obtenerAgendaConfig, leerAsignadoresTurno, guardarAsignadoresTurno
+    obtenerAgendaConfig, leerAsignadoresTurno, guardarAsignadoresTurno,
+    leerFranjasPreferidasSugerir, guardarFranjaPreferidaSugerir, eliminarFranjaPreferidaSugerir
   };
 })();
