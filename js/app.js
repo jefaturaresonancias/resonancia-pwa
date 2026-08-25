@@ -128,6 +128,17 @@ const App = (() => {
     }
     document.getElementById("nav-cambiar-pin").style.order = "99";
 
+    // A pedido (25/8/2026): administrativo ve solo Agenda arriba de todo y
+    // Buscar debajo — el resto del menú queda oculto por ahora (temporal,
+    // se revierte sacando este bloque).
+    if (rol === "administrativo") {
+      document.querySelectorAll("#sidebar .nav-btn").forEach(el => {
+        if (el.id !== "nav-agenda" && el.id !== "nav-buscar") el.style.display = "none";
+      });
+      navAgenda.style.order = "1";
+      document.getElementById("nav-buscar").style.order = "2";
+    }
+
     // Vista a restaurar: la que se pide (última vista antes de refrescar),
     // pero solo si sigue siendo accesible para este rol — si no, a Agenda.
     let defaultView = vistaRestaurar || "agenda";
