@@ -45,10 +45,10 @@ const App = (() => {
   // ── Mostrar opciones de un turno (click en celda) ─────────
   let _turnoSeleccionado = null;
 
-  function mostrarOpcionesTurno(fila, tooltipEncoded) {
+  function mostrarOpcionesTurno(fila, tooltipEncoded, fecha, mins) {
     if (!fila) return;
     const tip = tooltipEncoded ? decodeURIComponent(tooltipEncoded) : "";
-    _turnoSeleccionado = { fila: parseInt(fila), tooltip: tip };
+    _turnoSeleccionado = { fila: parseInt(fila), tooltip: tip, fecha, mins };
 
     const body = document.getElementById("panel-opciones-body");
     body.innerHTML = `
@@ -70,8 +70,9 @@ const App = (() => {
     document.getElementById("btn-op-modificar").addEventListener("click", () => {
       const filaGuardada = _turnoSeleccionado.fila;
       const tipGuardado  = tip;
+      const { fecha, mins } = _turnoSeleccionado;
       cerrarOpcionesTurno();
-      TurnoView.abrirPanelModificar(filaGuardada, tipGuardado);
+      TurnoView.abrirPanelModificar(filaGuardada, tipGuardado, fecha, mins);
     });
 
     document.getElementById("panel-opciones-turno").style.display = "flex";

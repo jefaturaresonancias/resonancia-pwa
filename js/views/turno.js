@@ -466,7 +466,7 @@ const TurnoView = (() => {
     _resetForm();
   }
 
-  async function abrirPanelModificar(fila, tooltipTexto) {
+  async function abrirPanelModificar(fila, tooltipTexto, fechaOriginal, minsOriginal) {
     // Buscar datos del turno por fila
     let turno = null;
     try {
@@ -530,13 +530,43 @@ const TurnoView = (() => {
     _actualizarTiempo();
     _poblarSelect();
 
+    // Precargar fecha y horario originales — si solo se quiere cambiar el
+    // estudio/paciente (no la fecha), no hay que volver a buscar un hueco:
+    // ya queda todo listo para confirmar tal cual, con la opción de buscar
+    // otro horario si hace falta.
+    let horaOriginal = "";
+    if (fechaOriginal && minsOriginal != null) {
+      const p = fechaOriginal.split("/");
+      document.getElementById("t-fecha").value = `${p[2]}-${p[1]}-${p[0]}`;
+      const mins = parseInt(minsOriginal, 10);
+      horaOriginal = String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0");
+
+      const slotsContainer = document.getElementById("slots-container");
+      const slotSel        = document.getElementById("slot-seleccionado");
+      const slotsGrid       = document.getElementById("slots-grid");
+      slotsContainer.classList.remove("hidden");
+      _slotSeleccionado = { hora: horaOriginal, mins };
+      document.getElementById("slot-hora-label").textContent = `Horario seleccionado: ${fechaOriginal} ${horaOriginal} hs`;
+      slotSel.classList.remove("hidden");
+      slotsGrid.innerHTML = `<div style="margin-bottom:.5rem;font-size:12px;color:var(--text-2)">
+        Se mantiene el horario original: <strong>${fechaOriginal} ${horaOriginal}</strong>.
+        <button type="button" id="btn-cambiar-hora-mod" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;text-decoration:underline;padding:0">Buscar otro horario</button>
+      </div>`;
+      document.getElementById("btn-cambiar-hora-mod").addEventListener("click", () => {
+        _slotSeleccionado = null;
+        slotSel.classList.add("hidden");
+        slotsGrid.innerHTML = "";
+        slotsContainer.classList.add("hidden");
+      });
+    }
+
     // Aviso de modificación
     const prev = document.getElementById("turno-ris-aviso");
     if (prev) prev.remove();
     const aviso = document.createElement("div");
     aviso.id = "turno-ris-aviso";
     aviso.style.cssText = "background:#fff8e1;border-left:4px solid #f0c040;padding:10px 14px;border-radius:6px;font-size:12px;color:#7a4f00;margin-bottom:1rem;font-weight:600";
-    aviso.innerHTML = `✏️ Modificando turno de <strong>${turno.apellido}, ${turno.nombre}</strong><br><span style="font-weight:400;color:#888">Seleccioná nueva fecha y horario. Al confirmar se anula el turno original.</span>`;
+    aviso.innerHTML = `✏️ Modificando turno de <strong>${turno.apellido}, ${turno.nombre}</strong><br><span style="font-weight:400;color:#888">${horaOriginal ? "Se mantiene la fecha y el horario originales — cambialos si hace falta." : "Seleccioná nueva fecha y horario."} Al confirmar se anula el turno original.</span>`;
     document.getElementById("form-turno").insertBefore(aviso, document.getElementById("form-turno").firstChild);
 
     // Guardar fila original y estudio original para reprogramar al confirmar
