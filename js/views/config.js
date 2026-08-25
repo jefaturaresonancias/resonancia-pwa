@@ -773,6 +773,7 @@ const ConfigView = (() => {
   let _reglasSugerirCache = [];
   let _idReglaSugerirEditando = null;
   let _formVentanasSugerir = [];
+  let _calendarioHeredado = null; // { bloqueos, bloqueosRecurrentes, ... } de AGENDA_CALENDARIO_CONFIG, solo lectura
 
   async function _abrirModalSugerirReglas() {
     document.getElementById('sugerir-modal-overlay').classList.remove('hidden');
@@ -781,7 +782,13 @@ const ConfigView = (() => {
       '<div style="text-align:center;padding:2rem;color:var(--text-3)">⏳ Cargando…</div>';
     document.getElementById('sugerir-modal-footer').innerHTML = '';
     try {
-      _reglasSugerirCache = await RailwayAPI.leerReglasSugerirSobreturno();
+      const [reglas, agendaConfig] = await Promise.all([
+        RailwayAPI.leerReglasSugerirSobreturno(),
+        // Informativo, no crítico — si falla no debe tumbar la lista de reglas propias.
+        RailwayAPI.obtenerAgendaConfig().catch(() => null)
+      ]);
+      _reglasSugerirCache = reglas;
+      _calendarioHeredado = agendaConfig && agendaConfig.calendario;
       _renderListaReglasSugerir();
     } catch (err) {
       document.getElementById('sugerir-modal-body').innerHTML = `<div style="color:#c62828">Error: ${err.message}</div>`;
@@ -793,6 +800,39 @@ const ConfigView = (() => {
       const dias = (v.dias || []).map(d => DIAS_LABEL[d]).join('/');
       return `${dias} ${v.horaDesde}-${v.horaHasta}`;
     }).join(' · ');
+  }
+
+  function _minAHoraSugerir(min) {
+    return String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0');
+  }
+
+  // Bloqueos puntuales (equipo parado) y franjas recurrentes exclusivas
+  // (ej. descompresión) de AGENDA_CALENDARIO_CONFIG — el sugeridor ya los
+  // respeta server-side (rpc/sobreturnoSugerir.js), esto es solo para que
+  // se vean acá y no parezcan magia. No editables desde este panel: se
+  // configuran donde ya se configuraban (Config → Bloqueos / calendario
+  // de agenda en el Sheet).
+  function _htmlHeredadasCalendario() {
+    if (!_calendarioHeredado) return '';
+    const bloqueos = _calendarioHeredado.bloqueos || [];
+    const recurrentes = _calendarioHeredado.bloqueosRecurrentes || [];
+    if (bloqueos.length === 0 && recurrentes.length === 0) return '';
+
+    const filasPuntuales = bloqueos.map(b => `
+      <div style="font-size:.78rem;color:var(--text-2);padding:.35rem 0;border-bottom:1px dashed var(--border)">
+        📅 ${b.fechaStr} · ${_minAHoraSugerir(b.minDesde)}-${_minAHoraSugerir(b.minHasta)} — ${b.concepto || 'Sin concepto'}
+      </div>`).join('');
+    const filasRecurrentes = recurrentes.map(f => `
+      <div style="font-size:.78rem;color:var(--text-2);padding:.35rem 0;border-bottom:1px dashed var(--border)">
+        🔁 ${(f.diasSemana || []).map(d => DIAS_LABEL[d]).join('/')} · ${_minAHoraSugerir(f.minDesde)}-${_minAHoraSugerir(f.minHasta)} — ${f.concepto || 'Sin concepto'}
+      </div>`).join('');
+
+    return `
+      <div style="background:var(--bg);border:1px dashed var(--border);border-radius:var(--radius);padding:.75rem;margin-bottom:1rem">
+        <div style="font-size:.78rem;font-weight:700;color:var(--text-2);text-transform:uppercase;margin-bottom:.35rem">🔒 Heredadas de Config (equipo parado / franjas exclusivas)</div>
+        ${filasPuntuales}${filasRecurrentes}
+        <div style="font-size:.72rem;color:var(--text-3);margin-top:.5rem">Ya las respeta el sugeridor — se editan desde el calendario de agenda en Config, no acá.</div>
+      </div>`;
   }
 
   function _renderListaReglasSugerir() {
@@ -809,8 +849,8 @@ const ConfigView = (() => {
         <button class="btn-sm" data-eliminar-sug="${r.id}" style="color:var(--danger)">🗑</button>
       </div>`).join('');
 
-    document.getElementById('sugerir-modal-body').innerHTML = filas ||
-      '<div style="text-align:center;padding:2rem;color:var(--text-3)">Sin reglas específicas todavía</div>';
+    document.getElementById('sugerir-modal-body').innerHTML = _htmlHeredadasCalendario() + (filas ||
+      '<div style="text-align:center;padding:2rem;color:var(--text-3)">Sin reglas específicas todavía</div>');
 
     document.getElementById('sugerir-modal-footer').innerHTML = `
       <button class="btn-sm" id="btn-sugerir-reglas-cancelar-lista">Cerrar</button>

@@ -252,11 +252,17 @@ const RailwayAPI = (() => {
     return rpc('api_sobreturnoSugerir_eliminarRegla', [{ id }]);
   }
 
+  /** Bloqueos/franjas exclusivas de Config (equipo parado, descompresión) — mismo blob que ya consulta el sugeridor server-side. Solo lectura. */
+  async function obtenerAgendaConfig() {
+    return rpc('api_agendaConfig_obtener');
+  }
+
   return {
     rpc, leerRISRango, leerCardiologia, asignar, anular, presente, modificar, turnos, buscar, agenda, slots,
     leerValidacionesAgenda, marcarValidacionReportada, leerReglasAgenda, guardarReglaAgenda, eliminarReglaAgenda,
     leerLimitesSobreturno, guardarLimiteSobreturno, eliminarLimiteSobreturno, sugerirSobreturno,
     leerConfigSugerirSobreturno, guardarConfigSugerirSobreturno,
-    leerReglasSugerirSobreturno, guardarReglaSugerirSobreturno, eliminarReglaSugerirSobreturno
+    leerReglasSugerirSobreturno, guardarReglaSugerirSobreturno, eliminarReglaSugerirSobreturno,
+    obtenerAgendaConfig
   };
 })();
