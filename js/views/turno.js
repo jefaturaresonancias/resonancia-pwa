@@ -377,12 +377,8 @@ const TurnoView = (() => {
       } else {
         await RailwayAPI.asignar({ nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs, tecnicoAsigno });
       }
-      const result = document.getElementById("turno-result");
-      result.className = "turno-result ok";
-      result.innerHTML = `✅ Turno confirmado<br><strong>${apellido}, ${nombre}</strong><br>${estudio}<br>📅 ${fecha} · 🕐 ${_slotSeleccionado.hora} hs`;
-      result.classList.remove("hidden");
       App.toast(`Turno asignado: ${apellido} — ${_slotSeleccionado.hora} hs`, "ok");
-      _resetForm();
+      cerrarPanel();
       App.refrescarAgenda();
     } catch (err) {
       const result = document.getElementById("turno-result");
