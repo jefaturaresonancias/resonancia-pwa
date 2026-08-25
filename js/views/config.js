@@ -806,32 +806,46 @@ const ConfigView = (() => {
     return String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0');
   }
 
-  // Bloqueos puntuales (equipo parado) y franjas recurrentes exclusivas
-  // (ej. descompresión) de AGENDA_CALENDARIO_CONFIG — el sugeridor ya los
-  // respeta server-side (rpc/sobreturnoSugerir.js), esto es solo para que
-  // se vean acá y no parezcan magia. No editables desde este panel: se
-  // configuran donde ya se configuraban (Config → Bloqueos / calendario
-  // de agenda en el Sheet).
+  // Bloqueos puntuales (equipo parado), franjas recurrentes exclusivas y
+  // restricciones por código/origen (ej. descompresión, "solo internados
+  // 20-22") de AGENDA_CALENDARIO_CONFIG — el sugeridor ya los respeta
+  // server-side (rpc/sobreturnoSugerir.js, lib/bloqueosCalendario.js,
+  // lib/restriccionesCodigo.js), esto es solo para que se vean acá y no
+  // parezcan magia. No editables desde este panel: restriccionesHorarias/
+  // restriccionesOrigen se configuran en Config → "Restricciones por
+  // código y origen"; bloqueos y restriccionesConfig, en el calendario de
+  // agenda del Sheet.
   function _htmlHeredadasCalendario() {
     if (!_calendarioHeredado) return '';
     const bloqueos = _calendarioHeredado.bloqueos || [];
     const recurrentes = _calendarioHeredado.bloqueosRecurrentes || [];
-    if (bloqueos.length === 0 && recurrentes.length === 0) return '';
+    const restHorarias = _calendarioHeredado.restriccionesHorarias || {};
+    const restOrigen = _calendarioHeredado.restriccionesOrigen || {};
+    const restConfig = _calendarioHeredado.restriccionesConfig || {};
+    const hayAlgo = bloqueos.length || recurrentes.length ||
+      Object.keys(restHorarias).length || Object.keys(restOrigen).length || Object.keys(restConfig).length;
+    if (!hayAlgo) return '';
 
-    const filasPuntuales = bloqueos.map(b => `
-      <div style="font-size:.78rem;color:var(--text-2);padding:.35rem 0;border-bottom:1px dashed var(--border)">
-        📅 ${b.fechaStr} · ${_minAHoraSugerir(b.minDesde)}-${_minAHoraSugerir(b.minHasta)} — ${b.concepto || 'Sin concepto'}
-      </div>`).join('');
-    const filasRecurrentes = recurrentes.map(f => `
-      <div style="font-size:.78rem;color:var(--text-2);padding:.35rem 0;border-bottom:1px dashed var(--border)">
-        🔁 ${(f.diasSemana || []).map(d => DIAS_LABEL[d]).join('/')} · ${_minAHoraSugerir(f.minDesde)}-${_minAHoraSugerir(f.minHasta)} — ${f.concepto || 'Sin concepto'}
-      </div>`).join('');
+    const _fila = (icono, texto) => `
+      <div style="font-size:.78rem;color:var(--text-2);padding:.35rem 0;border-bottom:1px dashed var(--border)">${icono} ${texto}</div>`;
+    const _diasYHoras = (r) => `${(r.diasSemana || []).map(d => DIAS_LABEL[d]).join('/')} · ${_minAHoraSugerir(r.minDesde)}-${_minAHoraSugerir(r.minHasta)}`;
+
+    const filasPuntuales = bloqueos.map(b =>
+      _fila('📅', `${b.fechaStr} · ${_minAHoraSugerir(b.minDesde)}-${_minAHoraSugerir(b.minHasta)} — ${b.concepto || 'Sin concepto'}`)).join('');
+    const filasRecurrentes = recurrentes.map(f =>
+      _fila('🔁', `${_diasYHoras(f)} — ${f.concepto || 'Sin concepto'}`)).join('');
+    const filasCodigo = Object.entries(restHorarias).flatMap(([cod, reglas]) => reglas.map(r =>
+      _fila('🔖', `Código ${cod} · ${_diasYHoras(r)} — ${r.leyenda || 'Reservado'} (solo estudios con este código entran ahí)`))).join('');
+    const filasOrigen = Object.entries(restOrigen).flatMap(([cod, reglas]) => reglas.map(r =>
+      _fila('🔖', `Origen ${cod} · ${_diasYHoras(r)} — ${r.leyenda || 'Reservado'} (solo ese origen entra ahí)`))).join('');
+    const filasPropias = Object.entries(restConfig).flatMap(([cod, reglas]) => reglas.map(r =>
+      _fila('📎', `Código ${cod} — solo puede darse ${_diasYHoras(r)}`))).join('');
 
     return `
       <div style="background:var(--bg);border:1px dashed var(--border);border-radius:var(--radius);padding:.75rem;margin-bottom:1rem">
-        <div style="font-size:.78rem;font-weight:700;color:var(--text-2);text-transform:uppercase;margin-bottom:.35rem">🔒 Heredadas de Config (equipo parado / franjas exclusivas)</div>
-        ${filasPuntuales}${filasRecurrentes}
-        <div style="font-size:.72rem;color:var(--text-3);margin-top:.5rem">Ya las respeta el sugeridor — se editan desde el calendario de agenda en Config, no acá.</div>
+        <div style="font-size:.78rem;font-weight:700;color:var(--text-2);text-transform:uppercase;margin-bottom:.35rem">🔒 Heredadas de Config (equipo parado / franjas exclusivas / restricciones por código)</div>
+        ${filasPuntuales}${filasRecurrentes}${filasCodigo}${filasOrigen}${filasPropias}
+        <div style="font-size:.72rem;color:var(--text-3);margin-top:.5rem">Ya las respeta el sugeridor — se editan donde ya se editaban, no acá.</div>
       </div>`;
   }
 
