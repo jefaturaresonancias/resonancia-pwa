@@ -486,11 +486,12 @@ const ValidacionesView = (() => {
         </select>
       </div>
       <div class="form-group" style="margin-bottom:.75rem">
-        <label>Palabra(s) clave en la práctica (opcional si elegís origen)</label>
+        <label>Palabra(s) clave en la práctica *</label>
         <input type="text" id="reglas-form-palabra" value="${regla ? regla.palabraClave.replace(/"/g,'&quot;') : ''}" placeholder="Ej: CARDIACA — o varias separadas por coma">
+        <div style="font-size:.72rem;color:var(--text-3);margin-top:2px">Siempre requerida acá — esta regla la audita también el bot de Validaciones, que matchea por palabra clave. Para reglas que dependen solo del origen (sin estudio puntual), usá "Reglas de asignación de sobreturno" en Config.</div>
       </div>
       <div style="margin-bottom:.75rem">
-        <label style="font-size:.85rem;display:block;margin-bottom:4px">Origen(es) (opcional si completás palabra clave — vacío = cualquier origen)</label>
+        <label style="font-size:.85rem;display:block;margin-bottom:4px">Origen(es) (opcional — filtro adicional sobre la palabra clave, no reemplaza)</label>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           ${ORIGENES.map(o => `
             <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-2);cursor:pointer">
@@ -540,12 +541,8 @@ const ValidacionesView = (() => {
     const motivo  = document.getElementById('reglas-form-motivo').value.trim();
     const activa  = document.getElementById('reglas-form-activa').checked;
 
-    if (!nombre || !motivo) {
-      errorEl.textContent = 'Completá nombre y motivo.';
-      return;
-    }
-    if (!palabra && !origen) {
-      errorEl.textContent = 'Completá palabra clave y/o origen — la regla necesita algo para filtrar.';
+    if (!nombre || !motivo || !palabra) {
+      errorEl.textContent = 'Completá nombre, palabra clave y motivo.';
       return;
     }
 

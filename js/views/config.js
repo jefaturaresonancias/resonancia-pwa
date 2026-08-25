@@ -223,7 +223,10 @@ const ConfigView = (() => {
           <span style="font-weight:500;font-size:15px">💡 Reglas de asignación de sobreturno</span>
           <div style="font-size:12px;color:var(--text-2);margin-top:2px">Parámetros del sugeridor de horario (botón en el panel de turno) — es solo una recomendación, no bloquea nada</div>
         </div>
-        <button id="cfg-btn-sugerir-gestionar" style="font-size:12px">⚙️ Ajustar parámetros</button>
+        <div style="display:flex;gap:8px">
+          <button id="cfg-btn-sugerir-reglas" style="font-size:12px">📋 Reglas específicas</button>
+          <button id="cfg-btn-sugerir-gestionar" style="font-size:12px">⚙️ Ajustar parámetros</button>
+        </div>
       </div>
     </div>`;
   }
@@ -369,6 +372,7 @@ const ConfigView = (() => {
 
     // Reglas de asignación de sobreturno
     document.getElementById("cfg-btn-sugerir-gestionar").addEventListener("click", _abrirModalSugerir);
+    document.getElementById("cfg-btn-sugerir-reglas").addEventListener("click", _abrirModalSugerirReglas);
   }
 
   // ── Editar estudio ────────────────────────────────────────
@@ -482,6 +486,17 @@ const ConfigView = (() => {
     'Columna Cervical', 'Columna Dorsal', 'Columna Lumbar',
     'Cardíaca', 'Espectro', 'Funcional', 'Mamaria', 'Fetal/Obstétrica'
   ];
+
+  // Reglas propias del sugeridor de sobreturno — mismo formato/semántica
+  // que "Reglas Agenda" (modo, ventanas), pero exclusivas de acá (nunca
+  // llegan al bot de Validaciones), así que acá SÍ puede quedar la
+  // palabra clave vacía (origen solo alcanza).
+  const MODOS_SUGERIR = {
+    prohibido_en_ventana: 'Prohibido en este horario',
+    reservado_en_ventana: 'Reservado en este horario (todo lo demás, prohibido)',
+    solo_en_ventanas:     'Solo permitido en estos horarios',
+  };
+  const ORIGENES_SUGERIR = ['AMBULATORIO', 'INTERNACIÓN', 'GUARDIA', 'DIRECCIÓN', 'TRASLADO'];
 
   let _limitesCache = [];
   let _idLimiteEditando = null; // null = límite nuevo
@@ -747,6 +762,223 @@ const ConfigView = (() => {
     document.getElementById('sugerir-modal-overlay').addEventListener('click', (e) => {
       if (e.target.id === 'sugerir-modal-overlay') _cerrarModalSugerir();
     });
+  }
+
+  // ── Modal: reglas específicas del sugeridor (lista ↔ formulario) ───
+  // Mismo overlay que el formulario de parámetros de arriba (#sugerir-
+  // modal-*), solo cambia el contenido. A diferencia de "Reglas Agenda"
+  // (validaciones.js), acá la palabra clave es opcional — estas reglas
+  // son exclusivas del sugeridor, nunca las audita el bot de Validaciones,
+  // así que "solo origen, sin estudio puntual" es seguro acá.
+  let _reglasSugerirCache = [];
+  let _idReglaSugerirEditando = null;
+  let _formVentanasSugerir = [];
+
+  async function _abrirModalSugerirReglas() {
+    document.getElementById('sugerir-modal-overlay').classList.remove('hidden');
+    document.getElementById('sugerir-modal-titulo').textContent = 'Reglas específicas del sugeridor';
+    document.getElementById('sugerir-modal-body').innerHTML =
+      '<div style="text-align:center;padding:2rem;color:var(--text-3)">⏳ Cargando…</div>';
+    document.getElementById('sugerir-modal-footer').innerHTML = '';
+    try {
+      _reglasSugerirCache = await RailwayAPI.leerReglasSugerirSobreturno();
+      _renderListaReglasSugerir();
+    } catch (err) {
+      document.getElementById('sugerir-modal-body').innerHTML = `<div style="color:#c62828">Error: ${err.message}</div>`;
+    }
+  }
+
+  function _resumenVentanasSugerir(ventanas) {
+    return (ventanas || []).map(v => {
+      const dias = (v.dias || []).map(d => DIAS_LABEL[d]).join('/');
+      return `${dias} ${v.horaDesde}-${v.horaHasta}`;
+    }).join(' · ');
+  }
+
+  function _renderListaReglasSugerir() {
+    document.getElementById('sugerir-modal-titulo').textContent = 'Reglas específicas del sugeridor';
+
+    const filas = _reglasSugerirCache.map(r => `
+      <div style="display:flex;align-items:center;gap:.75rem;padding:.75rem;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:.5rem;${r.activa === false ? 'opacity:.55' : ''}">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:.9rem">${r.nombre}${r.activa === false ? ' <span style="font-weight:400;color:var(--text-3)">(inactiva)</span>' : ''}</div>
+          <div style="font-size:.78rem;color:var(--text-2);margin-top:.15rem">${MODOS_SUGERIR[r.modo] || r.modo} — ${[r.palabraClave, r.origen].filter(Boolean).join(' · ') || '—'}</div>
+          <div style="font-size:.75rem;color:var(--text-3);margin-top:.15rem">${_resumenVentanasSugerir(r.ventanas)}</div>
+        </div>
+        <button class="btn-sm" data-editar-sug="${r.id}">✏️</button>
+        <button class="btn-sm" data-eliminar-sug="${r.id}" style="color:var(--danger)">🗑</button>
+      </div>`).join('');
+
+    document.getElementById('sugerir-modal-body').innerHTML = filas ||
+      '<div style="text-align:center;padding:2rem;color:var(--text-3)">Sin reglas específicas todavía</div>';
+
+    document.getElementById('sugerir-modal-footer').innerHTML = `
+      <button class="btn-sm" id="btn-sugerir-reglas-cancelar-lista">Cerrar</button>
+      <button class="btn-primary" id="btn-sugerir-reglas-nueva">+ Nueva regla</button>`;
+
+    document.getElementById('sugerir-modal-body').querySelectorAll('[data-editar-sug]').forEach(btn => {
+      btn.addEventListener('click', () => _abrirFormularioReglaSugerir(_reglasSugerirCache.find(r => r.id === btn.dataset.editarSug)));
+    });
+    document.getElementById('sugerir-modal-body').querySelectorAll('[data-eliminar-sug]').forEach(btn => {
+      btn.addEventListener('click', () => _eliminarReglaSugerir(btn.dataset.eliminarSug));
+    });
+    document.getElementById('btn-sugerir-reglas-cancelar-lista').addEventListener('click', _cerrarModalSugerir);
+    document.getElementById('btn-sugerir-reglas-nueva').addEventListener('click', () => _abrirFormularioReglaSugerir(null));
+  }
+
+  async function _eliminarReglaSugerir(id) {
+    const regla = _reglasSugerirCache.find(r => r.id === id);
+    if (!confirm(`¿Eliminar la regla "${regla ? regla.nombre : id}"? Esta acción no se puede deshacer.`)) return;
+    try {
+      await RailwayAPI.eliminarReglaSugerirSobreturno(id);
+      App.toast('Regla eliminada', 'ok');
+      _abrirModalSugerirReglas();
+    } catch (err) {
+      App.toast('Error: ' + err.message, 'error');
+    }
+  }
+
+  function _htmlVentanaSugerir(idx, v) {
+    const dias = DIAS_LABEL.map((lbl, d) => `
+      <label style="display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--text-2);cursor:pointer">
+        <input type="checkbox" class="sugerir-ventana-dia" value="${d}" ${v.dias.includes(d) ? 'checked' : ''}>
+        ${lbl}
+      </label>`).join('');
+
+    return `
+      <div class="sugerir-ventana-row" data-idx="${idx}" style="border:1px solid var(--border);border-radius:var(--radius);padding:.75rem;margin-bottom:.5rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+          <span style="font-size:.78rem;font-weight:700;color:var(--text-2);text-transform:uppercase">Ventana ${idx + 1}</span>
+          <button type="button" class="btn-sm" data-quitar-ventana-sug="${idx}" style="color:var(--danger)">Quitar</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:.5rem">${dias}</div>
+        <div class="form-row" style="margin-bottom:0">
+          <div class="form-group"><label>Desde</label><input type="time" class="sugerir-ventana-desde" value="${v.horaDesde}"></div>
+          <div class="form-group"><label>Hasta</label><input type="time" class="sugerir-ventana-hasta" value="${v.horaHasta}"></div>
+        </div>
+      </div>`;
+  }
+
+  function _renderVentanasSugerir() {
+    const cont = document.getElementById('sugerir-reglas-form-ventanas');
+    cont.innerHTML = _formVentanasSugerir.map((v, i) => _htmlVentanaSugerir(i, v)).join('');
+    cont.querySelectorAll('[data-quitar-ventana-sug]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.quitarVentanaSug, 10);
+        _formVentanasSugerir.splice(idx, 1);
+        if (_formVentanasSugerir.length === 0) _formVentanasSugerir.push({ dias: [], horaDesde: '08:00', horaHasta: '17:00' });
+        _renderVentanasSugerir();
+      });
+    });
+  }
+
+  function _abrirFormularioReglaSugerir(regla) {
+    _idReglaSugerirEditando = regla ? regla.id : null;
+    _formVentanasSugerir = regla ? JSON.parse(JSON.stringify(regla.ventanas)) : [{ dias: [], horaDesde: '08:00', horaHasta: '17:00' }];
+
+    document.getElementById('sugerir-modal-titulo').textContent = regla ? 'Editar regla' : 'Nueva regla';
+
+    document.getElementById('sugerir-modal-body').innerHTML = `
+      <div class="form-group" style="margin-bottom:.75rem">
+        <label>Nombre</label>
+        <input type="text" id="sugerir-reglas-form-nombre" value="${regla ? regla.nombre.replace(/"/g,'&quot;') : ''}" placeholder="Ej: Mamarias solo sábados">
+      </div>
+      <div class="form-group" style="margin-bottom:.75rem">
+        <label>Modo</label>
+        <select id="sugerir-reglas-form-modo">
+          ${Object.entries(MODOS_SUGERIR).map(([v, lbl]) => `<option value="${v}" ${regla && regla.modo === v ? 'selected' : ''}>${lbl}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:.75rem">
+        <label>Palabra(s) clave en el estudio (opcional si elegís origen)</label>
+        <input type="text" id="sugerir-reglas-form-palabra" value="${regla ? (regla.palabraClave||'').replace(/"/g,'&quot;') : ''}" placeholder="Ej: MAMARIA — o varias separadas por coma">
+      </div>
+      <div style="margin-bottom:.75rem">
+        <label style="font-size:.85rem;display:block;margin-bottom:4px">Origen(es) (opcional si completás palabra clave — vacío = cualquier origen)</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${ORIGENES_SUGERIR.map(o => `
+            <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-2);cursor:pointer">
+              <input type="checkbox" class="sugerir-regla-origen" value="${o}" ${regla && (regla.origen || '').split(',').map(s => s.trim().toUpperCase()).includes(o) ? 'checked' : ''}>
+              ${o}
+            </label>`).join('')}
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:.75rem">
+        <label>Motivo (queda como nota interna)</label>
+        <input type="text" id="sugerir-reglas-form-motivo" value="${regla ? (regla.motivo||'').replace(/"/g,'&quot;') : ''}" placeholder="Ej: Solo hay técnico de mamarias los sábados">
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;margin-bottom:1rem;cursor:pointer">
+        <input type="checkbox" id="sugerir-reglas-form-activa" ${!regla || regla.activa !== false ? 'checked' : ''}> Regla activa
+      </label>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+        <span style="font-size:.78rem;font-weight:700;color:var(--text-2);text-transform:uppercase">Ventanas horarias</span>
+        <button type="button" class="btn-sm" id="btn-sugerir-reglas-agregar-ventana">+ Agregar ventana</button>
+      </div>
+      <div id="sugerir-reglas-form-ventanas"></div>
+      <div id="sugerir-reglas-form-error" style="color:#c62828;font-size:.8rem;margin-top:.5rem"></div>
+    `;
+
+    _renderVentanasSugerir();
+
+    document.getElementById('btn-sugerir-reglas-agregar-ventana').addEventListener('click', () => {
+      _formVentanasSugerir.push({ dias: [], horaDesde: '08:00', horaHasta: '17:00' });
+      _renderVentanasSugerir();
+    });
+
+    document.getElementById('sugerir-modal-footer').innerHTML = `
+      <button class="btn-sm" id="btn-sugerir-reglas-cancelar-form">Cancelar</button>
+      <button class="btn-primary" id="btn-sugerir-reglas-guardar">Guardar</button>`;
+
+    document.getElementById('btn-sugerir-reglas-cancelar-form').addEventListener('click', _renderListaReglasSugerir);
+    document.getElementById('btn-sugerir-reglas-guardar').addEventListener('click', _guardarFormularioReglaSugerir);
+  }
+
+  async function _guardarFormularioReglaSugerir() {
+    const errorEl = document.getElementById('sugerir-reglas-form-error');
+    errorEl.textContent = '';
+
+    const nombre  = document.getElementById('sugerir-reglas-form-nombre').value.trim();
+    const modo    = document.getElementById('sugerir-reglas-form-modo').value;
+    const palabra = document.getElementById('sugerir-reglas-form-palabra').value.trim();
+    const origen  = [...document.querySelectorAll('.sugerir-regla-origen:checked')].map(cb => cb.value).join(', ');
+    const motivo  = document.getElementById('sugerir-reglas-form-motivo').value.trim();
+    const activa  = document.getElementById('sugerir-reglas-form-activa').checked;
+
+    if (!nombre) {
+      errorEl.textContent = 'Completá el nombre.';
+      return;
+    }
+    if (!palabra && !origen) {
+      errorEl.textContent = 'Completá palabra clave y/o origen — la regla necesita algo para filtrar.';
+      return;
+    }
+
+    const ventanas = [];
+    const filas = document.querySelectorAll('#sugerir-reglas-form-ventanas .sugerir-ventana-row');
+    for (const fila of filas) {
+      const dias = [...fila.querySelectorAll('.sugerir-ventana-dia:checked')].map(cb => parseInt(cb.value, 10));
+      const horaDesde = fila.querySelector('.sugerir-ventana-desde').value;
+      const horaHasta = fila.querySelector('.sugerir-ventana-hasta').value;
+      if (dias.length === 0) {
+        errorEl.textContent = 'Cada ventana necesita al menos un día seleccionado.';
+        return;
+      }
+      if (!horaDesde || !horaHasta || horaHasta <= horaDesde) {
+        errorEl.textContent = `Ventana inválida (${horaDesde}-${horaHasta}): la hora hasta tiene que ser mayor a la hora desde. Si cruza medianoche, usá 23:59 y cargá otra ventana aparte para el resto.`;
+        return;
+      }
+      ventanas.push({ dias, horaDesde, horaHasta });
+    }
+
+    const regla = { id: _idReglaSugerirEditando || undefined, nombre, modo, palabraClave: palabra, origen, motivo, activa, ventanas };
+
+    try {
+      await RailwayAPI.guardarReglaSugerirSobreturno(regla);
+      App.toast('Regla guardada', 'ok');
+      await _abrirModalSugerirReglas();
+    } catch (err) {
+      errorEl.textContent = 'Error: ' + err.message;
+    }
   }
 
   function _init() {

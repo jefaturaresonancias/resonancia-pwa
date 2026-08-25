@@ -238,10 +238,25 @@ const RailwayAPI = (() => {
     return rpc('api_sobreturnoSugerir_guardarConfig', [config]);
   }
 
+  /** Reglas propias del sugeridor (origen/estudio + ventana) — exclusivas de acá, nunca llegan al bot de Validaciones. */
+  async function leerReglasSugerirSobreturno() {
+    const data = await rpc('api_sobreturnoSugerir_leerReglas');
+    return data.reglas;
+  }
+
+  async function guardarReglaSugerirSobreturno(regla) {
+    return rpc('api_sobreturnoSugerir_guardarRegla', [regla]);
+  }
+
+  async function eliminarReglaSugerirSobreturno(id) {
+    return rpc('api_sobreturnoSugerir_eliminarRegla', [{ id }]);
+  }
+
   return {
     rpc, leerRISRango, leerCardiologia, asignar, anular, presente, modificar, turnos, buscar, agenda, slots,
     leerValidacionesAgenda, marcarValidacionReportada, leerReglasAgenda, guardarReglaAgenda, eliminarReglaAgenda,
     leerLimitesSobreturno, guardarLimiteSobreturno, eliminarLimiteSobreturno, sugerirSobreturno,
-    leerConfigSugerirSobreturno, guardarConfigSugerirSobreturno
+    leerConfigSugerirSobreturno, guardarConfigSugerirSobreturno,
+    leerReglasSugerirSobreturno, guardarReglaSugerirSobreturno, eliminarReglaSugerirSobreturno
   };
 })();
