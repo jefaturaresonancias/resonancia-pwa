@@ -271,6 +271,22 @@ const RailwayAPI = (() => {
     return rpc('api_sobreturnoSugerir_eliminarFranjaPreferida', [{ id }]);
   }
 
+  // ── Categorías de estudio (#MSK, #NEURO, etc.) ──────────────────
+  // Reutilizables desde "Reglas específicas" y "Franjas preferidas" del
+  // sugeridor (no desde Reglas Agenda compartida — ver rpc/categoriasEstudio.js).
+  async function leerCategoriasEstudio() {
+    const data = await rpc('api_categoriasEstudio_leer');
+    return data.categorias;
+  }
+
+  async function guardarCategoriaEstudio(categoria) {
+    return rpc('api_categoriasEstudio_guardar', [categoria]);
+  }
+
+  async function eliminarCategoriaEstudio(codigo) {
+    return rpc('api_categoriasEstudio_eliminar', [{ codigo }]);
+  }
+
   // ── Quién asigna el turno ────────────────────────────────────────
   // Lista editable de personas que pueden figurar como "quién está dando
   // el turno" — obligatorio en el panel de turno, mismo criterio que ya
@@ -292,6 +308,7 @@ const RailwayAPI = (() => {
     leerConfigSugerirSobreturno, guardarConfigSugerirSobreturno,
     leerReglasSugerirSobreturno, guardarReglaSugerirSobreturno, eliminarReglaSugerirSobreturno,
     obtenerAgendaConfig, leerAsignadoresTurno, guardarAsignadoresTurno,
-    leerFranjasPreferidasSugerir, guardarFranjaPreferidaSugerir, eliminarFranjaPreferidaSugerir
+    leerFranjasPreferidasSugerir, guardarFranjaPreferidaSugerir, eliminarFranjaPreferidaSugerir,
+    leerCategoriasEstudio, guardarCategoriaEstudio, eliminarCategoriaEstudio
   };
 })();

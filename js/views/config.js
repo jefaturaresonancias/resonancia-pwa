@@ -228,6 +228,7 @@ const ConfigView = (() => {
           <div style="font-size:12px;color:var(--text-2);margin-top:2px">Parámetros del sugeridor de horario (botón en el panel de turno) — es solo una recomendación, no bloquea nada</div>
         </div>
         <div style="display:flex;gap:8px">
+          <button id="cfg-btn-sugerir-categorias" style="font-size:12px">🏷️ Categorías de estudio</button>
           <button id="cfg-btn-sugerir-franjas" style="font-size:12px">🎯 Franjas preferidas</button>
           <button id="cfg-btn-sugerir-reglas" style="font-size:12px">📋 Reglas específicas</button>
           <button id="cfg-btn-sugerir-gestionar" style="font-size:12px">⚙️ Ajustar parámetros</button>
@@ -411,6 +412,7 @@ const ConfigView = (() => {
     document.getElementById("cfg-btn-sugerir-gestionar").addEventListener("click", _abrirModalSugerir);
     document.getElementById("cfg-btn-sugerir-reglas").addEventListener("click", _abrirModalSugerirReglas);
     document.getElementById("cfg-btn-sugerir-franjas").addEventListener("click", _abrirModalFranjasPreferidas);
+    document.getElementById("cfg-btn-sugerir-categorias").addEventListener("click", _abrirModalCategorias);
 
     // Quién asigna el turno
     document.getElementById("cfg-btn-nuevo-asignador").addEventListener("click", () => {
@@ -999,7 +1001,7 @@ const ConfigView = (() => {
       </div>
       <div class="form-group" style="margin-bottom:.75rem">
         <label>Palabra(s) clave en el estudio (opcional si elegís origen)</label>
-        <input type="text" id="sugerir-reglas-form-palabra" value="${regla ? (regla.palabraClave||'').replace(/"/g,'&quot;') : ''}" placeholder="Ej: MAMARIA — o varias separadas por coma">
+        <input type="text" id="sugerir-reglas-form-palabra" value="${regla ? (regla.palabraClave||'').replace(/"/g,'&quot;') : ''}" placeholder="Ej: MAMARIA, #MSK — separadas por coma, admite #CODIGO de categoría">
       </div>
       <div style="margin-bottom:.75rem">
         <label style="font-size:.85rem;display:block;margin-bottom:4px">Origen(es) (opcional si completás palabra clave — vacío = cualquier origen)</label>
@@ -1167,7 +1169,7 @@ const ConfigView = (() => {
       </div>
       <div class="form-group" style="margin-bottom:.75rem">
         <label>Palabra(s) clave del estudio</label>
-        <input type="text" id="sugerir-franja-form-palabra" value="${franja ? franja.palabraClave.replace(/"/g,'&quot;') : ''}" placeholder="Ej: lumbar, msk sin contraste">
+        <input type="text" id="sugerir-franja-form-palabra" value="${franja ? franja.palabraClave.replace(/"/g,'&quot;') : ''}" placeholder="Ej: lumbar, #MSK — separadas por coma, admite #CODIGO de categoría">
       </div>
       <div class="form-row" style="margin-bottom:.75rem">
         <div class="form-group"><label>Franja preferida desde</label><input type="time" id="sugerir-franja-form-desde" value="${franja ? franja.horaDesde : '00:00'}"></div>
@@ -1218,6 +1220,120 @@ const ConfigView = (() => {
       await RailwayAPI.guardarFranjaPreferidaSugerir(franja);
       App.toast('Franja guardada', 'ok');
       await _abrirModalFranjasPreferidas();
+    } catch (err) {
+      errorEl.textContent = 'Error: ' + err.message;
+    }
+  }
+
+  // ── Modal: categorías de estudio (lista ↔ formulario) ──────────────
+  // Agrupan varios nombres de estudio bajo un código corto (#MSK, #NEURO,
+  // #CUERPO...) reutilizable escribiendo "#CODIGO" dentro del campo
+  // palabra clave de "Reglas específicas" o "Franjas preferidas" — NUNCA
+  // en Reglas Agenda (esa la audita el bot externo, que no entiende esta
+  // sintaxis). Mismo overlay que arriba.
+  let _categoriasCache = [];
+
+  async function _abrirModalCategorias() {
+    document.getElementById('sugerir-modal-overlay').classList.remove('hidden');
+    document.getElementById('sugerir-modal-titulo').textContent = 'Categorías de estudio';
+    document.getElementById('sugerir-modal-body').innerHTML =
+      '<div style="text-align:center;padding:2rem;color:var(--text-3)">⏳ Cargando…</div>';
+    document.getElementById('sugerir-modal-footer').innerHTML = '';
+    try {
+      _categoriasCache = await RailwayAPI.leerCategoriasEstudio();
+      _renderListaCategorias();
+    } catch (err) {
+      document.getElementById('sugerir-modal-body').innerHTML = `<div style="color:#c62828">Error: ${err.message}</div>`;
+    }
+  }
+
+  function _renderListaCategorias() {
+    document.getElementById('sugerir-modal-titulo').textContent = 'Categorías de estudio';
+
+    const filas = _categoriasCache.map(c => `
+      <div style="display:flex;align-items:center;gap:.75rem;padding:.75rem;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:.5rem">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:.9rem">#${c.codigo} — ${c.nombre}</div>
+          <div style="font-size:.78rem;color:var(--text-2);margin-top:.15rem">${c.palabrasClave}</div>
+        </div>
+        <button class="btn-sm" data-editar-categoria="${c.codigo}">✏️</button>
+        <button class="btn-sm" data-eliminar-categoria="${c.codigo}" style="color:var(--danger)">🗑</button>
+      </div>`).join('');
+
+    document.getElementById('sugerir-modal-body').innerHTML = `
+      <p style="font-size:.78rem;color:var(--text-2);margin-bottom:.75rem">Usalas escribiendo <code>#CODIGO</code> dentro de la palabra clave en "Reglas específicas" o "Franjas preferidas" — se puede combinar con texto suelto (ej. "cerebro, #MSK"). No funcionan en Reglas Agenda.</p>
+      ${filas || '<div style="text-align:center;padding:2rem;color:var(--text-3)">Sin categorías todavía</div>'}`;
+
+    document.getElementById('sugerir-modal-footer').innerHTML = `
+      <button class="btn-sm" id="btn-sugerir-categorias-cancelar-lista">Cerrar</button>
+      <button class="btn-primary" id="btn-sugerir-categorias-nueva">+ Nueva categoría</button>`;
+
+    document.getElementById('sugerir-modal-body').querySelectorAll('[data-editar-categoria]').forEach(btn => {
+      btn.addEventListener('click', () => _abrirFormularioCategoria(_categoriasCache.find(c => c.codigo === btn.dataset.editarCategoria)));
+    });
+    document.getElementById('sugerir-modal-body').querySelectorAll('[data-eliminar-categoria]').forEach(btn => {
+      btn.addEventListener('click', () => _eliminarCategoria(btn.dataset.eliminarCategoria));
+    });
+    document.getElementById('btn-sugerir-categorias-cancelar-lista').addEventListener('click', _cerrarModalSugerir);
+    document.getElementById('btn-sugerir-categorias-nueva').addEventListener('click', () => _abrirFormularioCategoria(null));
+  }
+
+  async function _eliminarCategoria(codigo) {
+    const cat = _categoriasCache.find(c => c.codigo === codigo);
+    if (!confirm(`¿Eliminar la categoría "#${codigo}"? Las reglas que la usen dejarán de matchear por ella.`)) return;
+    try {
+      await RailwayAPI.eliminarCategoriaEstudio(codigo);
+      App.toast('Categoría eliminada', 'ok');
+      _abrirModalCategorias();
+    } catch (err) {
+      App.toast('Error: ' + err.message, 'error');
+    }
+  }
+
+  function _abrirFormularioCategoria(categoria) {
+    document.getElementById('sugerir-modal-titulo').textContent = categoria ? 'Editar categoría' : 'Nueva categoría';
+
+    document.getElementById('sugerir-modal-body').innerHTML = `
+      <div class="form-group" style="margin-bottom:.75rem">
+        <label>Código (sin espacios, ej. MSK)</label>
+        <input type="text" id="sugerir-categoria-form-codigo" value="${categoria ? categoria.codigo : ''}" placeholder="MSK" ${categoria ? 'disabled style="background:#f0f0f0;color:#888"' : ''}>
+      </div>
+      <div class="form-group" style="margin-bottom:.75rem">
+        <label>Nombre</label>
+        <input type="text" id="sugerir-categoria-form-nombre" value="${categoria ? categoria.nombre.replace(/"/g,'&quot;') : ''}" placeholder="Músculo-esquelético">
+      </div>
+      <div class="form-group" style="margin-bottom:.75rem">
+        <label>Palabras clave que agrupa (separadas por coma)</label>
+        <input type="text" id="sugerir-categoria-form-palabras" value="${categoria ? categoria.palabrasClave.replace(/"/g,'&quot;') : ''}" placeholder="rodilla, hombro, tobillo, columna lumbar">
+      </div>
+      <div id="sugerir-categoria-form-error" style="color:#c62828;font-size:.8rem;margin-top:.5rem"></div>
+    `;
+
+    document.getElementById('sugerir-modal-footer').innerHTML = `
+      <button class="btn-sm" id="btn-sugerir-categorias-cancelar-form">Cancelar</button>
+      <button class="btn-primary" id="btn-sugerir-categorias-guardar">Guardar</button>`;
+
+    document.getElementById('btn-sugerir-categorias-cancelar-form').addEventListener('click', _renderListaCategorias);
+    document.getElementById('btn-sugerir-categorias-guardar').addEventListener('click', _guardarFormularioCategoria);
+  }
+
+  async function _guardarFormularioCategoria() {
+    const errorEl = document.getElementById('sugerir-categoria-form-error');
+    errorEl.textContent = '';
+
+    const codigo = document.getElementById('sugerir-categoria-form-codigo').value.trim();
+    const nombre = document.getElementById('sugerir-categoria-form-nombre').value.trim();
+    const palabrasClave = document.getElementById('sugerir-categoria-form-palabras').value.trim();
+
+    if (!codigo || !nombre || !palabrasClave) {
+      errorEl.textContent = 'Completá código, nombre y palabras clave.';
+      return;
+    }
+
+    try {
+      await RailwayAPI.guardarCategoriaEstudio({ codigo, nombre, palabrasClave });
+      App.toast('Categoría guardada', 'ok');
+      await _abrirModalCategorias();
     } catch (err) {
       errorEl.textContent = 'Error: ' + err.message;
     }
