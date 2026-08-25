@@ -477,7 +477,8 @@ const AgendaView = (() => {
           </div>
           <div class="slot-ris-side slot-content" style="flex:1;background:#f0f0f0;border-left:2px dashed #bbb;cursor:pointer;overflow:hidden"
             data-fecha="${fecha}" data-mins="${mins}" data-ris-nombre="${encodeURIComponent(ris.apellido_nombre)}" data-ris-practica="${encodeURIComponent(ris.practica)}"
-            title="RIS: ${ris.apellido_nombre} — ${ris.practica}\nClic para asignar sobreturno">
+            data-ya-sobreturno="1"
+            title="Ya hay un sobreturno en este horario (${slot.apellido}, ${slot.nombre})">
             <span class="slot-nombre" style="color:#888;font-style:italic;font-size:10px">${ris.apellido_nombre}</span>
             <span class="slot-estudio" style="color:#aaa;font-size:9px">${ris.practica} <span style="background:#ddd;color:#777;border-radius:3px;padding:0 3px;font-size:8px">RIS</span></span>
           </div>
@@ -681,6 +682,12 @@ const AgendaView = (() => {
         const franjaLabel = div.dataset.franjaLabel ? decodeURIComponent(div.dataset.franjaLabel) : "";
         if (/descompres/i.test(franjaLabel)) {
           App.toast(`"${franjaLabel}" — horario bloqueado, no se puede cargar nada ahí`, "error");
+          return;
+        }
+        // Ya hay un sobreturno propio exactamente en este horario — no
+        // apilar otro encima haciendo clic de nuevo en el lado RIS.
+        if (div.dataset.yaSobreturno === "1") {
+          App.toast("Ya hay un sobreturno en este horario", "error");
           return;
         }
         const mins     = parseInt(div.dataset.mins);
