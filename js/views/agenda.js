@@ -286,6 +286,13 @@ const AgendaView = (() => {
       for (let di = 0; di < datos.length; di++) {
         const dia = datos[di];
         const s   = dia.slots.find(sl => sl.mins === mins);
+        // El backend calcula franjas/bloqueos cada 20 min exactos; cuando la
+        // grilla agrega una fila "rara" (un paciente de RIS que arranca en
+        // un minuto no múltiplo de 20), esa fila no tiene su propio slot —
+        // `s` da undefined y la franja se cortaba ahí. Para pintar el color
+        // de la franja (no para turno/continuación, que sí necesitan el
+        // slot exacto) usamos el bloque de 20 min que la contiene.
+        const sFranja = s || dia.slots.find(sl => sl.mins === Math.floor(mins/20)*20);
         const esContinuacion = s && s.tipo === "continuacion";
 
         // Actualizar turno activo y rowspan
@@ -349,15 +356,15 @@ const AgendaView = (() => {
           // "Franja de descompresión") aunque sea continuación de RIS — sin
           // esto la fila se veía en blanco, cortando el color de la franja
           // a la mitad del bloque.
-          const esFranjaAqui = s && (s.tipo === "franja" || s.tipo === "franja_origen" || s.tipo === "bloqueo_rec" || s.tipo === "bloqueo");
-          const bgFila     = esFranjaAqui ? s.color : "#f4f4f4";
-          const bordeFila  = esFranjaAqui ? s.color : "#bbb";
+          const esFranjaAqui = sFranja && (sFranja.tipo === "franja" || sFranja.tipo === "franja_origen" || sFranja.tipo === "bloqueo_rec" || sFranja.tipo === "bloqueo");
+          const bgFila     = esFranjaAqui ? sFranja.color : "#f4f4f4";
+          const bordeFila  = esFranjaAqui ? sFranja.color : "#bbb";
           html += `<td class="slot-ris-clickable slot-ris-continua"
             style="background:${bgFila};border-left:2px dashed ${bordeFila};border:1px solid #ebebeb;cursor:pointer;padding:0 6px"
             data-fecha="${dia.fecha}" data-mins="${mins}"
             data-ris-nombre="${encodeURIComponent(r.apellido_nombre)}"
             data-ris-practica="${encodeURIComponent(r.practica)}"
-            title="${esFranjaAqui ? s.label + ' — ' : ''}${r.apellido_nombre} · ${r.practica} — hasta ${horaF} — clic para sobreturno">
+            title="${esFranjaAqui ? sFranja.label + ' — ' : ''}${r.apellido_nombre} · ${r.practica} — hasta ${horaF} — clic para sobreturno">
             <div style="height:100%;display:flex;align-items:center;justify-content:space-between;pointer-events:none">
               <div style="height:1px;flex:1;background:${esFranjaAqui ? bgFila : '#bbb'};border-top:1px dashed ${esFranjaAqui ? bgFila : '#ccc'}"></div>
               ${etiqueta}
@@ -416,7 +423,9 @@ const AgendaView = (() => {
             if (risNuevo && risActivoCol[di]) risActivoCol[di].mostrado = true;
             const renderRIS = cardioRender.length > 0 ? cardioRender : (risNuevo ? [risNuevo] : []);
             const rowSpan = inicioTurno ? activosPorCol[di].rowSpan : 1;
-            html += _renderCeldaCombinada(s, renderRIS, dia.fecha, mins, risMap[dia.fecha] || [], rowSpan);
+            // Sin slot propio (fila "rara" de RIS) pero dentro de una franja
+            // — usar el fallback para no perder el color a mitad de bloque.
+            html += _renderCeldaCombinada(s || sFranja, renderRIS, dia.fecha, mins, risMap[dia.fecha] || [], rowSpan);
           }
         }
       }
