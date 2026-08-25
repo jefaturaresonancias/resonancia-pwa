@@ -345,14 +345,21 @@ const AgendaView = (() => {
           const etiqueta = esUltimaFila
             ? `<span style="color:#999;font-size:8px;font-weight:700;padding:0 4px;flex-shrink:0">→${horaF}</span>`
             : "";
+          // Esta fila puntual puede caer sobre una franja/bloqueo (ej.
+          // "Franja de descompresión") aunque sea continuación de RIS — sin
+          // esto la fila se veía en blanco, cortando el color de la franja
+          // a la mitad del bloque.
+          const esFranjaAqui = s && (s.tipo === "franja" || s.tipo === "franja_origen" || s.tipo === "bloqueo_rec" || s.tipo === "bloqueo");
+          const bgFila     = esFranjaAqui ? s.color : "#f4f4f4";
+          const bordeFila  = esFranjaAqui ? s.color : "#bbb";
           html += `<td class="slot-ris-clickable slot-ris-continua"
-            style="background:#f4f4f4;border-left:2px dashed #bbb;border:1px solid #ebebeb;cursor:pointer;padding:0 6px"
+            style="background:${bgFila};border-left:2px dashed ${bordeFila};border:1px solid #ebebeb;cursor:pointer;padding:0 6px"
             data-fecha="${dia.fecha}" data-mins="${mins}"
             data-ris-nombre="${encodeURIComponent(r.apellido_nombre)}"
             data-ris-practica="${encodeURIComponent(r.practica)}"
-            title="${r.apellido_nombre} · ${r.practica} — hasta ${horaF} — clic para sobreturno">
+            title="${esFranjaAqui ? s.label + ' — ' : ''}${r.apellido_nombre} · ${r.practica} — hasta ${horaF} — clic para sobreturno">
             <div style="height:100%;display:flex;align-items:center;justify-content:space-between;pointer-events:none">
-              <div style="height:1px;flex:1;background:#bbb;border-top:1px dashed #ccc"></div>
+              <div style="height:1px;flex:1;background:${esFranjaAqui ? bgFila : '#bbb'};border-top:1px dashed ${esFranjaAqui ? bgFila : '#ccc'}"></div>
               ${etiqueta}
             </div></td>`;
         } else {

@@ -144,6 +144,11 @@ const App = (() => {
       visibles.forEach((id, i) => { document.getElementById(id).style.display = ""; document.getElementById(id).style.order = String(i + 1); });
     }
 
+    // Orden personalizado por el usuario (arrastrando) para este rol, si
+    // guardó uno — pisa el orden por defecto de arriba.
+    const ordenGuardado = _cargarOrdenSidebar(rol);
+    if (ordenGuardado) _aplicarOrdenSidebar(ordenGuardado);
+
     // Vista a restaurar: la que se pide (última vista antes de refrescar),
     // pero solo si sigue siendo accesible para este rol — si no, a Agenda.
     let defaultView = vistaRestaurar || "agenda";
@@ -288,10 +293,57 @@ const App = (() => {
   }
 
   // ── Nav ───────────────────────────────────────────────────
+  // ── Sidebar reordenable (arrastrar y soltar) ──────────────
+  // Orden guardado por rol en localStorage — cada rol puede acomodar su
+  // menú a su gusto sin afectar a los demás.
+  function _sidebarOrderIds() {
+    return [...document.querySelectorAll("#sidebar .nav-btn")]
+      .sort((a, b) => (parseInt(a.style.order || "0", 10) - parseInt(b.style.order || "0", 10)))
+      .map(b => b.id);
+  }
+  function _aplicarOrdenSidebar(ids) {
+    ids.forEach((id, i) => { const el = document.getElementById(id); if (el) el.style.order = String(i + 1); });
+  }
+  function _guardarOrdenSidebar(rol, ids) {
+    try { localStorage.setItem("navOrder_" + rol, JSON.stringify(ids)); } catch (e) {}
+  }
+  function _cargarOrdenSidebar(rol) {
+    try { const raw = localStorage.getItem("navOrder_" + rol); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+  }
+
+  function _initSidebarDragDrop() {
+    document.querySelectorAll("#sidebar .nav-btn").forEach(btn => {
+      btn.draggable = true;
+      btn.addEventListener("dragstart", e => {
+        e.dataTransfer.setData("text/plain", btn.id);
+        e.dataTransfer.effectAllowed = "move";
+        btn.classList.add("dragging");
+      });
+      btn.addEventListener("dragend", () => btn.classList.remove("dragging"));
+      btn.addEventListener("dragover", e => { e.preventDefault(); btn.classList.add("drag-over"); });
+      btn.addEventListener("dragleave", () => btn.classList.remove("drag-over"));
+      btn.addEventListener("drop", e => {
+        e.preventDefault();
+        btn.classList.remove("drag-over");
+        const draggedId = e.dataTransfer.getData("text/plain");
+        if (!draggedId || draggedId === btn.id) return;
+        const ids  = _sidebarOrderIds();
+        const from = ids.indexOf(draggedId);
+        const to   = ids.indexOf(btn.id);
+        if (from === -1 || to === -1) return;
+        ids.splice(from, 1);
+        ids.splice(to, 0, draggedId);
+        _aplicarOrdenSidebar(ids);
+        _guardarOrdenSidebar(Config.getRol(), ids);
+      });
+    });
+  }
+
   function _initNav() {
     document.querySelectorAll(".nav-btn[data-view]").forEach(btn => {
       btn.addEventListener("click", () => showView(btn.dataset.view));
     });
+    _initSidebarDragDrop();
 
     document.getElementById("nav-cambiar-pin").addEventListener("click", async () => {
       const rol = Config.getRol();
