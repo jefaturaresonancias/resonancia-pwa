@@ -9,6 +9,7 @@ const AgendaView = (() => {
   let _filtroOrigenes = new Set(); // vacío = todos
   let _filtroEstados  = new Set(); // vacío = todos
   let _filtroEstudio  = "";
+  let _ocultarRIS     = false; // true = mostrar solo los sobreturnos, ocultar lo que viene de BD_RIS sin turno propio
 
   // ── Calcular duración real de práctica RIS (Config − 10 min) ──
   function _duracionRIS(practica) {
@@ -188,6 +189,14 @@ const AgendaView = (() => {
       document.querySelectorAll("#agenda-filtros .filtro-chip.activo").forEach(b => b.classList.remove("activo"));
       _aplicarFiltros();
       _actualizarBtnLimpiar();
+    });
+
+    // Mostrar/ocultar RIS — mismo criterio que Portada: destildado, la
+    // grilla solo muestra los sobreturnos (turnos propios), sin los
+    // pacientes de BD_RIS que todavía no tienen un turno cargado encima.
+    document.getElementById("chk-mostrar-ris").addEventListener("change", (e) => {
+      _ocultarRIS = !e.target.checked;
+      _cargarSemana(); // reusa la cache de sessionStorage, no vuelve a pedir datos
     });
   }
 
@@ -418,6 +427,16 @@ const AgendaView = (() => {
     const tieneRIS = risSlot && risSlot.length > 0;
     const ris      = tieneRIS ? risSlot[0] : null;
     const rowspanAttr = rowspan > 1 ? ` rowspan="${rowspan}"` : "";
+
+    // "Mostrar RIS" destildado: cae directo al render sin RIS — un turno
+    // propio (sobreturno incluido) se ve igual que siempre, y un slot que
+    // solo tenía un paciente de BD_RIS (sin turno cargado) pasa a verse
+    // libre/franja/bloqueo, según corresponda, como si no hubiera RIS.
+    // Cardiología no es RIS (otra planilla) — no se toca con este toggle.
+    const esCardio = tieneRIS && risSlot[0] && risSlot[0]._cardio;
+    if (_ocultarRIS && !esCardio) {
+      return _renderSlot(slot, fecha, mins, risDelDia || [], rowspan);
+    }
 
     // Si hay turno propio + RIS → celda dividida side by side
     if (tipo === "turno" && tieneRIS) {
