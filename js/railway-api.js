@@ -105,6 +105,23 @@ const RailwayAPI = (() => {
 
   // ── Fase 2a: alta de turnos migrada a Railway ──────────────────
 
+  // Un alta/anulación/modificación deja obsoleta la cache de la grilla
+  // semanal/mensual (agenda.js) — pero OJO: sessionStorage también guarda
+  // railway_token (ver _getToken arriba). Un sessionStorage.clear() liso
+  // borraba el token junto con la cache, forzando el prompt() del PIN de
+  // servicio de nuevo después de CADA turno cargado (invisible mientras el
+  // login pasaba por Apps Script en silencio; muy visible ahora que pide
+  // el PIN por prompt() — bug encontrado 26/8/2026). Por eso esto borra
+  // solo las claves de cache de agenda, nunca el token.
+  function _invalidarCacheAgenda() {
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const key = sessionStorage.key(i);
+      if (key && (key.startsWith('agenda_sem_') || key.startsWith('agenda_mes_'))) {
+        sessionStorage.removeItem(key);
+      }
+    }
+  }
+
   /**
    * Asigna un nuevo turno (incluye sobreturnos sobre un slot de RIS).
    * Mismo contrato que API.asignar — Railway lo guarda en Postgres y lo
@@ -112,7 +129,7 @@ const RailwayAPI = (() => {
    * @param {object} datos  { nombre, apellido, dni, estudio, origen, fecha, hora, observaciones }
    */
   async function asignar(datos) {
-    sessionStorage.clear();
+    _invalidarCacheAgenda();
     return rpc('api_turnos_asignar', [datos]);
   }
 
@@ -124,7 +141,7 @@ const RailwayAPI = (() => {
 
   /** Anula un turno existente. @param {number} fila Fila en "Base de datos" */
   async function anular(fila) {
-    sessionStorage.clear();
+    _invalidarCacheAgenda();
     return rpc('api_turnos_anular', [{ filaSheet: fila }]);
   }
 
@@ -139,7 +156,7 @@ const RailwayAPI = (() => {
    * @param {object} datos  { tipo, nombre, apellido, dni, estudio, origen, fecha, hora, observaciones }
    */
   async function modificar(fila, datos) {
-    sessionStorage.clear();
+    _invalidarCacheAgenda();
     return rpc('api_turnos_modificar', [{ filaSheet: fila, ...datos }]);
   }
 
@@ -446,6 +463,57 @@ const RailwayAPI = (() => {
     return rpc('api_parte_actualizarPracticas', [fecha, items]);
   }
 
+  // ── Agendas especiales NCX/Neurología (26/8/2026) ───────────────
+  // Uso desde el SPA principal (login normal, sesión ya abierta) — para
+  // Config (editar ventana) y "Verificar agendas especiales" (sidebar).
+  async function leerAgendaEspecialConfig() {
+    const data = await rpc('api_agendaEspecial_leerConfig');
+    return data.config;
+  }
+  async function guardarAgendaEspecialConfig(datos) {
+    return rpc('api_agendaEspecial_guardarConfig', [datos]);
+  }
+  async function leerAgendaEspecialTurnos(pendientesSolo = true) {
+    const data = await rpc('api_agendaEspecial_leerTurnos', [{ pendientesSolo }]);
+    return data.turnos;
+  }
+  async function marcarAgendaEspecialCargado(id, cargado = true) {
+    return rpc('api_agendaEspecial_marcarCargado', [{ id, cargado }]);
+  }
+
+  // ── Agendas especiales — llamadas públicas (sin login de Railway) ──
+  // Las usan ncx.html/neurologia.html: páginas propias para coordinadores
+  // externos que solo tienen el PIN de su especialidad, no una sesión de
+  // la app. Van directo por fetch, sin pasar por _getToken()/rpc() (que
+  // pedirían el PIN de servicio interno, algo que esta gente no debería
+  // ni necesita conocer).
+  async function _rpcPublico(fn, args = []) {
+    const resp = await fetch(`${RAILWAY_URL}/api/rpc/${fn}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ args })
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const json = await resp.json();
+    if (json.ok === false) throw new Error(json.error || 'Error desconocido de Railway');
+    return json;
+  }
+  async function agendaEspecialConfigPublico() {
+    const data = await _rpcPublico('api_agendaEspecial_leerConfig');
+    return data.config;
+  }
+  async function agendaEspecialEstudiosPublico(tipo, pin) {
+    const data = await _rpcPublico('api_agendaEspecial_leerEstudios', [{ tipo, pin }]);
+    return data.estudios;
+  }
+  async function agendaEspecialPropiosPublico(tipo, pin) {
+    const data = await _rpcPublico('api_agendaEspecial_leerPropios', [{ tipo, pin }]);
+    return data.turnos;
+  }
+  async function agendaEspecialAsignarPublico(datos) {
+    return _rpcPublico('api_turnos_asignarEspecialPublico', [datos]);
+  }
+
   return {
     rpc, leerRISRango, leerCardiologia, asignar, anular, presente, modificar, turnos, buscar, agenda, slots,
     leerValidacionesAgenda, marcarValidacionReportada, leerReglasAgenda, guardarReglaAgenda, eliminarReglaAgenda,
@@ -463,6 +531,8 @@ const RailwayAPI = (() => {
     leerAgendaRestriccionesPropia, guardarAgendaRestriccionPropia, eliminarAgendaRestriccionPropia,
     leerAgendaEstudiosCatalogo, guardarAgendaEstudio, eliminarAgendaEstudio,
     validarPinRol, cambiarPinRol,
-    verificarParteRIS, escribirParteRIS, actualizarEstadosParteRIS, actualizarPracticasParteRIS
+    verificarParteRIS, escribirParteRIS, actualizarEstadosParteRIS, actualizarPracticasParteRIS,
+    leerAgendaEspecialConfig, guardarAgendaEspecialConfig, leerAgendaEspecialTurnos, marcarAgendaEspecialCargado,
+    agendaEspecialConfigPublico, agendaEspecialEstudiosPublico, agendaEspecialPropiosPublico, agendaEspecialAsignarPublico
   };
 })();

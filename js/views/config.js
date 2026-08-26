@@ -5,13 +5,14 @@ const ConfigView = (() => {
   let _estudiosEditados = [];
   let _limitesCount = 0;
   let _asignadoresTurno = [];
+  let _agendaEspecial = {};
 
   // ── Cargar datos ──────────────────────────────────────────
   async function cargar() {
     const container = document.getElementById("config-container");
     container.innerHTML = '<div class="empty-state">Cargando configuración...</div>';
     try {
-      const [estudios, feriados, franjas, bloqueos, restricciones, restriccionesOrigen, restriccionesPropia, limites, asignadores] = await Promise.all([
+      const [estudios, feriados, franjas, bloqueos, restricciones, restriccionesOrigen, restriccionesPropia, limites, asignadores, agendaEspecial] = await Promise.all([
         RailwayAPI.leerAgendaEstudiosCatalogo(),
         RailwayAPI.leerAgendaFeriados(),
         RailwayAPI.leerAgendaFranjas(),
@@ -22,11 +23,13 @@ const ConfigView = (() => {
         // Límites vive en Railway (como Reglas Agenda) — si falla no debe
         // tumbar el resto de Config, solo el contador.
         RailwayAPI.leerLimitesSobreturno().catch(() => []),
-        RailwayAPI.leerAsignadoresTurno().catch(() => [])
+        RailwayAPI.leerAsignadoresTurno().catch(() => []),
+        RailwayAPI.leerAgendaEspecialConfig().catch(() => ({}))
       ]);
       _datos = { estudios, feriados, franjas, bloqueos, restricciones, restriccionesOrigen, restriccionesPropia };
       _limitesCount = limites.length;
       _asignadoresTurno = asignadores;
+      _agendaEspecial = agendaEspecial;
       _render();
     } catch(err) {
       container.innerHTML = `<div class="empty-state">Error: ${err.message}</div>`;
@@ -55,6 +58,7 @@ const ConfigView = (() => {
         ${_seccionLimites()}
         ${_seccionSugerirSobreturno()}
         ${_seccionAsignadoresTurno()}
+        ${_seccionAgendaEspecial()}
       </div>`;
     _bindEvents();
   }
@@ -297,6 +301,45 @@ const ConfigView = (() => {
     } catch (err) { App.toast("Error: " + err.message, "error"); }
   }
 
+  // ── Sección Agendas especiales (NCX/Neurología) ─────────────
+  // Ventana horaria de ncx.html/neurologia.html (26/8/2026) — coordinadores
+  // externos solo pueden cargar dentro de esto. Reusa _pedirDiasSemana
+  // (mismo prompt de texto que ya usan franjas/restricciones).
+  function _seccionAgendaEspecial() {
+    const _item = (tipo, icono) => {
+      const v = _agendaEspecial[tipo];
+      const dias = v ? (v.diasSemana || []).map(d => DIAS_LABEL[d]).join("/") : "—";
+      return `<div style="padding:10px;border-radius:8px;background:var(--bg);display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:13px;font-weight:600">${icono} ${tipo === "NCX" ? "Neurocirugía (NCX)" : "Neurología"}</div>
+          <div style="font-size:12px;color:var(--text-2)">${v ? `${dias} · ${v.horaDesde}–${v.horaHasta}` : "Sin configurar"}</div>
+        </div>
+        <button class="cfg-edit-agenda-especial" data-tipo="${tipo}" style="font-size:12px">✏️ Editar</button>
+      </div>`;
+    };
+    return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem">
+      <div style="margin-bottom:12px">
+        <span style="font-weight:500;font-size:15px">🩺 Agendas especiales (NCX / Neurología)</span>
+        <div style="font-size:12px;color:var(--text-2);margin-top:2px">Ventana en la que ncx.html/neurologia.html dejan cargar un turno — coordinadores externos, con PIN propio</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        ${_item("NCX", "🔪")}
+        ${_item("NEUROLOGIA", "🧠")}
+      </div>
+    </div>`;
+  }
+
+  function _editarAgendaEspecial(tipo) {
+    const actual = _agendaEspecial[tipo] || { diasSemana: [], horaDesde: "", horaHasta: "" };
+    const diasSemana = _pedirDiasSemana(actual.diasSemana);
+    if (!diasSemana) return;
+    const horaDesde = prompt("Hora desde (HH:MM):", actual.horaDesde);
+    if (!horaDesde) return;
+    const horaHasta = prompt("Hora hasta (HH:MM):", actual.horaHasta);
+    if (!horaHasta) return;
+    _guardarSeccion(RailwayAPI.guardarAgendaEspecialConfig, { tipo, diasSemana, horaDesde, horaHasta }, "Ventana guardada");
+  }
+
   // ── Eventos ───────────────────────────────────────────────
   function _bindEvents() {
     const container = document.getElementById("config-container");
@@ -479,6 +522,11 @@ const ConfigView = (() => {
         _asignadoresTurno.splice(i, 1);
         _guardarAsignadoresTurno();
       });
+    });
+
+    // Agendas especiales (NCX/Neurología)
+    container.querySelectorAll(".cfg-edit-agenda-especial").forEach(btn => {
+      btn.addEventListener("click", () => _editarAgendaEspecial(btn.dataset.tipo));
     });
   }
 

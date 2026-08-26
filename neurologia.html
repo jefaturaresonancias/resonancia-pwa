@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Agenda Neurología — RMN Santojanni</title>
+  <link rel="icon" href="icons/Icon-192.png">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/agenda-especial.css">
+</head>
+<body class="ae-body">
+
+  <div class="ae-card">
+    <h1>🧠 Agenda Neurología</h1>
+    <p class="ae-sub">Carga de turnos — Hospital Donación Francisco Santojanni</p>
+    <div id="ae-ventana-info" class="ae-ventana-info">Cargando…</div>
+
+    <!-- PIN -->
+    <div id="ae-screen-pin">
+      <div class="form-group">
+        <label for="ae-pin">PIN de acceso</label>
+        <input type="password" inputmode="numeric" id="ae-pin" maxlength="8" autocomplete="off" placeholder="••••">
+        <div id="ae-pin-error"></div>
+      </div>
+      <button id="ae-btn-ingresar" class="btn-primary" style="margin-top:.5rem;width:100%">Ingresar</button>
+    </div>
+
+    <!-- Formulario -->
+    <div id="ae-screen-form" class="hidden">
+      <form id="ae-form" class="ae-form-grid">
+        <div class="ae-form-row">
+          <div class="form-group">
+            <label for="ae-nombre">Nombre</label>
+            <input type="text" id="ae-nombre" required>
+          </div>
+          <div class="form-group">
+            <label for="ae-apellido">Apellido</label>
+            <input type="text" id="ae-apellido" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="ae-dni">DNI</label>
+          <input type="text" id="ae-dni" required>
+        </div>
+        <div class="form-group">
+          <label for="ae-estudio">Estudio</label>
+          <select id="ae-estudio" required><option value="">Cargando…</option></select>
+        </div>
+        <div class="ae-form-row">
+          <div class="form-group">
+            <label for="ae-fecha">Fecha</label>
+            <input type="date" id="ae-fecha" required>
+          </div>
+          <div class="form-group">
+            <label for="ae-hora">Hora</label>
+            <select id="ae-hora" required></select>
+          </div>
+        </div>
+        <div id="ae-fecha-error"></div>
+        <div class="form-group">
+          <label for="ae-observaciones">Observaciones (opcional)</label>
+          <input type="text" id="ae-observaciones">
+        </div>
+        <button type="submit" id="ae-btn-confirmar" class="btn-primary">Cargar turno</button>
+      </form>
+
+      <div class="ae-lista-propios-wrap">
+        <h2>Turnos ya cargados</h2>
+        <div id="ae-lista-propios"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="ae-toast" class="ae-toast hidden"></div>
+
+  <script>window.AGENDA_ESPECIAL_TIPO = 'NEUROLOGIA';</script>
+  <script src="js/railway-api.js"></script>
+  <script src="js/agendaEspecialExterna.js"></script>
+</body>
+</html>

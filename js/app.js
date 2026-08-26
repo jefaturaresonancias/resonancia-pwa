@@ -35,6 +35,7 @@ const App = (() => {
     if (id === "pami")   PamiView.cargar();
     if (id === "config") ConfigView.cargar();
     if (id === "validaciones") ValidacionesView.cargar();
+    if (id === "agenda-especial") AgendaEspecialView.cargar();
   }
 
   // ── Abrir turno con fecha/hora prellenos (desde agenda) ───
@@ -133,7 +134,7 @@ const App = (() => {
     // por ahora — el resto queda oculto (temporal, se revierte sacando
     // este bloque). Orden explícito por rol.
     const MENU_ACOTADO = {
-      administrativo: ["nav-agenda", "nav-buscar", "nav-reclamos", "nav-turnos-informes"],
+      administrativo: ["nav-agenda", "nav-buscar", "nav-reclamos", "nav-turnos-informes", "nav-agenda-especial"],
       tecnico:        ["nav-agenda", "nav-reclamos", "nav-buscar"],
     };
     if (MENU_ACOTADO[rol]) {
@@ -380,6 +381,7 @@ const App = (() => {
       else if (_viewActual === "lista")  ListaView.cargar();
       else if (_viewActual === "pami")   PamiView.cargar();
       else if (_viewActual === "config") ConfigView.cargar();
+      else if (_viewActual === "agenda-especial") AgendaEspecialView.cargar();
       else if (_viewActual === "bot") {
         const iframe = document.getElementById("iframe-bot");
         if (iframe) iframe.src = iframe.src;
@@ -410,6 +412,7 @@ const App = (() => {
     PamiView.init();
     ConfigView.init();
     ValidacionesView.init();
+    AgendaEspecialView.init();
     _initPin();
 
     // Si ya tiene URL guardada, saltar el setup

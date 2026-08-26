@@ -143,6 +143,10 @@
           <span class="nav-icon">🗂️</span>
           <span class="nav-label">Turnos/Informes</span>
         </button>
+        <button class="nav-btn admin-only" data-view="agenda-especial" id="nav-agenda-especial">
+          <span class="nav-icon">🩺</span>
+          <span class="nav-label">Agendas especiales</span>
+        </button>
 
         <button class="nav-btn jefatura-exclusivo" data-view="guardias" id="nav-guardias">
           <span class="nav-icon">🚑</span>
@@ -450,6 +454,20 @@
           </div>
         </div>
 
+        <!-- ── VISTA: Agendas especiales (NCX/Neurología) ─── -->
+        <div id="view-agenda-especial" class="view hidden">
+          <div class="view-header">
+            <h2>Verificar agendas especiales</h2>
+            <div style="display:flex;gap:.5rem;align-items:center">
+              <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text-2)">
+                <input type="checkbox" id="ae-ver-cargados"> Ver también los ya cargados
+              </label>
+              <button id="ae-especial-btn-reload" class="btn-sm">↺ Actualizar</button>
+            </div>
+          </div>
+          <div id="agenda-especial-container" style="padding:1rem;overflow-y:auto;flex:1"></div>
+        </div>
+
         <!-- ── VISTA: PAMI ─── -->
         <div id="view-pami" class="view hidden">
           <div class="view-header">
@@ -667,6 +685,7 @@
   <script src="js/views/turno.js"></script>
   <script src="js/views/parte.js"></script>
   <script src="js/views/pami.js"></script>
+  <script src="js/views/agendaEspecial.js"></script>
   <script src="js/views/config.js"></script>
   <script src="js/views/validaciones.js"></script>
   <script src="js/app.js"></script>
