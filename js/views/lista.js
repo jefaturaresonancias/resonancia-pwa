@@ -412,11 +412,12 @@ Esta acción no se puede deshacer.`)) return;
     loading.classList.remove("hidden");
     try {
       const fechaStr = API.fechaAStr(_fecha);
-      const [agendaArr, turnos, risDelDia] = await Promise.all([
+      const [agendaArr, turnos, risPorFecha] = await Promise.all([
         RailwayAPI.agenda(fechaStr, 1, 20),
         RailwayAPI.turnos(fechaStr),
-        API.leerRIS(fechaStr).catch(() => [])
+        RailwayAPI.leerRISRango(fechaStr, 1).catch(() => ({}))
       ]);
+      const risDelDia = risPorFecha[fechaStr] || [];
       const agendaDia = agendaArr && agendaArr[0] ? agendaArr[0] : null;
       _render(agendaDia, turnos, filtro, risDelDia);
     } catch(err) {

@@ -15,11 +15,12 @@ const Config = (() => {
 
     isReady() { return !!this.getUrl(); },
 
-    // Valida PIN contra la API — devuelve Promise<boolean>
+    // Valida PIN contra Railway (pin_roles, corte de Sheets 25/8/2026) —
+    // devuelve Promise<boolean>. Reemplaza a API.validarPin (Apps Script).
     async validarPin(rol, pin) {
       try {
-        const data = await API.validarPin(rol, pin);
-        return data && data.valido === true;
+        const data = await RailwayAPI.validarPinRol(rol, pin);
+        return data && data.ok === true;
       } catch (e) {
         console.error("validarPin error:", e);
         return false;

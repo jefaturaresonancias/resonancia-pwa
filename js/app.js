@@ -357,11 +357,11 @@ const App = (() => {
       const confirmar = prompt("Repetí el nuevo PIN:");
       if (nuevo !== confirmar) { App.toast("Los PINs no coinciden", "error"); return; }
       try {
-        const data = await API.cambiarPin(rol, pinActual, nuevo);
-        if (data && data.actualizado) {
+        const data = await RailwayAPI.cambiarPinRol(rol, pinActual, nuevo);
+        if (data && data.ok) {
           App.toast("PIN actualizado correctamente", "ok");
         } else {
-          App.toast("Error al actualizar el PIN", "error");
+          App.toast(data && data.error ? data.error : "Error al actualizar el PIN", "error");
         }
       } catch {
         App.toast("Error de conexión", "error");
