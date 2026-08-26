@@ -881,6 +881,22 @@ function _apiLeerConfig(p) {
     return { estudios, feriados, franjas, bloqueos, restricciones, restriccionesOrigen };
   }
 
+  // Temporal (corte de Sheets, 25/8/2026) — Y3:AF500 nunca se expuso acá,
+  // solo la usa cargarConfigCalendario() para restriccionesConfig. Este
+  // branch es de solo lectura, para el backfill one-off a Postgres
+  // (agenda_restricciones_propia); se puede borrar después del corte.
+  if (tipo === "restriccionesPropias") {
+    const cfg = cargarConfigCalendario();
+    const restriccionesPropias = [];
+    for (const [codigo, reglas] of Object.entries(cfg.restriccionesConfig || {})) {
+      for (const r of reglas) {
+        restriccionesPropias.push({ codigo, ...r,
+          horaD: minutosAHora(r.minDesde), horaH: minutosAHora(r.minHasta) });
+      }
+    }
+    return { restriccionesPropias };
+  }
+
   throw new Error("Sección no soportada: " + tipo);
 }
 

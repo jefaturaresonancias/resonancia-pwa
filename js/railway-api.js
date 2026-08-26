@@ -1,20 +1,39 @@
 // js/railway-api.js — Cliente para la API de sistema2-node (Railway).
-// El token se pide una sola vez vía Apps Script (API.obtenerTokenRailway,
-// que guarda el PIN de servicio server-side — nunca llega al navegador) y
-// se cachea en sessionStorage; las llamadas de datos van directo del
-// navegador a Railway, sin pasar por Apps Script en cada request.
+// El token se pide una sola vez por sesión directo a Railway (api_login,
+// que es pública — ver FUNCIONES_PUBLICAS en server.js) pidiendo el PIN de
+// servicio con prompt(); ya no pasa por Apps Script (corte de Sheets,
+// 25/8/2026). Se cachea en sessionStorage.
 const RailwayAPI = (() => {
   const RAILWAY_URL = "https://jefatura-rmn-sistema2-production.up.railway.app";
   const KEY_TOKEN = "railway_token";
+
+  async function _login(pin) {
+    const resp = await fetch(`${RAILWAY_URL}/api/rpc/api_login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ args: [pin] })
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return resp.json();
+  }
 
   async function _getToken(forzar = false) {
     if (!forzar) {
       const cacheado = sessionStorage.getItem(KEY_TOKEN);
       if (cacheado) return cacheado;
     }
-    const data = await API.obtenerTokenRailway();
-    sessionStorage.setItem(KEY_TOKEN, data.token);
-    return data.token;
+    let mensaje = "PIN de acceso:";
+    for (let intentos = 0; intentos < 3; intentos++) {
+      const pin = prompt(mensaje);
+      if (pin === null) throw new Error("Login cancelado");
+      const json = await _login(pin);
+      if (json.ok) {
+        sessionStorage.setItem(KEY_TOKEN, json.token);
+        return json.token;
+      }
+      mensaje = "PIN incorrecto, reintentar:";
+    }
+    throw new Error("No se pudo iniciar sesión");
   }
 
   async function _post(fn, args, token) {
