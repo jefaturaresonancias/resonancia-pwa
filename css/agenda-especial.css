@@ -46,6 +46,11 @@
 
 .ae-vacio { color: var(--text-3); font-size: .85rem; font-style: italic; }
 
+#ae-ocupados-dia { margin-top: -.3rem; }
+.ae-ocupados-titulo { font-size: .75rem; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 4px; }
+
+#ae-hora option:disabled { color: var(--text-3); font-style: italic; }
+
 .ae-item {
   padding: .5rem .6rem;
   border-radius: 8px;
