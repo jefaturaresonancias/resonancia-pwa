@@ -429,6 +429,23 @@ const RailwayAPI = (() => {
     return rpc('api_pinRoles_cambiar', [{ rol, pinActual, pinNuevo }]);
   }
 
+  // ── Parte diario (corte de Sheets, 25/8/2026) ───────────────────
+  // Reemplaza a API.escribirRIS/verificarRIS/actualizarEstadosRIS/
+  // actualizarPracticasRIS (Apps Script, escribían a BD_RIS — hoja que ya
+  // nadie lee). Mismo contrato de entrada/salida, ahora contra Postgres.
+  async function verificarParteRIS(fecha) {
+    return rpc('api_parte_verificarRis', [fecha]);
+  }
+  async function escribirParteRIS(fecha, filas) {
+    return rpc('api_parte_escribirRis', [fecha, filas]);
+  }
+  async function actualizarEstadosParteRIS(fecha, items) {
+    return rpc('api_parte_actualizarEstados', [fecha, items]);
+  }
+  async function actualizarPracticasParteRIS(fecha, items) {
+    return rpc('api_parte_actualizarPracticas', [fecha, items]);
+  }
+
   return {
     rpc, leerRISRango, leerCardiologia, asignar, anular, presente, modificar, turnos, buscar, agenda, slots,
     leerValidacionesAgenda, marcarValidacionReportada, leerReglasAgenda, guardarReglaAgenda, eliminarReglaAgenda,
@@ -445,6 +462,7 @@ const RailwayAPI = (() => {
     leerAgendaRestriccionesOrigen, guardarAgendaRestriccionOrigen, eliminarAgendaRestriccionOrigen,
     leerAgendaRestriccionesPropia, guardarAgendaRestriccionPropia, eliminarAgendaRestriccionPropia,
     leerAgendaEstudiosCatalogo, guardarAgendaEstudio, eliminarAgendaEstudio,
-    validarPinRol, cambiarPinRol
+    validarPinRol, cambiarPinRol,
+    verificarParteRIS, escribirParteRIS, actualizarEstadosParteRIS, actualizarPracticasParteRIS
   };
 })();

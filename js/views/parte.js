@@ -429,7 +429,7 @@ const partes = String(practica).split(/\s*·\s*|\s*-\s*/);
 ¿Cargar a la agenda RIS?`)) return;
 
       btn.textContent = "⏳ Cargando…";
-      const resultado = await API.escribirRIS(fechaStr, filas);
+      const resultado = await RailwayAPI.escribirParteRIS(fechaStr, filas);
       App.toast(`✅ ${resultado.mensaje}`, "ok");
 
     } catch(err) {
@@ -515,7 +515,7 @@ const partes = String(practica).split(/\s*·\s*|\s*-\s*/);
 
 Solo se modificará la columna ESTADO en BD_RIS.`)) return;
 
-      const res = await API.actualizarEstadosRIS(fechaStr, actualizaciones);
+      const res = await RailwayAPI.actualizarEstadosParteRIS(fechaStr, actualizaciones);
       App.toast(`✅ ${res.mensaje}`, "ok");
 
     } catch(err) {
@@ -536,7 +536,7 @@ Solo se modificará la columna ESTADO en BD_RIS.`)) return;
 
     try {
       // Verificar duplicados primero
-      const verif = await API.verificarRIS(_fecha);
+      const verif = await RailwayAPI.verificarParteRIS(_fecha);
       const existentes = new Set(verif.hashes || []);
 
       const nuevas = _filas.filter(f => {
@@ -563,7 +563,7 @@ Solo se modificará la columna ESTADO en BD_RIS.`)) return;
       }
 
       btn.textContent = "⏳ Guardando…";
-      const resp = await API.escribirRIS(_fecha, nuevas);
+      const resp = await RailwayAPI.escribirParteRIS(_fecha, nuevas);
       App.toast(resp.mensaje, "ok");
 
       // Marcar visualmente las filas cargadas
@@ -651,7 +651,7 @@ Solo se modificará la columna ESTADO en BD_RIS.`)) return;
 
       if (!confirm(`Excel del ${fechaStr}: actualizar prácticas de ${items.length} pacientes?`)) return;
 
-      const res = await API.actualizarPracticasRIS(fechaStr, items);
+      const res = await RailwayAPI.actualizarPracticasParteRIS(fechaStr, items);
       App.toast(`✅ ${res.mensaje}`, "ok");
 
     } catch(err) {
