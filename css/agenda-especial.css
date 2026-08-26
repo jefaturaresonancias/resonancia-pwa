@@ -17,7 +17,11 @@
   max-width: 480px;
   width: 100%;
   box-shadow: 0 10px 40px rgba(0,0,0,.25);
+  transition: max-width .2s;
 }
+/* Una vez desbloqueada (PIN ok), la tarjeta crece para que entre la grilla
+   de horarios sin achicarla — ver #ae-screen-form:not(.hidden). */
+.ae-card:has(#ae-screen-form:not(.hidden)) { max-width: 760px; }
 
 .ae-card h1 { font-size: 1.3rem; color: var(--navy); margin-bottom: .25rem; }
 .ae-card .ae-sub { color: var(--text-2); font-size: .85rem; margin-bottom: 1.5rem; }
@@ -50,6 +54,23 @@
 .ae-ocupados-titulo { font-size: .75rem; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 4px; }
 
 #ae-hora option:disabled { color: var(--text-3); font-style: italic; }
+
+/* ── Grilla visual de próximos horarios ─────────────────────── */
+.ae-grilla-wrap { margin-bottom: 1.5rem; }
+.ae-grilla-wrap h2 { font-size: .8rem; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .03em; margin-bottom: .6rem; }
+.ae-grilla-scroll { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+
+.ae-grilla-tabla { border-collapse: collapse; width: 100%; font-size: .78rem; }
+.ae-grilla-tabla th {
+  background: var(--navy); color: #fff; padding: 6px 8px; font-weight: 700;
+  text-align: center; white-space: nowrap; position: sticky; top: 0;
+}
+.ae-grilla-hora { font-weight: 700; color: var(--text-2); background: var(--bg); padding: 6px 10px; white-space: nowrap; }
+.ae-grilla-celda { padding: 6px 8px; text-align: center; border-top: 1px solid var(--border); border-left: 1px solid var(--border); white-space: nowrap; min-width: 90px; }
+
+.ae-grilla-libre { background: #eaf7ec; color: #2e7d32; cursor: pointer; font-style: italic; }
+.ae-grilla-libre:hover { background: #d3efd8; }
+.ae-grilla-ocupada { background: #fde8e8; color: var(--danger); font-weight: 600; font-style: normal; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
 
 .ae-item {
   padding: .5rem .6rem;

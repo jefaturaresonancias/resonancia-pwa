@@ -119,6 +119,75 @@
       }).join('');
     }
     _actualizarDisponibilidad();
+    _renderGrilla();
+  }
+
+  // ── Grilla visual (26/8/2026, a pedido) — mismo criterio que la agenda
+  // real: columnas por fecha, filas por horario, celda ocupada/libre. Se
+  // arma enteramente con datos que ya se tienen en el navegador (_propios,
+  // _ventana) — no hace falta ningún endpoint nuevo. Clic en una celda
+  // libre precarga fecha+hora en el formulario de abajo.
+  const CANTIDAD_FECHAS_GRILLA = 6;
+
+  function _proximasFechas(n) {
+    const fechas = [];
+    const cur = new Date();
+    cur.setUTCHours(0, 0, 0, 0);
+    let guard = 0;
+    while (fechas.length < n && guard < 90) {
+      if (_ventana.diasSemana.includes(cur.getUTCDay())) {
+        fechas.push(cur.toISOString().slice(0, 10));
+      }
+      cur.setUTCDate(cur.getUTCDate() + 1);
+      guard++;
+    }
+    return fechas;
+  }
+
+  function _fechaISOaEtiqueta(iso) {
+    const [y, m, d] = iso.split('-').map(Number);
+    const dia = DIAS_LABEL[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+    return `${dia.slice(0, 3)} ${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}`;
+  }
+
+  function _renderGrilla() {
+    const cont = document.getElementById('ae-grilla');
+    if (!cont) return;
+    const fechas = _proximasFechas(CANTIDAD_FECHAS_GRILLA);
+    const desde = _horaAMin(_ventana.horaDesde);
+    const hasta = _horaAMin(_ventana.horaHasta);
+
+    let html = '<table class="ae-grilla-tabla"><thead><tr><th>Hora</th>';
+    fechas.forEach((f) => { html += `<th>${_fechaISOaEtiqueta(f)}</th>`; });
+    html += '</tr></thead><tbody>';
+
+    for (let m = desde; m < hasta; m += 20) {
+      html += `<tr><td class="ae-grilla-hora">${_minAHora(m)}</td>`;
+      fechas.forEach((f) => {
+        const ocupado = _propios.find((t) => t.fecha === f && t.mins === m);
+        if (ocupado) {
+          html += `<td class="ae-grilla-celda ae-grilla-ocupada" title="${ocupado.estudio}">${ocupado.apellido}</td>`;
+        } else {
+          html += `<td class="ae-grilla-celda ae-grilla-libre" data-fecha="${f}" data-hora="${_minAHora(m)}">libre</td>`;
+        }
+      });
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    cont.innerHTML = html;
+
+    cont.querySelectorAll('.ae-grilla-libre').forEach((celda) => {
+      celda.addEventListener('click', () => {
+        document.getElementById('ae-fecha').value = celda.dataset.fecha;
+        _validarFecha();
+        _actualizarDisponibilidad();
+        const selHora = document.getElementById('ae-hora');
+        if ([...selHora.options].some((o) => o.value === celda.dataset.hora && !o.disabled)) {
+          selHora.value = celda.dataset.hora;
+        }
+        document.getElementById('ae-nombre').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    });
   }
 
   async function _refrescarPropios() {
