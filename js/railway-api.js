@@ -320,6 +320,99 @@ const RailwayAPI = (() => {
     return rpc('api_asignadoresTurno_guardar', [{ nombres }]);
   }
 
+  // ── Config de agenda (corte de Sheets, 25/8/2026) ───────────────
+  // Feriados, franjas recurrentes, bloqueos, restricciones por
+  // código/origen/propia y catálogo de estudios — antes vivían en la hoja
+  // "Config" del Sheet, ahora son tablas propias en Postgres (Config →
+  // Fase 4 del corte). Cada una es CRUD directo por id (o por clave natural
+  // en feriados/estudios), sin el paso intermedio de reescribir un array
+  // completo que usaba el Sheet.
+
+  async function leerAgendaFeriados() {
+    const data = await rpc('api_agendaFeriados_leer');
+    return data.feriados;
+  }
+  async function guardarAgendaFeriado(feriado) {
+    return rpc('api_agendaFeriados_guardar', [feriado]);
+  }
+  async function eliminarAgendaFeriado(id) {
+    return rpc('api_agendaFeriados_eliminar', [{ id }]);
+  }
+
+  async function leerAgendaFranjas() {
+    const data = await rpc('api_agendaFranjas_leer');
+    return data.franjas;
+  }
+  async function guardarAgendaFranja(franja) {
+    return rpc('api_agendaFranjas_guardar', [franja]);
+  }
+  async function eliminarAgendaFranja(id) {
+    return rpc('api_agendaFranjas_eliminar', [{ id }]);
+  }
+
+  async function leerAgendaBloqueos() {
+    const data = await rpc('api_agendaBloqueos_leer');
+    return data.bloqueos;
+  }
+  async function guardarAgendaBloqueo(bloqueo) {
+    return rpc('api_agendaBloqueos_guardar', [bloqueo]);
+  }
+  async function eliminarAgendaBloqueo(id) {
+    return rpc('api_agendaBloqueos_eliminar', [{ id }]);
+  }
+
+  async function leerAgendaRestriccionesHorarias() {
+    const data = await rpc('api_agendaRestriccionesHorarias_leer');
+    return data.restricciones;
+  }
+  async function guardarAgendaRestriccionHoraria(restriccion) {
+    return rpc('api_agendaRestriccionesHorarias_guardar', [restriccion]);
+  }
+  async function eliminarAgendaRestriccionHoraria(id) {
+    return rpc('api_agendaRestriccionesHorarias_eliminar', [{ id }]);
+  }
+
+  async function leerAgendaRestriccionesOrigen() {
+    const data = await rpc('api_agendaRestriccionesOrigen_leer');
+    return data.restricciones;
+  }
+  async function guardarAgendaRestriccionOrigen(restriccion) {
+    return rpc('api_agendaRestriccionesOrigen_guardar', [restriccion]);
+  }
+  async function eliminarAgendaRestriccionOrigen(id) {
+    return rpc('api_agendaRestriccionesOrigen_eliminar', [{ id }]);
+  }
+
+  async function leerAgendaRestriccionesPropia() {
+    const data = await rpc('api_agendaRestriccionesPropia_leer');
+    return data.restricciones;
+  }
+  async function guardarAgendaRestriccionPropia(restriccion) {
+    return rpc('api_agendaRestriccionesPropia_guardar', [restriccion]);
+  }
+  async function eliminarAgendaRestriccionPropia(id) {
+    return rpc('api_agendaRestriccionesPropia_eliminar', [{ id }]);
+  }
+
+  async function leerAgendaEstudiosCatalogo() {
+    const data = await rpc('api_agendaEstudiosCatalogo_leer');
+    return data.estudios;
+  }
+  async function guardarAgendaEstudio(estudio) {
+    return rpc('api_agendaEstudiosCatalogo_guardar', [estudio]);
+  }
+  async function eliminarAgendaEstudio(id) {
+    return rpc('api_agendaEstudiosCatalogo_eliminar', [{ id }]);
+  }
+
+  // ── PIN por rol (corte de Sheets, 25/8/2026) ────────────────────
+  async function validarPinRol(rol, pin) {
+    return rpc('api_pinRoles_validar', [{ rol, pin }]);
+  }
+  async function cambiarPinRol(rol, pinActual, pinNuevo) {
+    return rpc('api_pinRoles_cambiar', [{ rol, pinActual, pinNuevo }]);
+  }
+
   return {
     rpc, leerRISRango, leerCardiologia, asignar, anular, presente, modificar, turnos, buscar, agenda, slots,
     leerValidacionesAgenda, marcarValidacionReportada, leerReglasAgenda, guardarReglaAgenda, eliminarReglaAgenda,
@@ -328,6 +421,14 @@ const RailwayAPI = (() => {
     leerReglasSugerirSobreturno, guardarReglaSugerirSobreturno, eliminarReglaSugerirSobreturno,
     obtenerAgendaConfig, leerAsignadoresTurno, guardarAsignadoresTurno,
     leerFranjasPreferidasSugerir, guardarFranjaPreferidaSugerir, eliminarFranjaPreferidaSugerir,
-    leerCategoriasEstudio, guardarCategoriaEstudio, eliminarCategoriaEstudio
+    leerCategoriasEstudio, guardarCategoriaEstudio, eliminarCategoriaEstudio,
+    leerAgendaFeriados, guardarAgendaFeriado, eliminarAgendaFeriado,
+    leerAgendaFranjas, guardarAgendaFranja, eliminarAgendaFranja,
+    leerAgendaBloqueos, guardarAgendaBloqueo, eliminarAgendaBloqueo,
+    leerAgendaRestriccionesHorarias, guardarAgendaRestriccionHoraria, eliminarAgendaRestriccionHoraria,
+    leerAgendaRestriccionesOrigen, guardarAgendaRestriccionOrigen, eliminarAgendaRestriccionOrigen,
+    leerAgendaRestriccionesPropia, guardarAgendaRestriccionPropia, eliminarAgendaRestriccionPropia,
+    leerAgendaEstudiosCatalogo, guardarAgendaEstudio, eliminarAgendaEstudio,
+    validarPinRol, cambiarPinRol
   };
 })();

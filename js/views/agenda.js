@@ -991,7 +991,7 @@ const AgendaView = (() => {
 
       let datos, risMap, cardioMap;
       if (!_estudiosConfigCache) {
-        try { const cfg = await API.config(); _estudiosConfigCache = cfg.estudios || {}; } catch(_) {}
+        try { const cfg = await RailwayAPI.obtenerAgendaConfig(); _estudiosConfigCache = cfg.estudios || {}; } catch(_) {}
       }
       if (cached) {
         ({ datos, risMap, cardioMap } = JSON.parse(cached));

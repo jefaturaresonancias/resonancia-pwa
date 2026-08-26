@@ -11,14 +11,20 @@ const ConfigView = (() => {
     const container = document.getElementById("config-container");
     container.innerHTML = '<div class="empty-state">Cargando configuración...</div>';
     try {
-      const [datos, limites, asignadores] = await Promise.all([
-        API.leerConfig("all"),
-        // Límites vive en Railway (como Reglas Agenda), no en el Sheet —
-        // si falla no debe tumbar el resto de Config, solo el contador.
+      const [estudios, feriados, franjas, bloqueos, restricciones, restriccionesOrigen, restriccionesPropia, limites, asignadores] = await Promise.all([
+        RailwayAPI.leerAgendaEstudiosCatalogo(),
+        RailwayAPI.leerAgendaFeriados(),
+        RailwayAPI.leerAgendaFranjas(),
+        RailwayAPI.leerAgendaBloqueos(),
+        RailwayAPI.leerAgendaRestriccionesHorarias(),
+        RailwayAPI.leerAgendaRestriccionesOrigen(),
+        RailwayAPI.leerAgendaRestriccionesPropia(),
+        // Límites vive en Railway (como Reglas Agenda) — si falla no debe
+        // tumbar el resto de Config, solo el contador.
         RailwayAPI.leerLimitesSobreturno().catch(() => []),
         RailwayAPI.leerAsignadoresTurno().catch(() => [])
       ]);
-      _datos = datos;
+      _datos = { estudios, feriados, franjas, bloqueos, restricciones, restriccionesOrigen, restriccionesPropia };
       _limitesCount = limites.length;
       _asignadoresTurno = asignadores;
       _render();
@@ -36,7 +42,7 @@ const ConfigView = (() => {
         ${_card("📚", d.estudios.length, "estudios")}
         ${_card("🗓", d.feriados.length, "feriados 2026")}
         ${_card("🎨", d.franjas.length, "franjas recurrentes")}
-        ${_card("🔒", (d.restricciones.length + (d.restriccionesOrigen||[]).length), "restricciones")}
+        ${_card("🔒", (d.restricciones.length + (d.restriccionesOrigen||[]).length + (d.restriccionesPropia||[]).length), "restricciones")}
       </div>
       <div style="display:flex;flex-direction:column;gap:12px">
         ${_seccionEstudios(d.estudios)}
@@ -45,7 +51,7 @@ const ConfigView = (() => {
           ${_seccionFranjas(d.franjas)}
           ${_seccionBloqueos(d.bloqueos)}
         </div>
-        ${_seccionRestricciones(d.restricciones, d.restriccionesOrigen||[])}
+        ${_seccionRestricciones(d.restricciones, d.restriccionesOrigen||[], d.restriccionesPropia||[])}
         ${_seccionLimites()}
         ${_seccionSugerirSobreturno()}
         ${_seccionAsignadoresTurno()}
@@ -86,7 +92,7 @@ const ConfigView = (() => {
       <span class="cfg-estadistica" style="font-size:12px;color:var(--text-2);cursor:pointer">${e.estadistica||"—"}</span>
       <span style="font-size:12px;text-align:center">${e.restriccion ? `<span style="background:var(--bg);border:0.5px solid var(--border);border-radius:4px;padding:1px 6px">${e.restriccion}</span>` : "—"}</span>
       <span class="cfg-duracion" data-idx="${i}" style="font-size:13px;text-align:center;cursor:pointer;text-decoration:underline dotted" title="Clic para editar duración">${e.duracion}</span>
-      <button class="cfg-btn-del-estudio" data-idx="${i}" style="background:transparent;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:0" aria-label="Eliminar">×</button>
+      <button class="cfg-btn-del-estudio" data-idx="${i}" data-id="${e.id}" style="background:transparent;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:0" aria-label="Eliminar">×</button>
     </div>`;
   }
 
@@ -112,7 +118,7 @@ const ConfigView = (() => {
             <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.concepto}</div>
             <div style="font-size:10px;color:var(--text-2)">${f.fecha}</div>
           </div>
-          <button class="cfg-del-feriado" data-idx="${f._idx}" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:0;line-height:1;flex-shrink:0" aria-label="Eliminar">×</button>
+          <button class="cfg-del-feriado" data-idx="${f._idx}" data-id="${f.id}" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:0;line-height:1;flex-shrink:0" aria-label="Eliminar">×</button>
         </div>`
       ).join("");
       return `<div style="background:var(--bg);border-radius:10px;padding:10px 12px">
@@ -135,15 +141,15 @@ const ConfigView = (() => {
   // ── Sección Franjas ───────────────────────────────────────
   function _seccionFranjas(franjas) {
     const items = franjas.map((f,i) => {
-      const dias = [f.dia1, f.func1, f.dia2, f.func2, f.dia3].filter(Boolean).join(" ");
+      const dias = (f.diasSemana||[]).map(d => DIAS_LABEL[d]).join("/");
       return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;background:var(--bg)">
         <div style="width:12px;height:12px;border-radius:50%;background:${f.color};flex-shrink:0"></div>
         <div style="flex:1">
           <div style="font-size:13px;font-weight:500">${f.concepto}</div>
-          <div style="font-size:11px;color:var(--text-2)">${dias} · ${f.horaD}–${f.horaH}</div>
+          <div style="font-size:11px;color:var(--text-2)">${dias} · ${f.horaDesde}–${f.horaHasta}</div>
         </div>
         <button class="cfg-edit-franja" data-idx="${i}" style="background:none;border:none;color:var(--text-2);cursor:pointer;font-size:14px" aria-label="Editar">✏️</button>
-        <button class="cfg-del-franja" data-idx="${i}" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px" aria-label="Eliminar">×</button>
+        <button class="cfg-del-franja" data-id="${f.id}" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px" aria-label="Eliminar">×</button>
       </div>`;
     }).join("");
     return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem">
@@ -162,10 +168,10 @@ const ConfigView = (() => {
         <span style="font-size:15px">🔒</span>
         <div style="flex:1">
           <div style="font-size:13px;font-weight:500">${b.concepto}</div>
-          <div style="font-size:11px;color:var(--text-2)">${b.fecha} · ${b.horaD}–${b.horaH}</div>
+          <div style="font-size:11px;color:var(--text-2)">${b.fecha} · ${b.horaDesde}–${b.horaHasta}</div>
         </div>
         <button class="cfg-edit-bloqueo" data-idx="${i}" style="background:none;border:none;color:var(--text-2);cursor:pointer;font-size:14px;margin-right:2px" aria-label="Editar">✏️</button>
-        <button class="cfg-del-bloqueo" data-idx="${i}" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px" aria-label="Eliminar">×</button>
+        <button class="cfg-del-bloqueo" data-id="${b.id}" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px" aria-label="Eliminar">×</button>
       </div>`
     ).join("");
     return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem">
@@ -180,25 +186,41 @@ const ConfigView = (() => {
   }
 
   // ── Sección Restricciones ─────────────────────────────────
-  function _seccionRestricciones(rest, origen) {
-    const items = [...rest, ...origen].map(r => {
-      const dias = [r.dia1, r.func1, r.dia2, r.func2, r.dia3].filter(Boolean).join(" ");
-      const cod  = r.codigo || r.origen;
-      return `<div style="padding:8px;border-radius:8px;background:var(--bg)">
-        <div style="font-size:12px;color:var(--text-2);margin-bottom:2px">${r.codigo ? "Código" : "Origen"}: ${cod}</div>
-        <div style="font-size:13px;font-weight:500">${r.leyenda||"—"}</div>
-        <div style="font-size:11px;color:var(--text-2)">${dias} · ${r.horaD}–${r.horaH}</div>
+  // Reserva (no bloqueo parejo): una franja por código/origen deja entrar
+  // solo estudios cuyo catálogo tenga ese código, o turnos con ese origen —
+  // ver lib/restriccionesCodigo.js (sistema2-node) para la mecánica real.
+  // "Propia" es la ventana en la que un estudio CON ese código puede darse,
+  // sin importar qué reserve la franja en ese momento.
+  function _seccionRestricciones(rest, origen, propia) {
+    const _item = (r, tipo) => {
+      const dias = (r.diasSemana||[]).map(d => DIAS_LABEL[d]).join("/");
+      const cod  = tipo === "origen" ? r.origen : r.codigo;
+      const cls  = tipo === "codigo" ? "cfg-edit-rest-cod" : tipo === "origen" ? "cfg-edit-rest-orig" : "cfg-edit-rest-propia";
+      const clsDel = tipo === "codigo" ? "cfg-del-rest-cod" : tipo === "origen" ? "cfg-del-rest-orig" : "cfg-del-rest-propia";
+      return `<div style="padding:8px;border-radius:8px;background:var(--bg);position:relative">
+        <div style="font-size:12px;color:var(--text-2);margin-bottom:2px">${tipo === "origen" ? "Origen" : "Código"}: ${cod}</div>
+        <div style="font-size:13px;font-weight:500">${r.leyenda||(tipo === "propia" ? "Ventana propia" : "—")}</div>
+        <div style="font-size:11px;color:var(--text-2)">${dias} · ${r.horaDesde}–${r.horaHasta}</div>
+        <div style="position:absolute;top:6px;right:6px;display:flex;gap:4px">
+          <button class="${cls}" data-id="${r.id}" style="background:none;border:none;color:var(--text-2);cursor:pointer;font-size:12px" aria-label="Editar">✏️</button>
+          <button class="${clsDel}" data-id="${r.id}" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px" aria-label="Eliminar">×</button>
+        </div>
       </div>`;
-    }).join("");
+    };
     return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <span style="font-weight:500;font-size:15px">🔐 Restricciones por código y origen</span>
+        <span style="font-weight:500;font-size:15px">🔐 Restricciones por código, origen y ventana propia</span>
         <div style="display:flex;gap:6px">
           <button id="cfg-btn-nueva-rest-cod" style="font-size:12px">+ Por código</button>
           <button id="cfg-btn-nueva-rest-orig" style="font-size:12px">+ Por origen</button>
+          <button id="cfg-btn-nueva-rest-propia" style="font-size:12px">+ Ventana propia</button>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${items||"Sin restricciones"}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        ${rest.map(r => _item(r, "codigo")).join("") || '<div style="font-size:12px;color:var(--text-2)">Sin restricciones por código</div>'}
+        ${origen.map(r => _item(r, "origen")).join("") || '<div style="font-size:12px;color:var(--text-2)">Sin restricciones por origen</div>'}
+        ${propia.map(r => _item(r, "propia")).join("") || '<div style="font-size:12px;color:var(--text-2)">Sin ventanas propias</div>'}
+      </div>
     </div>`;
   }
 
@@ -288,8 +310,7 @@ const ConfigView = (() => {
         const i = parseInt(el.dataset.idx);
         const nueva = parseInt(prompt("Duración en minutos:", _datos.estudios[i].duracion));
         if (isNaN(nueva)) return;
-        _datos.estudios[i].duracion = nueva;
-        _guardarEstudios();
+        _guardarEstudio({ ..._datos.estudios[i], duracion: nueva });
       });
     });
 
@@ -303,11 +324,14 @@ const ConfigView = (() => {
 
     // Eliminar estudio
     container.querySelectorAll(".cfg-btn-del-estudio").forEach(btn => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", async () => {
         const i = parseInt(btn.dataset.idx);
         if (!confirm(`¿Eliminar estudio "${_datos.estudios[i].nombre}"?`)) return;
-        _datos.estudios.splice(i, 1);
-        _guardarEstudios();
+        try {
+          await RailwayAPI.eliminarAgendaEstudio(btn.dataset.id);
+          App.toast("Estudio eliminado", "ok");
+          cargar();
+        } catch (err) { App.toast("Error: " + err.message, "error"); }
       });
     });
 
@@ -316,34 +340,38 @@ const ConfigView = (() => {
 
     // Feriados
     container.querySelectorAll(".cfg-del-feriado").forEach(btn => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", async () => {
         const i = parseInt(btn.dataset.idx);
         if (!confirm(`¿Eliminar feriado "${_datos.feriados[i].fecha}"?`)) return;
-        _datos.feriados.splice(i, 1);
-        _guardarFeriados();
+        try {
+          await RailwayAPI.eliminarAgendaFeriado(btn.dataset.id);
+          App.toast("Feriado eliminado", "ok");
+          cargar();
+        } catch (err) { App.toast("Error: " + err.message, "error"); }
       });
     });
 
-    document.getElementById("cfg-btn-nuevo-feriado").addEventListener("click", () => {
+    document.getElementById("cfg-btn-nuevo-feriado").addEventListener("click", async () => {
       const fecha    = prompt("Fecha del feriado (dd/MM/yyyy):");
       if (!fecha) return;
       const concepto = prompt("Concepto:");
       if (!concepto) return;
-      _datos.feriados.push({ fecha, concepto });
-      _datos.feriados.sort((a,b) => {
-        const pa = a.fecha.split("/"), pb = b.fecha.split("/");
-        return new Date(pa[2],pa[1]-1,pa[0]) - new Date(pb[2],pb[1]-1,pb[0]);
-      });
-      _guardarFeriados();
+      try {
+        await RailwayAPI.guardarAgendaFeriado({ fecha, concepto });
+        App.toast("Feriado guardado", "ok");
+        cargar();
+      } catch (err) { App.toast("Error: " + err.message, "error"); }
     });
 
     // Bloqueos
     container.querySelectorAll(".cfg-del-bloqueo").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const i = parseInt(btn.dataset.idx);
+      btn.addEventListener("click", async () => {
         if (!confirm("¿Eliminar este bloqueo?")) return;
-        _datos.bloqueos.splice(i, 1);
-        _guardarBloqueos();
+        try {
+          await RailwayAPI.eliminarAgendaBloqueo(btn.dataset.id);
+          App.toast("Bloqueo eliminado", "ok");
+          cargar();
+        } catch (err) { App.toast("Error: " + err.message, "error"); }
       });
     });
 
@@ -364,45 +392,62 @@ const ConfigView = (() => {
     });
 
     container.querySelectorAll(".cfg-del-franja").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const i = parseInt(btn.dataset.idx);
-        if (!confirm(`¿Eliminar franja "${_datos.franjas[i].concepto}"?`)) return;
-        _datos.franjas.splice(i, 1);
-        _guardarFranjas();
+      btn.addEventListener("click", async () => {
+        if (!confirm("¿Eliminar esta franja?")) return;
+        try {
+          await RailwayAPI.eliminarAgendaFranja(btn.dataset.id);
+          App.toast("Franja eliminada", "ok");
+          cargar();
+        } catch (err) { App.toast("Error: " + err.message, "error"); }
       });
     });
 
-    // Nueva restricción por código
-    document.getElementById("cfg-btn-nueva-rest-cod").addEventListener("click", () => {
-      const codigo   = prompt("Código (ej: MM, CAR):");
-      if (!codigo) return;
-      const dia1     = prompt("Día desde (ej: LUNES):");
-      const func1    = prompt("Función (hasta / y / vacío):");
-      const dia2     = prompt("Día hasta (opcional):");
-      const horaD    = prompt("Hora desde (HH:MM):");
-      const horaH    = prompt("Hora hasta (HH:MM):");
-      const leyenda  = prompt("Leyenda:");
-      const color    = prompt("Color hex (ej: #e06666):", "#e06666");
-      _datos.restricciones.push({ codigo, dia1, func1: func1||"", dia2: dia2||"", func2:"", dia3:"", horaD, horaH, leyenda, color });
-      App.toast("Restricción agregada — guardá desde el sheet Config para hacerla permanente", "ok");
-      _render();
+    // Restricciones por código
+    document.getElementById("cfg-btn-nueva-rest-cod").addEventListener("click", () => _editarRestriccionCodigo(null));
+    container.querySelectorAll(".cfg-edit-rest-cod").forEach(btn => {
+      btn.addEventListener("click", () => _editarRestriccionCodigo(_datos.restricciones.find(r => String(r.id) === btn.dataset.id)));
+    });
+    container.querySelectorAll(".cfg-del-rest-cod").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("¿Eliminar esta restricción por código?")) return;
+        try {
+          await RailwayAPI.eliminarAgendaRestriccionHoraria(btn.dataset.id);
+          App.toast("Restricción eliminada", "ok");
+          cargar();
+        } catch (err) { App.toast("Error: " + err.message, "error"); }
+      });
     });
 
-    // Nueva restricción por origen
-    document.getElementById("cfg-btn-nueva-rest-orig").addEventListener("click", () => {
-      const origen   = prompt("Origen (ej: INTERNACIÓN):");
-      if (!origen) return;
-      const dia1     = prompt("Día desde (ej: LUNES):");
-      const func1    = prompt("Función (hasta / y / vacío):");
-      const dia2     = prompt("Día hasta (opcional):");
-      const horaD    = prompt("Hora desde (HH:MM):");
-      const horaH    = prompt("Hora hasta (HH:MM):");
-      const leyenda  = prompt("Leyenda:");
-      const color    = prompt("Color hex (ej: #ffd966):", "#ffd966");
-      if (!_datos.restriccionesOrigen) _datos.restriccionesOrigen = [];
-      _datos.restriccionesOrigen.push({ origen, dia1, func1: func1||"", dia2: dia2||"", func2:"", dia3:"", horaD, horaH, leyenda, color });
-      App.toast("Restricción agregada — guardá desde el sheet Config para hacerla permanente", "ok");
-      _render();
+    // Restricciones por origen
+    document.getElementById("cfg-btn-nueva-rest-orig").addEventListener("click", () => _editarRestriccionOrigen(null));
+    container.querySelectorAll(".cfg-edit-rest-orig").forEach(btn => {
+      btn.addEventListener("click", () => _editarRestriccionOrigen((_datos.restriccionesOrigen||[]).find(r => String(r.id) === btn.dataset.id)));
+    });
+    container.querySelectorAll(".cfg-del-rest-orig").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("¿Eliminar esta restricción por origen?")) return;
+        try {
+          await RailwayAPI.eliminarAgendaRestriccionOrigen(btn.dataset.id);
+          App.toast("Restricción eliminada", "ok");
+          cargar();
+        } catch (err) { App.toast("Error: " + err.message, "error"); }
+      });
+    });
+
+    // Ventana propia del código
+    document.getElementById("cfg-btn-nueva-rest-propia").addEventListener("click", () => _editarRestriccionPropia(null));
+    container.querySelectorAll(".cfg-edit-rest-propia").forEach(btn => {
+      btn.addEventListener("click", () => _editarRestriccionPropia((_datos.restriccionesPropia||[]).find(r => String(r.id) === btn.dataset.id)));
+    });
+    container.querySelectorAll(".cfg-del-rest-propia").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("¿Eliminar esta ventana propia?")) return;
+        try {
+          await RailwayAPI.eliminarAgendaRestriccionPropia(btn.dataset.id);
+          App.toast("Ventana eliminada", "ok");
+          cargar();
+        } catch (err) { App.toast("Error: " + err.message, "error"); }
+      });
     });
 
     // Límites de sobreturno
@@ -431,6 +476,25 @@ const ConfigView = (() => {
     });
   }
 
+  // ── Días de semana en texto (LUNES,MARTES,...) ↔ diasSemana:[0-6] ──
+  // Reemplaza al viejo dia1/func1/dia2/func2/dia3 (rango de celdas del
+  // Sheet) — acá se guarda directo el array de días, sin resolver rangos.
+  const DIAS_NOMBRE = ['DOMINGO','LUNES','MARTES','MIERCOLES','JUEVES','VIERNES','SABADO'];
+  const DIAS_NOMBRE_MAP = { DOMINGO:0, LUNES:1, MARTES:2, MIERCOLES:3, 'MIÉRCOLES':3, JUEVES:4, VIERNES:5, SABADO:6, 'SÁBADO':6 };
+  function _diasSemanaATexto(dias) {
+    return (dias||[]).slice().sort((a,b)=>a-b).map(d => DIAS_NOMBRE[d]).join(',');
+  }
+  function _textoADiasSemana(texto) {
+    return String(texto||'').split(',').map(s => DIAS_NOMBRE_MAP[s.trim().toUpperCase()]).filter(d => d !== undefined);
+  }
+  function _pedirDiasSemana(actuales) {
+    const texto = prompt("Días (separados por coma — LUNES,MARTES,...):", _diasSemanaATexto(actuales));
+    if (texto === null) return null;
+    const dias = _textoADiasSemana(texto);
+    if (dias.length === 0) { App.toast("Ningún día válido reconocido", "error"); return null; }
+    return dias;
+  }
+
   // ── Editar estudio ────────────────────────────────────────
   function _editarEstudio(idx) {
     const nuevo = idx === -1;
@@ -441,88 +505,103 @@ const ConfigView = (() => {
     const restriccion = prompt("Restricción (C, S, MM, etc.):", e.restriccion);
     const duracion    = parseInt(prompt("Tiempo en minutos:", e.duracion));
     if (isNaN(duracion)) { App.toast("Duración inválida", "error"); return; }
-    const actualizado = { nombre, estadistica, restriccion, duracion };
-    if (nuevo) _datos.estudios.push(actualizado);
-    else _datos.estudios[idx] = actualizado;
-    _datos.estudios.sort((a,b) => a.nombre.localeCompare(b.nombre));
-    _guardarEstudios();
+    _guardarEstudio({ id: e.id, nombre, estadistica, restriccion, duracion });
+  }
+
+  async function _guardarEstudio(estudio) {
+    try {
+      await RailwayAPI.guardarAgendaEstudio(estudio);
+      App.toast("Estudio guardado", "ok");
+      cargar();
+    } catch (err) { App.toast("Error: " + err.message, "error"); }
   }
 
   // ── Editar bloqueo ────────────────────────────────────────
   function _editarBloqueo(idx) {
     const nuevo = idx === -1;
-    const b     = nuevo ? { fecha:"", horaD:"", horaH:"", concepto:"" } : {..._datos.bloqueos[idx]};
+    const b     = nuevo ? { fecha:"", horaDesde:"", horaHasta:"", concepto:"" } : {..._datos.bloqueos[idx]};
     const fecha    = prompt("Fecha del bloqueo (dd/MM/yyyy):", b.fecha);
     if (!fecha) return;
-    const horaD    = prompt("Hora desde (HH:MM):", b.horaD);
-    if (!horaD) return;
-    const horaH    = prompt("Hora hasta (HH:MM):", b.horaH);
-    if (!horaH) return;
+    const horaDesde = prompt("Hora desde (HH:MM):", b.horaDesde);
+    if (!horaDesde) return;
+    const horaHasta = prompt("Hora hasta (HH:MM):", b.horaHasta);
+    if (!horaHasta) return;
     const concepto = prompt("Concepto:", b.concepto);
     if (!concepto) return;
-    const actualizado = { fecha, horaD, horaH, concepto };
-    if (nuevo) _datos.bloqueos.push(actualizado);
-    else _datos.bloqueos[idx] = actualizado;
-    _guardarBloqueos();
+    _guardarSeccion(RailwayAPI.guardarAgendaBloqueo, { id: b.id, fecha, horaDesde, horaHasta, concepto }, "Bloqueo guardado");
   }
 
   // ── Editar franja ─────────────────────────────────────────
   function _editarFranja(idx) {
     const nuevo = idx === -1;
     const f = nuevo
-      ? { dia1:"", func1:"", dia2:"", func2:"", dia3:"", horaD:"", horaH:"", concepto:"", color:"#e06666" }
+      ? { diasSemana:[], horaDesde:"", horaHasta:"", concepto:"", color:"#e06666" }
       : {..._datos.franjas[idx]};
     const concepto = prompt("Concepto (ej: Franja Exclusiva Neurología):", f.concepto);
     if (!concepto) return;
-    const dia1    = prompt("Día desde (ej: LUNES, MARTES):", f.dia1);
-    if (!dia1) return;
-    const func1   = prompt("Función: 'hasta', 'y', o dejar vacío:", f.func1);
-    const dia2    = prompt("Día hasta/adicional (opcional):", f.dia2);
-    const func2   = prompt("Segunda función (opcional):", f.func2);
-    const dia3    = prompt("Tercer día (opcional):", f.dia3);
-    const horaD   = prompt("Hora desde (HH:MM):", f.horaD);
-    if (!horaD) return;
-    const horaH   = prompt("Hora hasta (HH:MM):", f.horaH);
-    if (!horaH) return;
-    const color   = prompt("Color hex (ej: #e06666):", f.color || "#e06666");
-    const actualizado = { dia1, func1: func1||"", dia2: dia2||"", func2: func2||"", dia3: dia3||"", horaD, horaH, concepto, color: color||"#e06666" };
-    if (nuevo) _datos.franjas.push(actualizado);
-    else _datos.franjas[idx] = actualizado;
-    _guardarFranjas();
+    const diasSemana = _pedirDiasSemana(f.diasSemana);
+    if (!diasSemana) return;
+    const horaDesde = prompt("Hora desde (HH:MM):", f.horaDesde);
+    if (!horaDesde) return;
+    const horaHasta = prompt("Hora hasta (HH:MM):", f.horaHasta);
+    if (!horaHasta) return;
+    const color = prompt("Color hex (ej: #e06666):", f.color || "#e06666");
+    _guardarSeccion(RailwayAPI.guardarAgendaFranja, { id: f.id, diasSemana, horaDesde, horaHasta, concepto, color: color||"#e06666" }, "Franja guardada");
   }
 
-  async function _guardarFranjas() {
-    try {
-      await API.escribirConfig("franjas", _datos.franjas);
-      App.toast("Franjas guardadas", "ok");
-      _render();
-    } catch(err) { App.toast("Error: " + err.message, "error"); }
+  // ── Editar restricción por código ─────────────────────────
+  function _editarRestriccionCodigo(r) {
+    const d = r || { codigo:"", diasSemana:[], horaDesde:"", horaHasta:"", leyenda:"", color:"#e06666" };
+    const codigo = prompt("Código (ej: MM, CAR, Q):", d.codigo);
+    if (!codigo) return;
+    const diasSemana = _pedirDiasSemana(d.diasSemana);
+    if (!diasSemana) return;
+    const horaDesde = prompt("Hora desde (HH:MM):", d.horaDesde);
+    if (!horaDesde) return;
+    const horaHasta = prompt("Hora hasta (HH:MM):", d.horaHasta);
+    if (!horaHasta) return;
+    const leyenda = prompt("Leyenda:", d.leyenda);
+    const color = prompt("Color hex (ej: #e06666):", d.color || "#e06666");
+    _guardarSeccion(RailwayAPI.guardarAgendaRestriccionHoraria, { id: d.id, codigo, diasSemana, horaDesde, horaHasta, leyenda, color: color||"#e06666" }, "Restricción guardada");
   }
 
-  // ── Guardar secciones ─────────────────────────────────────
-  async function _guardarEstudios() {
-    try {
-      App.toast("Guardando estudios...", "ok");
-      await API.escribirEstudios(_datos.estudios);
-      App.toast("Estudios guardados", "ok");
-      _render();
-    } catch(err) { App.toast("Error: "+err.message, "error"); }
+  // ── Editar restricción por origen ─────────────────────────
+  function _editarRestriccionOrigen(r) {
+    const d = r || { origen:"", diasSemana:[], horaDesde:"", horaHasta:"", leyenda:"", color:"#ffd966" };
+    const origen = prompt("Origen (ej: INTERNACIÓN):", d.origen);
+    if (!origen) return;
+    const diasSemana = _pedirDiasSemana(d.diasSemana);
+    if (!diasSemana) return;
+    const horaDesde = prompt("Hora desde (HH:MM):", d.horaDesde);
+    if (!horaDesde) return;
+    const horaHasta = prompt("Hora hasta (HH:MM):", d.horaHasta);
+    if (!horaHasta) return;
+    const leyenda = prompt("Leyenda:", d.leyenda);
+    const color = prompt("Color hex (ej: #ffd966):", d.color || "#ffd966");
+    _guardarSeccion(RailwayAPI.guardarAgendaRestriccionOrigen, { id: d.id, origen, diasSemana, horaDesde, horaHasta, leyenda, color: color||"#ffd966" }, "Restricción guardada");
   }
 
-  async function _guardarFeriados() {
-    try {
-      await API.escribirConfig("feriados", _datos.feriados);
-      App.toast("Feriados guardados", "ok");
-      _render();
-    } catch(err) { App.toast("Error: "+err.message, "error"); }
+  // ── Editar ventana propia del código ──────────────────────
+  function _editarRestriccionPropia(r) {
+    const d = r || { codigo:"", diasSemana:[], horaDesde:"", horaHasta:"" };
+    const codigo = prompt("Código (ej: MM, CAR):", d.codigo);
+    if (!codigo) return;
+    const diasSemana = _pedirDiasSemana(d.diasSemana);
+    if (!diasSemana) return;
+    const horaDesde = prompt("Hora desde (HH:MM):", d.horaDesde);
+    if (!horaDesde) return;
+    const horaHasta = prompt("Hora hasta (HH:MM):", d.horaHasta);
+    if (!horaHasta) return;
+    _guardarSeccion(RailwayAPI.guardarAgendaRestriccionPropia, { id: d.id, codigo, diasSemana, horaDesde, horaHasta }, "Ventana guardada");
   }
 
-  async function _guardarBloqueos() {
+  // ── Guardar (genérico) ────────────────────────────────────
+  async function _guardarSeccion(fnGuardar, datos, mensajeOk) {
     try {
-      await API.escribirConfig("bloqueos", _datos.bloqueos);
-      App.toast("Bloqueos guardados", "ok");
-      _render();
-    } catch(err) { App.toast("Error: "+err.message, "error"); }
+      await fnGuardar(datos);
+      App.toast(mensajeOk, "ok");
+      cargar();
+    } catch (err) { App.toast("Error: " + err.message, "error"); }
   }
 
   // ── Modal: gestionar límites de sobreturno (lista ↔ formulario) ────

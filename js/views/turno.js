@@ -12,7 +12,7 @@ const TurnoView = (() => {
   async function cargarEstudios() {
     if (Object.keys(_estudiosConfig).length > 0) return;
     try {
-      const cfg = await API.config();
+      const cfg = await RailwayAPI.obtenerAgendaConfig();
       _estudiosConfig = cfg.estudios || {};
       _poblarSelect();
     } catch (err) {
