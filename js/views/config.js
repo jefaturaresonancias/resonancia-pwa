@@ -207,6 +207,12 @@ const ConfigView = (() => {
         </div>
       </div>`;
     };
+    const _grupo = (titulo, lista, tipo, vacio) => `<div>
+      <div style="font-size:11px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">${titulo}</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${lista.map(r => _item(r, tipo)).join("") || `<div style="font-size:12px;color:var(--text-2)">${vacio}</div>`}
+      </div>
+    </div>`;
     return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <span style="font-weight:500;font-size:15px">🔐 Restricciones por código, origen y ventana propia</span>
@@ -216,10 +222,10 @@ const ConfigView = (() => {
           <button id="cfg-btn-nueva-rest-propia" style="font-size:12px">+ Ventana propia</button>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-        ${rest.map(r => _item(r, "codigo")).join("") || '<div style="font-size:12px;color:var(--text-2)">Sin restricciones por código</div>'}
-        ${origen.map(r => _item(r, "origen")).join("") || '<div style="font-size:12px;color:var(--text-2)">Sin restricciones por origen</div>'}
-        ${propia.map(r => _item(r, "propia")).join("") || '<div style="font-size:12px;color:var(--text-2)">Sin ventanas propias</div>'}
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:start">
+        ${_grupo("Por código", rest, "codigo", "Sin restricciones por código")}
+        ${_grupo("Por origen", origen, "origen", "Sin restricciones por origen")}
+        ${_grupo("Ventana propia", propia, "propia", "Sin ventanas propias")}
       </div>
     </div>`;
   }

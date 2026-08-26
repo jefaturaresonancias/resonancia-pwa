@@ -17,23 +17,39 @@ const RailwayAPI = (() => {
     return resp.json();
   }
 
+  // Config.cargar() y otras pantallas piden varios RPCs en paralelo
+  // (Promise.all) — sin esta guarda, cada uno vería "no hay token todavía"
+  // al mismo tiempo y abriría su propio prompt() del PIN, superpuestos.
+  // _tokenPromise deja que todos esperen el mismo login en curso.
+  let _tokenPromise = null;
+
   async function _getToken(forzar = false) {
     if (!forzar) {
       const cacheado = sessionStorage.getItem(KEY_TOKEN);
       if (cacheado) return cacheado;
     }
-    let mensaje = "PIN de acceso:";
-    for (let intentos = 0; intentos < 3; intentos++) {
-      const pin = prompt(mensaje);
-      if (pin === null) throw new Error("Login cancelado");
-      const json = await _login(pin);
-      if (json.ok) {
-        sessionStorage.setItem(KEY_TOKEN, json.token);
-        return json.token;
+    if (_tokenPromise) return _tokenPromise;
+
+    _tokenPromise = (async () => {
+      let mensaje = "PIN de acceso:";
+      for (let intentos = 0; intentos < 3; intentos++) {
+        const pin = prompt(mensaje);
+        if (pin === null) throw new Error("Login cancelado");
+        const json = await _login(pin);
+        if (json.ok) {
+          sessionStorage.setItem(KEY_TOKEN, json.token);
+          return json.token;
+        }
+        mensaje = "PIN incorrecto, reintentar:";
       }
-      mensaje = "PIN incorrecto, reintentar:";
+      throw new Error("No se pudo iniciar sesión");
+    })();
+
+    try {
+      return await _tokenPromise;
+    } finally {
+      _tokenPromise = null;
     }
-    throw new Error("No se pudo iniciar sesión");
   }
 
   async function _post(fn, args, token) {
