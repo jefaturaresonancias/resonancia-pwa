@@ -65,6 +65,7 @@ function _routeGet(action, p) {
     case 'leerLog':     return _leerLog(p);
     case 'validarPin':  return _apiValidarPin(p);
     case 'cambiarPin':  return _apiCambiarPin(p);
+    case 'espejarPinRol': return _apiEspejarPinRol(p);
     case 'listarFilasCrudasRIS': return _apiListarFilasCrudasRIS(p)
     case 'eliminarFilaRIS': return _apiEliminarFilaRIS(p)
     case 'leerCardiacas':   return _apiLeerCardiacas(p)
@@ -962,7 +963,71 @@ function _apiEscribirConfig(p) {
     return { escritos: feriados.length };
   }
 
+  // Espejo Postgres → Sheet (plan de contingencia, 26/8/2026) — estos 3
+  // tipos nunca tuvieron rama de escritura acá (Y3:AF500/AH3:AQ16/
+  // AH19:AQ500 se cargaban a mano). Mismo criterio que bloqueos/franjas de
+  // arriba: limpiar el rango entero y reescribir todo. `datos` ya viene con
+  // dia1/func1/dia2/func2/dia3 resueltos desde sistema2-node
+  // (lib/diasSemanaSheet.js) — acá no se resuelve nada, solo se escribe tal
+  // cual, igual que ya hace esta función con franjas/bloqueos.
+  if (tipo === "restriccionesHorarias") {
+    const filas = datos || [];
+    config.getRange("AH3:AQ16").clearContent();
+    if (filas.length > 0) {
+      const valores = filas.map(r => [
+        r.codigo, r.dia1||"", r.func1||"", r.dia2||"", r.func2||"", r.dia3||"",
+        r.horaD, r.horaH, r.leyenda||"", r.color||"#e06666"
+      ]);
+      config.getRange(3, 34, valores.length, 10).setValues(valores);
+    }
+    _invalidarCacheConfig();
+    return { escritos: filas.length };
+  }
+
+  if (tipo === "restriccionesOrigen") {
+    const filas = datos || [];
+    config.getRange("AH19:AQ500").clearContent();
+    if (filas.length > 0) {
+      const valores = filas.map(r => [
+        r.codigo, r.dia1||"", r.func1||"", r.dia2||"", r.func2||"", r.dia3||"",
+        r.horaD, r.horaH, r.leyenda||"", r.color||"#e06666"
+      ]);
+      config.getRange(19, 34, valores.length, 10).setValues(valores);
+    }
+    _invalidarCacheConfig();
+    return { escritos: filas.length };
+  }
+
+  if (tipo === "restriccionesPropia") {
+    const filas = datos || [];
+    config.getRange("Y3:AF500").clearContent();
+    if (filas.length > 0) {
+      const valores = filas.map(r => [
+        r.codigo, r.dia1||"", r.func1||"", r.dia2||"", r.func2||"", r.dia3||"",
+        r.horaD, r.horaH
+      ]);
+      config.getRange(3, 25, valores.length, 8).setValues(valores);
+    }
+    _invalidarCacheConfig();
+    return { escritos: filas.length };
+  }
+
   return { error: "Tipo no reconocido" };
+}
+
+// Espejo Postgres → Sheet (plan de contingencia, 26/8/2026) — a diferencia
+// del resto de este archivo (sin autenticación, igual que siempre), esta
+// acción exige un secreto compartido porque toca el PIN. El token vive en
+// la Script Property MIRROR_TOKEN (se pega a mano una sola vez) y en
+// Postgres (config.APPS_SCRIPT_MIRROR_TOKEN, ver rpc/pinRoles.js).
+function _apiEspejarPinRol(p) {
+  if (!p.rol || !p.pin || !p.token) throw new Error("Faltan parámetros rol/pin/token");
+  const props = PropertiesService.getScriptProperties();
+  const tokenEsperado = props.getProperty("MIRROR_TOKEN") || "";
+  if (!tokenEsperado || p.token !== tokenEsperado) throw new Error("Token inválido");
+  const key = p.rol === "admin" ? "PIN_ADMIN" : "PIN_JEFATURA";
+  props.setProperty(key, String(p.pin));
+  return { actualizado: true };
 }
 
 function _apiValidarPin(p) {
