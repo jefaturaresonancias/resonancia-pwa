@@ -718,50 +718,128 @@ const ConfigView = (() => {
     _guardarSeccion(RailwayAPI.guardarAgendaFranja, { id: f.id, diasSemana, horaDesde, horaHasta, concepto, color: color||"#e06666" }, "Franja guardada");
   }
 
-  // ── Editar restricción por código ─────────────────────────
-  function _editarRestriccionCodigo(r) {
-    const d = r || { codigo:"", diasSemana:[], horaDesde:"", horaHasta:"", leyenda:"", color:"#e06666" };
-    const codigo = prompt("Código (ej: MM, CAR, Q):", d.codigo);
-    if (!codigo) return;
-    const diasSemana = _pedirDiasSemana(d.diasSemana);
-    if (!diasSemana) return;
-    const horaDesde = prompt("Hora desde (HH:MM):", d.horaDesde);
-    if (!horaDesde) return;
-    const horaHasta = prompt("Hora hasta (HH:MM):", d.horaHasta);
-    if (!horaHasta) return;
-    const leyenda = prompt("Leyenda:", d.leyenda);
-    const color = prompt("Color hex (ej: #e06666):", d.color || "#e06666");
-    _guardarSeccion(RailwayAPI.guardarAgendaRestriccionHoraria, { id: d.id, codigo, diasSemana, horaDesde, horaHasta, leyenda, color: color||"#e06666" }, "Restricción guardada");
+  // ── Restricciones (código / origen / ventana propia) ──────
+  // Antes era una cadena de prompt() (código, días como texto libre,
+  // horaDesde, horaHasta, leyenda, color) — reemplazado por un modal con
+  // campos estructurados, mismo criterio que ya usa "Límites de
+  // sobreturno" (27/8/2026, a pedido).
+  const REST_TITULOS = { codigo: "Restricción por código", origen: "Restricción por origen", propia: "Ventana propia del código" };
+  function _restGuardarFn(tipo) {
+    return tipo === "origen" ? RailwayAPI.guardarAgendaRestriccionOrigen
+      : tipo === "propia" ? RailwayAPI.guardarAgendaRestriccionPropia
+      : RailwayAPI.guardarAgendaRestriccionHoraria;
+  }
+  let _restModalTipo = null;
+  let _restModalEditando = null;
+
+  function _editarRestriccionCodigo(r) { _abrirModalRestriccion("codigo", r); }
+  function _editarRestriccionOrigen(r) { _abrirModalRestriccion("origen", r); }
+  function _editarRestriccionPropia(r) { _abrirModalRestriccion("propia", r); }
+
+  function _abrirModalRestriccion(tipo, r) {
+    _restModalTipo = tipo;
+    _restModalEditando = r || null;
+    document.getElementById("rest-modal-overlay").classList.remove("hidden");
+    _renderFormularioRestriccion(tipo, r);
   }
 
-  // ── Editar restricción por origen ─────────────────────────
-  function _editarRestriccionOrigen(r) {
-    const d = r || { origen:"", diasSemana:[], horaDesde:"", horaHasta:"", leyenda:"", color:"#ffd966" };
-    const origen = prompt("Origen (ej: INTERNACIÓN):", d.origen);
-    if (!origen) return;
-    const diasSemana = _pedirDiasSemana(d.diasSemana);
-    if (!diasSemana) return;
-    const horaDesde = prompt("Hora desde (HH:MM):", d.horaDesde);
-    if (!horaDesde) return;
-    const horaHasta = prompt("Hora hasta (HH:MM):", d.horaHasta);
-    if (!horaHasta) return;
-    const leyenda = prompt("Leyenda:", d.leyenda);
-    const color = prompt("Color hex (ej: #ffd966):", d.color || "#ffd966");
-    _guardarSeccion(RailwayAPI.guardarAgendaRestriccionOrigen, { id: d.id, origen, diasSemana, horaDesde, horaHasta, leyenda, color: color||"#ffd966" }, "Restricción guardada");
+  function _cerrarModalRestriccion() {
+    document.getElementById("rest-modal-overlay").classList.add("hidden");
   }
 
-  // ── Editar ventana propia del código ──────────────────────
-  function _editarRestriccionPropia(r) {
-    const d = r || { codigo:"", diasSemana:[], horaDesde:"", horaHasta:"" };
-    const codigo = prompt("Código (ej: MM, CAR):", d.codigo);
-    if (!codigo) return;
-    const diasSemana = _pedirDiasSemana(d.diasSemana);
-    if (!diasSemana) return;
-    const horaDesde = prompt("Hora desde (HH:MM):", d.horaDesde);
-    if (!horaDesde) return;
-    const horaHasta = prompt("Hora hasta (HH:MM):", d.horaHasta);
-    if (!horaHasta) return;
-    _guardarSeccion(RailwayAPI.guardarAgendaRestriccionPropia, { id: d.id, codigo, diasSemana, horaDesde, horaHasta }, "Ventana guardada");
+  function _renderFormularioRestriccion(tipo, r) {
+    document.getElementById("rest-modal-titulo").textContent = (r ? "Editar — " : "Nueva — ") + REST_TITULOS[tipo];
+    const diasActuales = r ? (r.diasSemana || []) : [];
+
+    const campoPrincipal = tipo === "origen"
+      ? `<div class="form-group" style="margin-bottom:.75rem">
+          <label>Origen</label>
+          <select id="rest-form-clave">
+            ${ORIGENES_SUGERIR.map(o => `<option value="${o}" ${r && r.origen === o ? "selected" : ""}>${o}</option>`).join("")}
+          </select>
+        </div>`
+      : `<div class="form-group" style="margin-bottom:.75rem">
+          <label>Código</label>
+          <input type="text" id="rest-form-clave" value="${r ? (r.codigo || "").replace(/"/g, "&quot;") : ""}" placeholder="Ej: MM, CAR, Q">
+        </div>`;
+
+    const camposLeyendaColor = tipo === "propia" ? "" : `
+      <div class="form-group" style="margin-bottom:.75rem">
+        <label>Leyenda</label>
+        <input type="text" id="rest-form-leyenda" value="${r ? (r.leyenda || "").replace(/"/g, "&quot;") : ""}" placeholder="Ej: Franja Exclusiva Neurología">
+      </div>
+      <div class="form-group" style="margin-bottom:.75rem;display:flex;align-items:center;gap:8px">
+        <label style="margin:0">Color</label>
+        <input type="color" id="rest-form-color" value="${r && r.color ? r.color : "#e06666"}">
+      </div>`;
+
+    document.getElementById("rest-modal-body").innerHTML = `
+      ${campoPrincipal}
+      <div style="margin-bottom:.75rem">
+        <label style="font-size:.85rem;display:block;margin-bottom:4px">Días de la semana</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${DIAS_LABEL.map((lbl, d) => `
+            <label style="display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--text-2);cursor:pointer">
+              <input type="checkbox" class="rest-form-dia" value="${d}" ${diasActuales.includes(d) ? "checked" : ""}>
+              ${lbl}
+            </label>`).join("")}
+        </div>
+      </div>
+      <div style="display:flex;gap:.75rem;margin-bottom:.75rem">
+        <div class="form-group" style="flex:1">
+          <label>Hora desde</label>
+          <input type="time" id="rest-form-desde" value="${r ? r.horaDesde || "" : ""}">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label>Hora hasta</label>
+          <input type="time" id="rest-form-hasta" value="${r ? r.horaHasta || "" : ""}">
+        </div>
+      </div>
+      ${camposLeyendaColor}
+      <div id="rest-form-error" style="color:#c62828;font-size:.8rem;margin-top:.5rem"></div>
+    `;
+
+    document.getElementById("rest-modal-footer").innerHTML = `
+      <button class="btn-sm" id="btn-rest-cancelar">Cancelar</button>
+      <button class="btn-primary" id="btn-rest-guardar">Guardar</button>`;
+    document.getElementById("btn-rest-cancelar").addEventListener("click", _cerrarModalRestriccion);
+    document.getElementById("btn-rest-guardar").addEventListener("click", _guardarFormularioRestriccion);
+  }
+
+  async function _guardarFormularioRestriccion() {
+    const errorEl = document.getElementById("rest-form-error");
+    errorEl.textContent = "";
+    const tipo = _restModalTipo;
+    const clave = document.getElementById("rest-form-clave").value.trim();
+    const diasSemana = [...document.querySelectorAll(".rest-form-dia:checked")].map(cb => parseInt(cb.value, 10));
+    const horaDesde = document.getElementById("rest-form-desde").value;
+    const horaHasta = document.getElementById("rest-form-hasta").value;
+
+    if (!clave) { errorEl.textContent = tipo === "origen" ? "Elegí un origen." : "Completá el código."; return; }
+    if (diasSemana.length === 0) { errorEl.textContent = "Elegí al menos un día."; return; }
+    if (!horaDesde || !horaHasta) { errorEl.textContent = "Completá las dos horas."; return; }
+    if (horaHasta <= horaDesde) { errorEl.textContent = "La hora hasta debe ser mayor a la hora desde."; return; }
+
+    const datos = { id: _restModalEditando ? _restModalEditando.id : undefined, diasSemana, horaDesde, horaHasta };
+    if (tipo === "origen") datos.origen = clave; else datos.codigo = clave;
+    if (tipo !== "propia") {
+      datos.leyenda = document.getElementById("rest-form-leyenda").value.trim();
+      datos.color = document.getElementById("rest-form-color").value;
+    }
+
+    try {
+      await _restGuardarFn(tipo)(datos);
+      App.toast(tipo === "propia" ? "Ventana guardada" : "Restricción guardada", "ok");
+      _cerrarModalRestriccion();
+      cargar();
+    } catch (err) { errorEl.textContent = "Error: " + err.message; }
+  }
+
+  function _initModalRestriccion() {
+    document.getElementById("btn-rest-modal-cerrar").addEventListener("click", _cerrarModalRestriccion);
+    document.getElementById("rest-modal-overlay").addEventListener("click", (e) => {
+      if (e.target.id === "rest-modal-overlay") _cerrarModalRestriccion();
+    });
   }
 
   // ── Guardar (genérico) ────────────────────────────────────
@@ -1590,6 +1668,7 @@ const ConfigView = (() => {
   function _init() {
     _initModalLimites();
     _initModalSugerir();
+    _initModalRestriccion();
   }
 
   return { init: _init, cargar };
