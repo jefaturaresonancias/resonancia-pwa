@@ -525,9 +525,7 @@ const AgendaView = (() => {
         : "";
       return `<td style="padding:0;border:1px solid #e4e8ee;height:36px">
         <div style="display:flex;height:100%;gap:1px">
-          <div class="slot-content" style="flex:1;background:${bg};overflow:hidden">
-            <span class="slot-label" style="font-size:10px;font-weight:600">${label}</span>
-          </div>
+          <div class="slot-content" style="flex:1;background:${bg};overflow:hidden" title="${label}"></div>
           <div class="slot-ris-side slot-content" style="flex:1;background:${risBg};border-left:2px dashed ${risBord};cursor:pointer;overflow:hidden"
             data-fecha="${fecha}" data-mins="${mins}"
             data-ris-nombre="${encodeURIComponent(ris.apellido_nombre)}"
@@ -649,10 +647,14 @@ const AgendaView = (() => {
       f.setHours(0,0,0,0);
       const hoy = new Date(); hoy.setHours(0,0,0,0);
       if (f >= hoy) {
-        return `<td class="slot-franja-origen" style="background:${bg};cursor:pointer" data-fecha="${fecha}" data-mins="${mins}" data-origen="${slot.origen}" data-label="${encodeURIComponent(slot.label||"")}" title="${slot.label||""} — clic para asignar con origen preseleccionado"${rowspanAttr}><div class="slot-content"><span class="slot-label">${slot.label||""}</span></div></td>`;
+        return `<td class="slot-franja-origen" style="background:${bg};cursor:pointer" data-fecha="${fecha}" data-mins="${mins}" data-origen="${slot.origen}" data-label="${encodeURIComponent(slot.label||"")}" title="${slot.label||""} — clic para asignar con origen preseleccionado"${rowspanAttr}><div class="slot-content"></div></td>`;
       }
     }
-    return `<td class="slot-bloqueo" style="background:${bg}"${rowspanAttr}><div class="slot-content"><span class="slot-label">${slot.label||""}</span></div></td>`;
+    // Compresión visual (27/8/2026, a pedido): franjas/bloqueos/feriados ya
+    // no repiten el texto completo en cada celda — solo el color, con el
+    // detalle en el title (tooltip nativo al pasar el mouse). La leyenda
+    // fija arriba de la grilla sigue mapeando color -> significado.
+    return `<td class="slot-bloqueo" style="background:${bg}" title="${slot.label||""}"${rowspanAttr}><div class="slot-content"></div></td>`;
   }
 
   function _bindSlotClicks(container) {
