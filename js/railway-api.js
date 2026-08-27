@@ -484,6 +484,17 @@ const RailwayAPI = (() => {
     return rpc('api_parte_actualizarPracticas', [fecha, items]);
   }
 
+  // ── Actualizar agenda para todos (27/8/2026) ────────────────────
+  // leerAgendaRefrescarPublico: polling sin sesión (App.init lo llama antes
+  // de saber si hay token). marcarAgendaRefrescar: solo lo usa el botón de
+  // jefatura/admin en el topbar.
+  async function leerAgendaRefrescarPublico() {
+    return _rpcPublico('api_agendaRefrescar_leer');
+  }
+  async function marcarAgendaRefrescar() {
+    return rpc('api_agendaRefrescar_marcar');
+  }
+
   // ── Agendas especiales NCX/Neurología (26/8/2026) ───────────────
   // Uso desde el SPA principal (login normal, sesión ya abierta) — para
   // Config (editar ventana) y "Verificar agendas especiales" (sidebar).
@@ -571,6 +582,7 @@ const RailwayAPI = (() => {
     verificarParteRIS, escribirParteRIS, actualizarEstadosParteRIS, actualizarPracticasParteRIS,
     leerAgendaEspecialConfig, guardarAgendaEspecialConfig, leerAgendaEspecialTurnos, marcarAgendaEspecialCargado,
     agendaEspecialConfigPublico, agendaEspecialEstudiosPublico, agendaEspecialPropiosPublico, agendaEspecialAsignarPublico,
-    leerMenuRolesPublico, guardarMenuRoles, cambiarPinMenuRoles
+    leerMenuRolesPublico, guardarMenuRoles, cambiarPinMenuRoles,
+    leerAgendaRefrescarPublico, marcarAgendaRefrescar
   };
 })();

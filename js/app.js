@@ -19,6 +19,29 @@ const App = (() => {
     } catch (e) { /* se queda con el fallback de arriba */ }
   }
 
+  // Actualizar agenda para todos (27/8/2026) — jefatura/admin marca el
+  // disparador desde el topbar; cada ventana abierta hace polling liviano
+  // (sin sesión) y se refresca sola apenas ve un timestamp más nuevo que
+  // el que tenía. _ultimoRefrescoTs arranca con el valor que ya existía al
+  // cargar la página para no disparar un refresh falso al abrir.
+  let _ultimoRefrescoTs = 0;
+  const POLL_REFRESCO_MS = 60 * 1000;
+  const REFRESCO_PERIODICO_MS = 15 * 60 * 1000;
+
+  async function _chequearRefrescoRemoto() {
+    try {
+      const { ts } = await RailwayAPI.leerAgendaRefrescarPublico();
+      if (ts > _ultimoRefrescoTs) {
+        const esPrimeraLectura = _ultimoRefrescoTs === 0;
+        _ultimoRefrescoTs = ts;
+        if (!esPrimeraLectura && _viewActual === "agenda") {
+          AgendaView.cargar(true);
+          toast("Agenda actualizada", "ok");
+        }
+      }
+    } catch (e) { /* sin conexión momentánea, se reintenta en el próximo poll */ }
+  }
+
   // ── Toast global ──────────────────────────────────────────
   function toast(msg, tipo = "") {
     const el = document.getElementById("toast");
@@ -414,6 +437,14 @@ const App = (() => {
         if (iframe) iframe.src = iframe.src;
       }
     });
+
+    document.getElementById("btn-refresh-todos").addEventListener("click", async () => {
+      try {
+        const r = await RailwayAPI.marcarAgendaRefrescar();
+        _ultimoRefrescoTs = r.ts;
+        toast("Aviso enviado — las ventanas abiertas van a actualizarse solas en menos de un minuto", "ok");
+      } catch (e) { toast("Error: " + e.message, "error"); }
+    });
   }
 
   // ── Topbar fecha ──────────────────────────────────────────
@@ -445,6 +476,13 @@ const App = (() => {
     // de botones por rol — si no, el primer render usaría el fallback
     // hardcodeado y recién se corregiría en el siguiente refresh.
     await _cargarMenuRolesConfig();
+
+    // Actualizar agenda para todos + refresco periódico (27/8/2026) — la
+    // primera llamada solo fija la base (no dispara un refresh falso al
+    // abrir la página), después sí cada vez que cambie el disparador.
+    _chequearRefrescoRemoto();
+    setInterval(_chequearRefrescoRemoto, POLL_REFRESCO_MS);
+    setInterval(() => { if (_viewActual === "agenda") AgendaView.cargar(true); }, REFRESCO_PERIODICO_MS);
 
     // Si ya tiene URL guardada, saltar el setup
     if (Config.isReady()) {
