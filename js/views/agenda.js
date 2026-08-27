@@ -367,7 +367,7 @@ const AgendaView = (() => {
             data-franja-label="${esFranjaAqui ? encodeURIComponent(sFranja.label) : ''}"
             title="${esFranjaAqui ? sFranja.label + ' — ' : ''}${r.apellido_nombre} · ${r.practica} — hasta ${horaF} — clic para sobreturno">
             <div style="height:100%;display:flex;align-items:center;justify-content:space-between;pointer-events:none">
-              <div style="height:1px;flex:1;background:${esFranjaAqui ? bgFila : '#bbb'};border-top:1px dashed ${esFranjaAqui ? bgFila : '#ccc'}"></div>
+              <div style="height:1px;flex:1;border-top:1px dashed #999"></div>
               ${etiqueta}
             </div></td>`;
         } else {
