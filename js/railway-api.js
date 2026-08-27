@@ -150,6 +150,24 @@ const RailwayAPI = (() => {
     return rpc('api_turnos_presente', [{ filaSheet: fila }]);
   }
 
+  // ── Carga manual en Suitestensa (25/8/2026, ver plan "Disparo manual
+  // de carga en Suitestensa") — dispara bot-cargar-suitestensa.js en modo
+  // manual para uno o más turnos puntuales (identificados por hash real
+  // de `estudios`, no por documento+fecha, para no ambigüar cuando un
+  // mismo paciente tiene más de un turno el mismo día). ────────────────
+  /** @param {string[]} hashes @param {string} fecha YYYY-MM-DD */
+  async function cargarEnSuitestensa(hashes, fecha) {
+    return rpc('api_bot_solicitarComando', [
+      'bot-ris', 'ejecutar_ahora', 'bot-cargar-suitestensa.js',
+      ['--hashes=' + hashes.join(','), '--fecha=' + fecha]
+    ]);
+  }
+  /** @param {string[]} hashes */
+  async function estadoSuitestensa(hashes) {
+    const data = await rpc('api_suitestensa_estadoPorHashes', [hashes]);
+    return data.filas;
+  }
+
   /**
    * Reprograma un turno existente (fecha y/o estudio) en una sola operación.
    * @param {number} fila   Fila original en "Base de datos"
@@ -515,7 +533,7 @@ const RailwayAPI = (() => {
   }
 
   return {
-    rpc, leerRISRango, leerCardiologia, asignar, anular, presente, modificar, turnos, buscar, agenda, slots,
+    rpc, leerRISRango, leerCardiologia, asignar, anular, presente, cargarEnSuitestensa, estadoSuitestensa, modificar, turnos, buscar, agenda, slots,
     leerValidacionesAgenda, marcarValidacionReportada, leerReglasAgenda, guardarReglaAgenda, eliminarReglaAgenda,
     leerLimitesSobreturno, guardarLimiteSobreturno, eliminarLimiteSobreturno, sugerirSobreturno,
     leerConfigSugerirSobreturno, guardarConfigSugerirSobreturno,

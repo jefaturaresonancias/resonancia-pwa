@@ -697,6 +697,18 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
   text-transform: uppercase;
 }
 
+/* Botón "Cargar en Suitestensa" (26/8/2026, disparo manual por fila —
+   ver plan "Disparo manual de carga en Suitestensa") */
+.btn-suitestensa {
+  padding: 4px 10px; border-radius: 8px;
+  border: 1px solid var(--navy); background: transparent;
+  color: var(--navy); font-size: 10px; font-weight: 700; cursor: pointer;
+  transition: all .15s; white-space: nowrap;
+}
+.btn-suitestensa:hover:not(:disabled) { background: var(--navy); color: #fff; }
+.btn-suitestensa:disabled { opacity: .6; cursor: default; }
+.suitestensa-estado { font-size: 10px; color: #888; }
+
 #tabla-turnos tbody tr.presente-row {
   background: #f0faf0 !important;
   border-left: 4px solid #4a9e5c !important;
@@ -785,6 +797,9 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 }
 .hora-ris    { font-size: 12px; font-weight: 600; color: #bbb; }
 .ris-body    { min-width: 0; }
+.ris-acciones {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+}
 
 /* Ocultar tabla cuando el técnico usa tarjetas */
 .tecnico-cards #tabla-turnos { display: none; }

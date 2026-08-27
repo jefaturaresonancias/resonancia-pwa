@@ -121,6 +121,16 @@ const App = (() => {
     // Reordenar nav: técnico ve Lista primero
     const navAgenda = document.getElementById("nav-agenda");
     const navLista  = document.getElementById("nav-lista");
+
+    // "Lista del día" (26/8/2026, ver plan "Disparo manual de carga en
+    // Suitestensa"): visible para técnico, admin y jefatura (no
+    // administrativo) — el botón solo tiene la clase .tecnico-only en el
+    // HTML, así que hace falta este chequeo dedicado DESPUÉS del loop
+    // genérico de arriba para que gane la decisión final (agregarle una
+    // segunda clase genérica al mismo botón no sirve: los loops de las
+    // distintas clases se pisarían entre sí según el orden en que corren).
+    navLista.style.display = (rol === "tecnico" || rol === "admin" || rol === "jefatura") ? "" : "none";
+
     if (rol === "tecnico") {
       navLista.style.order  = "1";
       navAgenda.style.order = "2";
@@ -135,7 +145,10 @@ const App = (() => {
     // este bloque). Orden explícito por rol.
     const MENU_ACOTADO = {
       administrativo: ["nav-agenda", "nav-buscar", "nav-reclamos", "nav-turnos-informes", "nav-agenda-especial"],
-      tecnico:        ["nav-agenda", "nav-reclamos", "nav-buscar"],
+      // "nav-lista" agregado 26/8/2026: sin esto, este whitelist tapaba
+      // "Lista del día" para el técnico aunque su clase .tecnico-only la
+      // marcara visible — necesaria para el botón de carga en Suitestensa.
+      tecnico:        ["nav-agenda", "nav-reclamos", "nav-buscar", "nav-lista"],
     };
     if (MENU_ACOTADO[rol]) {
       const visibles = MENU_ACOTADO[rol];

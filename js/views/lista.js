@@ -18,6 +18,82 @@ const ListaView = (() => {
     return ORIGEN_STYLE[(o||"").toUpperCase()] || { bg: "#fce4ec", border: "#c9506a", text: "#7a1f35" };
   }
 
+  // ── carga manual en Suitestensa (26/8/2026, ver plan "Disparo manual
+  // de carga en Suitestensa") ────────────────────────────────
+  function _dmyAIso(dmy) {
+    const [d, m, y] = String(dmy || "").split("/");
+    return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+
+  // No hace un `await cargar()` al terminar (a diferencia de Presente/
+  // Anular): recargar toda la lista mientras hay otras filas en polling
+  // perdería su estado. El botón mismo refleja el resultado final.
+  async function _dispararCargaSuitestensa(btn) {
+    const hashes = (btn.dataset.hashes || "").split(",").filter(Boolean);
+    const fecha  = _dmyAIso(btn.dataset.fecha);
+    const nombre = btn.dataset.nombre;
+    if (hashes.length === 0) { App.toast("No se pudo identificar el turno (sin hash)", "error"); return; }
+    if (!confirm(`¿Cargar a ${nombre} en Suitestensa?`)) return;
+
+    const fila = btn.closest(".row-ris, tr");
+    const estadoEl = fila ? fila.querySelector(".suitestensa-estado") : null;
+    const desde = new Date();
+
+    btn.disabled = true;
+    btn.textContent = "Encolando…";
+    if (estadoEl) estadoEl.textContent = "";
+
+    try {
+      await RailwayAPI.cargarEnSuitestensa(hashes, fecha);
+    } catch (err) {
+      App.toast("Error al encolar: " + err.message, "error");
+      btn.disabled = false;
+      btn.textContent = "Cargar en Suitestensa";
+      return;
+    }
+    btn.textContent = "Cargando…";
+
+    const TIMEOUT_MS = 120000, INTERVALO_MS = 5000;
+
+    const poll = async () => {
+      let filas = [];
+      try { filas = await RailwayAPI.estadoSuitestensa(hashes); } catch (e) { /* reintenta en el próximo tick */ }
+
+      // Solo cuentan filas actualizadas DESPUÉS del click — evita confundir
+      // el estado de un intento anterior (ej. un 'error' viejo) con el
+      // resultado de este click.
+      const vigentes = filas.filter(f => new Date(f.actualizado_en) >= desde);
+      const resueltos = hashes.map(h => vigentes.find(f => f.hash === h)).filter(Boolean);
+
+      if (resueltos.length === hashes.length) {
+        const conError  = resueltos.some(f => f.estado === "error" || f.estado === "error_permanente");
+        const sinMapeo  = resueltos.some(f => f.estado === "sin_mapeo");
+        btn.disabled = false;
+        if (conError)      { btn.textContent = "Reintentar"; if (estadoEl) estadoEl.textContent = "❌ error"; }
+        else if (sinMapeo) { btn.textContent = "Reintentar"; if (estadoEl) estadoEl.textContent = "⚠️ sin mapeo"; }
+        else               { btn.textContent = "✅ Cargado"; btn.disabled = true; }
+        return;
+      }
+
+      if (Date.now() - desde.getTime() >= TIMEOUT_MS) {
+        btn.disabled = false;
+        btn.textContent = "Reintentar";
+        if (estadoEl) estadoEl.textContent = "⏱ sin respuesta, revisar panel de bots";
+        return;
+      }
+
+      setTimeout(poll, INTERVALO_MS);
+    };
+    setTimeout(poll, INTERVALO_MS);
+  }
+
+  function _bindBotonSuitestensa(root) {
+    if (!root) return;
+    root.querySelectorAll(".btn-suitestensa").forEach(btn => {
+      btn.addEventListener("click", () => _dispararCargaSuitestensa(btn));
+    });
+  }
+
   // ── render combinado: slots de agenda + turnos ────────────
   function _render(agendaDia, turnos, filtro, risDelDia) {
     risDelDia = risDelDia || [];
@@ -191,13 +267,18 @@ const ListaView = (() => {
             }
             // Solo RIS
             else if (ris) {
+              const hashesAttr = (ris.hashes || []).join(",");
               cards.push(`<div class="row-ris">
                 <div class="hora-ris">${hora}</div>
                 <div class="ris-body">
                   <div class="ris-nombre">${ris.apellido_nombre}</div>
                   <div class="ris-estudio">${ris.practica}</div>
                 </div>
-                <span class="ris-badge">RIS</span>
+                <div class="ris-acciones">
+                  <span class="ris-badge">RIS</span>
+                  <span class="suitestensa-estado" data-hashes="${hashesAttr}"></span>
+                  <button class="btn-suitestensa" data-hashes="${hashesAttr}" data-fecha="${ris.fecha}" data-nombre="${ris.apellido_nombre}">Cargar en Suitestensa</button>
+                </div>
               </div>`);
             }
           }
@@ -240,6 +321,8 @@ Esta acción no se puede deshacer.`)) return;
             }
           });
         });
+
+        _bindBotonSuitestensa(contenedor);
       }
       document.getElementById("lista-empty").classList.toggle("hidden", filasFiltradas.some(f=>f.turno||f.esRIS));
       return;
@@ -263,6 +346,7 @@ Esta acción no se puede deshacer.`)) return;
         const nombre   = (partes[1] || "").trim();
         // Extraer solo el número del documento
         const dniNum   = String(r.documento || "").replace(/^(DNI|CIBO|RP)\s*/i,"").trim();
+        const hashesAttr = (r.hashes || []).join(",");
         return `<tr class="fila-ris-row">
           <td class="td-hora" style="color:#999;font-size:13px">${hora}</td>
           <td class="ris-nombre">${nombre}</td>
@@ -270,8 +354,8 @@ Esta acción no se puede deshacer.`)) return;
           <td class="ris-dni">${dniNum}</td>
           <td class="ris-estudio">${r.practica}</td>
           <td><span class="ris-badge">RIS</span></td>
-          <td></td>
-          <td></td>
+          <td><span class="suitestensa-estado" data-hashes="${hashesAttr}"></span></td>
+          <td><button class="btn-suitestensa" data-hashes="${hashesAttr}" data-fecha="${r.fecha}" data-nombre="${nombre} ${apellido}">Cargar en Suitestensa</button></td>
           <td></td>
         </tr>`;
       }
@@ -402,6 +486,8 @@ Esta acción no se puede deshacer.`)) return;
         }
       });
     });
+
+    _bindBotonSuitestensa(tbody);
   }
 
   // ── carga ─────────────────────────────────────────────────
