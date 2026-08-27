@@ -4,6 +4,21 @@ const App = (() => {
   let _viewActual = "";
   let _toastTimer = null;
 
+  // Botones del sidebar por rol (27/8/2026, editable desde Config) — estos
+  // valores son el fallback si todavía no llegó la respuesta del servidor
+  // (o falló), para que el sidebar no se rompa nunca; se pisan apenas
+  // resuelve _cargarMenuRolesConfig() en init().
+  let _menuRolesConfig = {
+    administrativo: ["nav-agenda", "nav-turno", "nav-buscar", "nav-reclamos", "nav-turnos-informes", "nav-agenda-especial"],
+    tecnico: ["nav-agenda", "nav-turno", "nav-reclamos", "nav-buscar", "nav-lista"]
+  };
+  async function _cargarMenuRolesConfig() {
+    try {
+      const cfg = await RailwayAPI.leerMenuRolesPublico();
+      if (cfg && Array.isArray(cfg.administrativo) && Array.isArray(cfg.tecnico)) _menuRolesConfig = cfg;
+    } catch (e) { /* se queda con el fallback de arriba */ }
+  }
+
   // ── Toast global ──────────────────────────────────────────
   function toast(msg, tipo = "") {
     const el = document.getElementById("toast");
@@ -140,21 +155,17 @@ const App = (() => {
     }
     document.getElementById("nav-cambiar-pin").style.order = "99";
 
-    // A pedido (25/8/2026): administrativo y técnico ven un menú acotado
-    // por ahora — el resto queda oculto (temporal, se revierte sacando
-    // este bloque). Orden explícito por rol.
-    const MENU_ACOTADO = {
-      // "nav-turno" agregado 27/8/2026: había quedado afuera del whitelist
-      // original del 25/8 — administrativo y técnico cargan turnos como
-      // tarea principal, no podían quedar sin el botón.
-      administrativo: ["nav-agenda", "nav-turno", "nav-buscar", "nav-reclamos", "nav-turnos-informes", "nav-agenda-especial"],
-      // "nav-lista" agregado 26/8/2026: sin esto, este whitelist tapaba
-      // "Lista del día" para el técnico aunque su clase .tecnico-only la
-      // marcara visible — necesaria para el botón de carga en Suitestensa.
-      tecnico:        ["nav-agenda", "nav-turno", "nav-reclamos", "nav-buscar", "nav-lista"],
-    };
-    if (MENU_ACOTADO[rol]) {
-      const visibles = MENU_ACOTADO[rol];
+    // Menú acotado por rol (25/8/2026, editable desde Config a partir del
+    // 27/8/2026 — ver _menuRolesConfig arriba) para administrativo y
+    // técnico: el resto de los botones queda oculto salvo que ese rol los
+    // tenga en su lista. Solo se filtra contra ids que ya pasaron el
+    // chequeo de clase (admin-only/tecnico-only/etc.) de arriba, así un
+    // id guardado a mano nunca puede destapar algo reservado a otro nivel.
+    if (_menuRolesConfig[rol]) {
+      const visibles = _menuRolesConfig[rol].filter(id => {
+        const el = document.getElementById(id);
+        return el && el.style.display !== "none";
+      });
       document.querySelectorAll("#sidebar .nav-btn").forEach(el => {
         if (!visibles.includes(el.id)) el.style.display = "none";
       });
@@ -415,7 +426,7 @@ const App = (() => {
   }
 
   // ── INIT ──────────────────────────────────────────────────
-  function init() {
+  async function init() {
     _actualizarFecha();
     _initSetup();
     _initRol();
@@ -430,6 +441,10 @@ const App = (() => {
     ValidacionesView.init();
     AgendaEspecialView.init();
     _initPin();
+    // Antes de mostrar/restaurar cualquier rol hay que tener la config real
+    // de botones por rol — si no, el primer render usaría el fallback
+    // hardcodeado y recién se corregiría en el siguiente refresh.
+    await _cargarMenuRolesConfig();
 
     // Si ya tiene URL guardada, saltar el setup
     if (Config.isReady()) {

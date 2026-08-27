@@ -6,11 +6,18 @@ const ConfigView = (() => {
   let _limitesCount = 0;
   let _asignadoresTurno = [];
   let _agendaEspecial = {};
+  // Panel de botones por rol (27/8/2026) — null = bloqueado; una vez
+  // validado el PIN propio (rol='menu_config', distinto del de
+  // jefatura/admin) guarda { pin, config } para poder guardar cambios sin
+  // volver a pedirlo mientras se sigue en esta pantalla. Se re-bloquea
+  // cada vez que se entra a Config de nuevo (ver cargar()).
+  let _menuRolesEditor = null;
 
   // ── Cargar datos ──────────────────────────────────────────
   async function cargar() {
     const container = document.getElementById("config-container");
     container.innerHTML = '<div class="empty-state">Cargando configuración...</div>';
+    _menuRolesEditor = null; // re-bloquear el panel de botones por rol
     try {
       const [estudios, feriados, franjas, bloqueos, restricciones, restriccionesOrigen, restriccionesPropia, limites, asignadores, agendaEspecial] = await Promise.all([
         RailwayAPI.leerAgendaEstudiosCatalogo(),
@@ -59,6 +66,7 @@ const ConfigView = (() => {
         ${_seccionSugerirSobreturno()}
         ${_seccionAsignadoresTurno()}
         ${_seccionAgendaEspecial()}
+        ${_seccionMenuRoles()}
       </div>`;
     _bindEvents();
   }
@@ -340,6 +348,105 @@ const ConfigView = (() => {
     _guardarSeccion(RailwayAPI.guardarAgendaEspecialConfig, { tipo, diasSemana, horaDesde, horaHasta }, "Ventana guardada");
   }
 
+  // ── Botones del sidebar por rol (27/8/2026) ────────────────
+  // Qué botones puede ver administrativo/técnico es editable acá, pero
+  // nunca por encima de lo que ya permite la clase del botón en el HTML
+  // (admin-only/tecnico-only/jefatura-only/etc.) — mismo tope que aplica
+  // js/app.js al construir el sidebar real, para que este panel no pueda
+  // ofrecer algo reservado a otro nivel (ej. Config a administrativo).
+  const ROLES_POR_CLASE = {
+    "tecnico-only": ["tecnico"],
+    "admin-only": ["administrativo", "jefatura", "admin"],
+    "jefatura-only": ["jefatura", "admin"],
+    "jefatura-exclusivo": ["jefatura"],
+    "admin-jefatura-only": ["admin", "jefatura"]
+  };
+  function _navEsElegibleParaRol(el, rol) {
+    for (const [clase, roles] of Object.entries(ROLES_POR_CLASE)) {
+      if (el.classList.contains(clase) && !roles.includes(rol)) return false;
+    }
+    return true;
+  }
+  function _botonesElegibles(rol) {
+    return [...document.querySelectorAll("#sidebar .nav-btn")]
+      .filter(el => el.id !== "nav-cambiar-pin" && _navEsElegibleParaRol(el, rol))
+      .map(el => ({ id: el.id, label: (el.querySelector(".nav-label") || el).textContent.trim() }));
+  }
+
+  function _seccionMenuRoles() {
+    if (!_menuRolesEditor) {
+      return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <span style="font-weight:500;font-size:15px">🔐 Botones del menú por rol</span>
+            <div style="font-size:12px;color:var(--text-2);margin-top:2px">Qué ve administrativo y técnico en su sidebar — protegido con un PIN propio</div>
+          </div>
+          <button id="cfg-desbloquear-menu-roles" style="font-size:12px">🔓 Desbloquear</button>
+        </div>
+      </div>`;
+    }
+    const filas = (rol) => _botonesElegibles(rol).map(b => {
+      const marcado = _menuRolesEditor.config[rol].includes(b.id) ? "checked" : "";
+      return `<label style="display:flex;align-items:center;gap:6px;font-size:13px;padding:3px 0">
+        <input type="checkbox" class="cfg-menu-rol-check" data-rol="${rol}" data-id="${b.id}" ${marcado}> ${b.label}
+      </label>`;
+    }).join("");
+    return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-weight:500;font-size:15px">🔐 Botones del menú por rol</span>
+        <div style="display:flex;gap:8px">
+          <button id="cfg-menu-roles-cambiar-pin" style="font-size:12px">Cambiar PIN del panel</button>
+          <button id="cfg-menu-roles-guardar" class="btn-primary" style="font-size:12px">Guardar</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div><div style="font-size:13px;font-weight:600;margin-bottom:6px">Administrativo</div>${filas("administrativo")}</div>
+        <div><div style="font-size:13px;font-weight:600;margin-bottom:6px">Técnico</div>${filas("tecnico")}</div>
+      </div>
+    </div>`;
+  }
+
+  async function _desbloquearMenuRoles() {
+    const pin = prompt("PIN del panel de botones por rol:");
+    if (!pin) return;
+    try {
+      const r = await RailwayAPI.validarPinRol("menu_config", pin);
+      if (!r.ok) { App.toast(r.error || "PIN incorrecto", "error"); return; }
+      const config = await RailwayAPI.leerMenuRolesPublico();
+      _menuRolesEditor = { pin, config };
+      _render();
+    } catch (err) { App.toast("Error: " + err.message, "error"); }
+  }
+
+  async function _guardarMenuRolesDesdeForm() {
+    const config = { administrativo: [], tecnico: [] };
+    document.querySelectorAll(".cfg-menu-rol-check").forEach(chk => {
+      if (chk.checked) config[chk.dataset.rol].push(chk.dataset.id);
+    });
+    try {
+      const r = await RailwayAPI.guardarMenuRoles(_menuRolesEditor.pin, config);
+      if (!r.ok) { App.toast(r.error || "No se pudo guardar", "error"); return; }
+      _menuRolesEditor.config = config;
+      App.toast("Botones por rol guardados", "ok");
+    } catch (err) { App.toast("Error: " + err.message, "error"); }
+  }
+
+  async function _cambiarPinMenuRoles() {
+    const pinActual = prompt("PIN actual del panel:");
+    if (!pinActual) return;
+    const nuevo = prompt("PIN nuevo (4 dígitos):");
+    if (!nuevo) return;
+    if (!/^\d{4}$/.test(nuevo)) { App.toast("El PIN debe tener exactamente 4 dígitos", "error"); return; }
+    const confirmar = prompt("Repetí el PIN nuevo:");
+    if (nuevo !== confirmar) { App.toast("Los PINs no coinciden", "error"); return; }
+    try {
+      const r = await RailwayAPI.cambiarPinMenuRoles(pinActual, nuevo);
+      if (!r.ok) { App.toast(r.error || "No se pudo cambiar el PIN", "error"); return; }
+      if (_menuRolesEditor) _menuRolesEditor.pin = nuevo;
+      App.toast("PIN del panel actualizado", "ok");
+    } catch (err) { App.toast("Error: " + err.message, "error"); }
+  }
+
   // ── Eventos ───────────────────────────────────────────────
   function _bindEvents() {
     const container = document.getElementById("config-container");
@@ -528,6 +635,14 @@ const ConfigView = (() => {
     container.querySelectorAll(".cfg-edit-agenda-especial").forEach(btn => {
       btn.addEventListener("click", () => _editarAgendaEspecial(btn.dataset.tipo));
     });
+
+    // Botones del menú por rol
+    const btnDesbloquear = document.getElementById("cfg-desbloquear-menu-roles");
+    if (btnDesbloquear) btnDesbloquear.addEventListener("click", _desbloquearMenuRoles);
+    const btnGuardarMenu = document.getElementById("cfg-menu-roles-guardar");
+    if (btnGuardarMenu) btnGuardarMenu.addEventListener("click", _guardarMenuRolesDesdeForm);
+    const btnCambiarPinMenu = document.getElementById("cfg-menu-roles-cambiar-pin");
+    if (btnCambiarPinMenu) btnCambiarPinMenu.addEventListener("click", _cambiarPinMenuRoles);
   }
 
   // ── Días de semana en texto (LUNES,MARTES,...) ↔ diasSemana:[0-6] ──

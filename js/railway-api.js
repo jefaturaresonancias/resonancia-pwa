@@ -499,6 +499,22 @@ const RailwayAPI = (() => {
     return rpc('api_agendaEspecial_marcarCargado', [{ id, cargado }]);
   }
 
+  // ── Botones del sidebar por rol (27/8/2026) ─────────────────────
+  // leerMenuRolesPublico (sin login) la usa App al arrancar para armar el
+  // sidebar de cualquier rol; guardar/cambiarPin están en Config
+  // (protegido con el PIN propio de este panel, distinto del de
+  // jefatura/admin).
+  async function leerMenuRolesPublico() {
+    const data = await _rpcPublico('api_menuRoles_leer');
+    return data.config;
+  }
+  async function guardarMenuRoles(pin, config) {
+    return rpc('api_menuRoles_guardar', [{ pin, config }]);
+  }
+  async function cambiarPinMenuRoles(pinActual, pinNuevo) {
+    return rpc('api_menuRoles_cambiarPin', [{ pinActual, pinNuevo }]);
+  }
+
   // ── Agendas especiales — llamadas públicas (sin login de Railway) ──
   // Las usan ncx.html/neurologia.html: páginas propias para coordinadores
   // externos que solo tienen el PIN de su especialidad, no una sesión de
@@ -551,6 +567,7 @@ const RailwayAPI = (() => {
     validarPinRol, cambiarPinRol,
     verificarParteRIS, escribirParteRIS, actualizarEstadosParteRIS, actualizarPracticasParteRIS,
     leerAgendaEspecialConfig, guardarAgendaEspecialConfig, leerAgendaEspecialTurnos, marcarAgendaEspecialCargado,
-    agendaEspecialConfigPublico, agendaEspecialEstudiosPublico, agendaEspecialPropiosPublico, agendaEspecialAsignarPublico
+    agendaEspecialConfigPublico, agendaEspecialEstudiosPublico, agendaEspecialPropiosPublico, agendaEspecialAsignarPublico,
+    leerMenuRolesPublico, guardarMenuRoles, cambiarPinMenuRoles
   };
 })();
