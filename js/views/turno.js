@@ -127,13 +127,20 @@ const TurnoView = (() => {
           }
         }
         sel.style.borderColor = "#c9a000";
+        // Clic directo en una franja reservada por origen (ej. Internación
+        // 20-23hs): el origen queda fijo, no editable — esa franja es
+        // exclusiva para ese origen, no tiene sentido dejar cambiarlo.
+        if (condicion.origenForzado) {
+          sel.disabled = true;
+          sel.style.background = "#f0f0f0";
+        }
       }
       if (condicion.filtro) _filtrarEstudios(condicion.filtro);
 
       const aviso = document.createElement("div");
       aviso.id = "turno-condicion-aviso";
       aviso.style.cssText = "background:#fff8e1;border-left:4px solid #f0c040;padding:8px 14px;border-radius:4px;font-size:12px;font-weight:600;color:#7a4f00;margin-bottom:1rem";
-      aviso.innerHTML = `⚠️ Franja con condición: <strong>${condicion.label}</strong>${condicion.filtro ? " — estudios filtrados" : ""}${condicion.origen ? " — origen pre-seleccionado" : ""}`;
+      aviso.innerHTML = `⚠️ Franja con condición: <strong>${condicion.label}</strong>${condicion.filtro ? " — estudios filtrados" : ""}${condicion.origen ? (condicion.origenForzado ? " — origen fijo, no se puede cambiar" : " — origen pre-seleccionado") : ""}`;
       const form = document.getElementById("form-turno");
       if (form) form.insertBefore(aviso, form.firstChild);
     }
@@ -393,6 +400,10 @@ const TurnoView = (() => {
 
   function _resetForm() {
     document.getElementById("form-turno").reset();
+    const selOrigen = document.getElementById("t-origen");
+    selOrigen.disabled = false;
+    selOrigen.style.background = "";
+    selOrigen.style.borderColor = "";
     _estudiosElegidos = [];
     _renderChips();
     _actualizarTiempo();

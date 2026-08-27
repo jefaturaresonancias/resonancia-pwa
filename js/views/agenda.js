@@ -635,6 +635,19 @@ const AgendaView = (() => {
         >${contenido}</td>`;
     }
     if (tipo === "continuacion") return `<td class="slot-continua" style="background:${bg}"${rowspanAttr}><div class="slot-content"></div></td>`;
+    // Franja reservada por origen (ej. Internación 20-23hs): sin RIS
+    // encima, antes quedaba como bloqueo mudo sin clic — el único camino
+    // para cargar ahí era "Nuevo turno" a mano. Con origen la dejamos
+    // clickeable y precargamos ese origen forzado en el panel.
+    if (tipo === "franja_origen" && slot.origen) {
+      const p = fecha.split("/");
+      const f = new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0]));
+      f.setHours(0,0,0,0);
+      const hoy = new Date(); hoy.setHours(0,0,0,0);
+      if (f >= hoy) {
+        return `<td class="slot-franja-origen" style="background:${bg};cursor:pointer" data-fecha="${fecha}" data-mins="${mins}" data-origen="${slot.origen}" data-label="${encodeURIComponent(slot.label||"")}" title="${slot.label||""} — clic para asignar con origen preseleccionado"${rowspanAttr}><div class="slot-content"><span class="slot-label">${slot.label||""}</span></div></td>`;
+      }
+    }
     return `<td class="slot-bloqueo" style="background:${bg}"${rowspanAttr}><div class="slot-content"><span class="slot-label">${slot.label||""}</span></div></td>`;
   }
 
@@ -646,6 +659,16 @@ const AgendaView = (() => {
       const hoy = new Date(); hoy.setHours(0,0,0,0);
       return f < hoy;
     }
+
+    container.querySelectorAll(".slot-franja-origen").forEach(td => {
+      td.addEventListener("click", () => {
+        if (_esPasado(td.dataset.fecha)) { App.toast("No se puede asignar en fechas pasadas", "error"); return; }
+        const mins  = parseInt(td.dataset.mins);
+        const hora  = String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0");
+        const label = td.dataset.label ? decodeURIComponent(td.dataset.label) : "";
+        App.abrirTurnoConCondicion(td.dataset.fecha, hora, { origen: td.dataset.origen, label, origenForzado: true });
+      });
+    });
 
     container.querySelectorAll(".slot-libre").forEach(td => {
       td.addEventListener("click", () => {
