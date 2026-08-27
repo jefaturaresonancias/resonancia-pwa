@@ -144,11 +144,14 @@ const App = (() => {
     // por ahora — el resto queda oculto (temporal, se revierte sacando
     // este bloque). Orden explícito por rol.
     const MENU_ACOTADO = {
-      administrativo: ["nav-agenda", "nav-buscar", "nav-reclamos", "nav-turnos-informes", "nav-agenda-especial"],
+      // "nav-turno" agregado 27/8/2026: había quedado afuera del whitelist
+      // original del 25/8 — administrativo y técnico cargan turnos como
+      // tarea principal, no podían quedar sin el botón.
+      administrativo: ["nav-agenda", "nav-turno", "nav-buscar", "nav-reclamos", "nav-turnos-informes", "nav-agenda-especial"],
       // "nav-lista" agregado 26/8/2026: sin esto, este whitelist tapaba
       // "Lista del día" para el técnico aunque su clase .tecnico-only la
       // marcara visible — necesaria para el botón de carga en Suitestensa.
-      tecnico:        ["nav-agenda", "nav-reclamos", "nav-buscar", "nav-lista"],
+      tecnico:        ["nav-agenda", "nav-turno", "nav-reclamos", "nav-buscar", "nav-lista"],
     };
     if (MENU_ACOTADO[rol]) {
       const visibles = MENU_ACOTADO[rol];
