@@ -635,11 +635,15 @@ const AgendaView = (() => {
         >${contenido}</td>`;
     }
     if (tipo === "continuacion") return `<td class="slot-continua" style="background:${bg}"${rowspanAttr}><div class="slot-content"></div></td>`;
-    // Franja reservada por origen (ej. Internación 20-23hs): sin RIS
+    // Franja reservada por origen (ej. Internación 20-22hs): sin RIS
     // encima, antes quedaba como bloqueo mudo sin clic — el único camino
     // para cargar ahí era "Nuevo turno" a mano. Con origen la dejamos
-    // clickeable y precargamos ese origen forzado en el panel.
-    if (tipo === "franja_origen" && slot.origen) {
+    // clickeable y precargamos ese origen forzado en el panel. La misma
+    // franja puede llegar como "franja_origen" o como "bloqueo_rec" (ej.
+    // "Solo internados" existe como bloqueo recurrente Y restricción por
+    // origen a la vez) — el backend expone `origen` en ambos casos cuando
+    // corresponde, así que alcanza con chequear ese campo, no el tipo.
+    if ((tipo === "franja_origen" || tipo === "bloqueo_rec") && slot.origen) {
       const p = fecha.split("/");
       const f = new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0]));
       f.setHours(0,0,0,0);
