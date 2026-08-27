@@ -164,9 +164,18 @@
     for (let m = desde; m < hasta; m += 20) {
       html += `<tr><td class="ae-grilla-hora">${_minAHora(m)}</td>`;
       fechas.forEach((f) => {
-        const ocupado = _propios.find((t) => t.fecha === f && t.mins === m);
+        // Ocupado si ESTE slot cae dentro de un turno ya cargado, tenga en
+        // cuenta su duración real (no solo si arranca justo acá) — antes
+        // un estudio largo (ej. 40 min) dejaba "libre" el slot siguiente,
+        // mismo bug que ya se había corregido en el desplegable de horarios.
+        const ocupado = _propios.find((t) => {
+          if (t.fecha !== f) return false;
+          const dur = _duracionEstudios[t.estudio] || 20;
+          return m < t.mins + dur && (m + 20) > t.mins;
+        });
         if (ocupado) {
-          html += `<td class="ae-grilla-celda ae-grilla-ocupada" title="${ocupado.estudio}">${ocupado.apellido}</td>`;
+          const esInicio = ocupado.mins === m;
+          html += `<td class="ae-grilla-celda ae-grilla-ocupada" title="${ocupado.estudio}">${esInicio ? ocupado.apellido : ''}</td>`;
         } else {
           html += `<td class="ae-grilla-celda ae-grilla-libre" data-fecha="${f}" data-hora="${_minAHora(m)}">libre</td>`;
         }
