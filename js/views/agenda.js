@@ -512,10 +512,28 @@ const AgendaView = (() => {
     // (cardioSlot se inyecta desde el loop principal via risSlot con flag especial)
     const cardioSlot = tieneRIS && risSlot[0]?._cardio ? risSlot[0] : null;
 
-    // Si hay RIS en slot de franja o bloqueo → celda dividida: franja izq | RIS der
+    // Si hay RIS en slot de franja o bloqueo → celda dividida: franja izq | RIS der.
+    // Si la franja quedó sin color propio (ej. "Solo sin contraste", blanca
+    // a propósito — ver Config), partir la celda a la mitad no aporta nada:
+    // la mitad de la franja se ve vacía y el RIS queda apretado sin
+    // necesidad. En ese caso el RIS ocupa el 100% del ancho.
     if (tieneRIS && !cardioSlot && slot && (tipo === "franja" || tipo === "franja_origen" || tipo === "bloqueo_rec" || tipo === "bloqueo")) {
       const bg      = slot.color || "#ccc";
       const label   = slot.label || tipo;
+      const franjaInvisible = bg.toLowerCase() === "#ffffff" || bg.toLowerCase() === "#fff";
+      if (franjaInvisible) {
+        const est = ris.estado || "";
+        return `<td class="slot-ris-clickable" style="background:#f4f4f4;border-left:2px dashed #bbb;border:1px solid #e4e8ee;cursor:pointer"
+          data-fecha="${fecha}" data-mins="${mins}"
+          data-ris-nombre="${encodeURIComponent(ris.apellido_nombre)}" data-ris-practica="${encodeURIComponent(ris.practica)}"
+          data-franja-label="${encodeURIComponent(label)}"
+          title="${label} — RIS: ${ris.apellido_nombre}\nEstado: ${est}\nClic para asignar sobreturno aquí">
+          <div class="slot-content">
+            <span class="slot-nombre" style="color:#888;font-style:italic">${ris.apellido_nombre}</span>
+            <span class="slot-estudio" style="color:#aaa;font-size:10px">${ris.practica} <span style="background:#ddd;color:#777;border-radius:3px;padding:0 3px;font-size:9px">RIS</span></span>
+          </div>
+        </td>`;
+      }
       const risBg   = bg + "33";
       const risBord = bg + "88";
       // Badge de estado RIS
