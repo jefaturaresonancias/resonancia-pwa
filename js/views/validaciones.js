@@ -357,7 +357,7 @@ const ValidacionesView = (() => {
     solo_en_ventanas:     'Solo permitido en estos horarios',
   };
   // Mismas opciones que el select de origen en el panel de turno (t-origen).
-  const ORIGENES = ['AMBULATORIO', 'INTERNACIÓN', 'GUARDIA', 'DIRECCIÓN', 'TRASLADO'];
+  const ORIGENES = ['AMBULATORIO', 'INTERNACIÓN', 'GUARDIA', 'DIRECCIÓN', 'TRASLADO', 'DELEGACION/VICTOR'];
 
   let _idEditando  = null; // null = nueva regla
   let _formVentanas = [];

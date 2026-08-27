@@ -13,6 +13,7 @@ const ListaView = (() => {
     "DIRECCIÓN":   { bg: "#f3e5f5", border: "#7c5cb5", text: "#3d1e7a" },
     "DIRECCION":   { bg: "#f3e5f5", border: "#7c5cb5", text: "#3d1e7a" },
     "TRASLADO":    { bg: "#e0f7fa", border: "#1a6e8a", text: "#0a3d52" },
+    "DELEGACION/VICTOR": { bg: "#fff3e0", border: "#c9762a", text: "#7a3d00" },
   };
   function _origen(o) {
     return ORIGEN_STYLE[(o||"").toUpperCase()] || { bg: "#fce4ec", border: "#c9506a", text: "#7a1f35" };
@@ -542,6 +543,7 @@ Esta acción no se puede deshacer.`)) return;
     if (l.includes("guardia")) return "GUARDIA";
     if (l.includes("direcci")) return "DIRECCIÓN";
     if (l.includes("traslad")) return "TRASLADO";
+    if (l.includes("delegaci") || l.includes("victor")) return "DELEGACION/VICTOR";
     return null;
   }
 

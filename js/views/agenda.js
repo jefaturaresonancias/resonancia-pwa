@@ -120,6 +120,7 @@ const AgendaView = (() => {
       "DIRECCIÓN":   { bg: "#a98fd4", text: "#3d1e7a", border: "#7c5cb5" },
       "DIRECCION":   { bg: "#a98fd4", text: "#3d1e7a", border: "#7c5cb5" },
       "TRASLADO":    { bg: "#3c9ab8", text: "#0a3d52", border: "#1a6e8a" },
+      "DELEGACION/VICTOR": { bg: "#f4b183", text: "#7a3d00", border: "#c9762a" },
     };
     return m[(o||"").toUpperCase()] || { bg: "#e8a09a", text: "#7a1f35", border: "#c9506a" };
   }
@@ -128,7 +129,7 @@ const AgendaView = (() => {
   function _renderLeyenda() {
     const el = document.getElementById("agenda-leyenda");
     if (!el) return;
-    const origenes = ["AMBULATORIO", "GUARDIA", "INTERNACIÓN", "DIRECCIÓN", "TRASLADO"];
+    const origenes = ["AMBULATORIO", "GUARDIA", "INTERNACIÓN", "DIRECCIÓN", "TRASLADO", "DELEGACION/VICTOR"];
     let html = origenes.map(o => {
       const c = _coloresOrigen(o);
       return `<span class="agenda-leyenda-item"><span class="agenda-leyenda-sw" style="background:${c.bg}"></span>${o.charAt(0)+o.slice(1).toLowerCase()}</span>`;
@@ -145,6 +146,7 @@ const AgendaView = (() => {
     { key: "INTERNACION", label: "Internación" },
     { key: "DIRECCION",   label: "Dirección" },
     { key: "TRASLADO",    label: "Traslado" },
+    { key: "DELEGACION/VICTOR", label: "Delegación/Víctor" },
     { key: "OTRO",        label: "Otro" },
   ];
 

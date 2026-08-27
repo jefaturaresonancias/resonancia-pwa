@@ -800,7 +800,7 @@ const ConfigView = (() => {
     reservado_en_ventana: 'Reservado en este horario (todo lo demás, prohibido)',
     solo_en_ventanas:     'Solo permitido en estos horarios',
   };
-  const ORIGENES_SUGERIR = ['AMBULATORIO', 'INTERNACIÓN', 'GUARDIA', 'DIRECCIÓN', 'TRASLADO'];
+  const ORIGENES_SUGERIR = ['AMBULATORIO', 'INTERNACIÓN', 'GUARDIA', 'DIRECCIÓN', 'TRASLADO', 'DELEGACION/VICTOR'];
 
   let _limitesCache = [];
   let _idLimiteEditando = null; // null = límite nuevo
