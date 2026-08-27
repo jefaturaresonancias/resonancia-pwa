@@ -1,8 +1,13 @@
 // js/railway-api.js — Cliente para la API de sistema2-node (Railway).
-// El token se pide una sola vez por sesión directo a Railway (api_login,
-// que es pública — ver FUNCIONES_PUBLICAS en server.js) pidiendo el PIN de
-// servicio con prompt(); ya no pasa por Apps Script (corte de Sheets,
-// 25/8/2026). Se cachea en sessionStorage.
+// El token se pide directo a Railway (api_login, que es pública — ver
+// FUNCIONES_PUBLICAS en server.js) pidiendo el PIN de servicio con
+// prompt(); ya no pasa por Apps Script (corte de Sheets, 25/8/2026). Se
+// cachea en localStorage (27/8/2026, antes sessionStorage) — el token dura
+// 30 días del lado del servidor (ver rpc/auth.js), pero sessionStorage se
+// borra al cerrar la pestaña/app, pidiendo el PIN de nuevo en cada
+// apertura sin aprovechar esos 30 días. localStorage persiste entre
+// cierres; sigue expirando solo (rechazado por el servidor) a los 30 días
+// o si cambia el PIN compartido.
 const RailwayAPI = (() => {
   const RAILWAY_URL = "https://jefatura-rmn-sistema2-production.up.railway.app";
   const KEY_TOKEN = "railway_token";
@@ -25,7 +30,7 @@ const RailwayAPI = (() => {
 
   async function _getToken(forzar = false) {
     if (!forzar) {
-      const cacheado = sessionStorage.getItem(KEY_TOKEN);
+      const cacheado = localStorage.getItem(KEY_TOKEN);
       if (cacheado) return cacheado;
     }
     if (_tokenPromise) return _tokenPromise;
@@ -37,7 +42,7 @@ const RailwayAPI = (() => {
         if (pin === null) throw new Error("Login cancelado");
         const json = await _login(pin);
         if (json.ok) {
-          sessionStorage.setItem(KEY_TOKEN, json.token);
+          localStorage.setItem(KEY_TOKEN, json.token);
           return json.token;
         }
         mensaje = "PIN incorrecto, reintentar:";
@@ -106,13 +111,11 @@ const RailwayAPI = (() => {
   // ── Fase 2a: alta de turnos migrada a Railway ──────────────────
 
   // Un alta/anulación/modificación deja obsoleta la cache de la grilla
-  // semanal/mensual (agenda.js) — pero OJO: sessionStorage también guarda
-  // railway_token (ver _getToken arriba). Un sessionStorage.clear() liso
-  // borraba el token junto con la cache, forzando el prompt() del PIN de
-  // servicio de nuevo después de CADA turno cargado (invisible mientras el
-  // login pasaba por Apps Script en silencio; muy visible ahora que pide
-  // el PIN por prompt() — bug encontrado 26/8/2026). Por eso esto borra
-  // solo las claves de cache de agenda, nunca el token.
+  // semanal/mensual (agenda.js) — se borra puntual (nunca sessionStorage.
+  // clear() liso) desde que un bug real (26/8/2026) forzaba el prompt()
+  // del PIN de servicio después de CADA turno cargado. El token ahora
+  // vive en localStorage (27/8/2026), así que ya ni corre ese riesgo, pero
+  // sigue sin tener sentido tocar más que las claves de agenda acá.
   function _invalidarCacheAgenda() {
     for (let i = sessionStorage.length - 1; i >= 0; i--) {
       const key = sessionStorage.key(i);
