@@ -7,6 +7,7 @@ const TurnoView = (() => {
   let _estudiosConfig   = {};        // { nombre: { duracion, restriccion } }
   let _estudiosElegidos = [];        // array de nombres elegidos
   let _asignadoresCache = null;      // [nombre, ...] — quién puede figurar como "quién asigna"
+  let _filtroCodigo     = null;      // código de restricción (ej. "SC") al entrar desde una franja por código en la agenda
 
   // ── Cargar estudios ───────────────────────────────────────
   async function cargarEstudios() {
@@ -39,6 +40,7 @@ const TurnoView = (() => {
     const nombres = Object.keys(_estudiosConfig).sort();
     for (const n of nombres) {
       if (filtro && !n.toLowerCase().includes(filtro.toLowerCase())) continue;
+      if (_filtroCodigo && (_estudiosConfig[n] || {}).restriccion !== _filtroCodigo) continue;
       if (_estudiosElegidos.includes(n)) continue; // ya agregado
       const opt = document.createElement("option");
       opt.value = n; opt.textContent = n;
@@ -136,11 +138,20 @@ const TurnoView = (() => {
         }
       }
       if (condicion.filtro) _filtrarEstudios(condicion.filtro);
+      // Clic directo en una franja reservada por código (ej. "Solo sin
+      // contraste"): el desplegable de estudios se filtra a solo los que
+      // tengan ese código — el backend igual rechaza cualquier otro al
+      // confirmar, esto es para no hacer buscar a ciegas.
+      if (condicion.codigo) {
+        _filtroCodigo = condicion.codigo;
+        _poblarSelect();
+        document.getElementById("t-estudio-sel").style.borderColor = "#f0c040";
+      }
 
       const aviso = document.createElement("div");
       aviso.id = "turno-condicion-aviso";
       aviso.style.cssText = "background:#fff8e1;border-left:4px solid #f0c040;padding:8px 14px;border-radius:4px;font-size:12px;font-weight:600;color:#7a4f00;margin-bottom:1rem";
-      aviso.innerHTML = `⚠️ Franja con condición: <strong>${condicion.label}</strong>${condicion.filtro ? " — estudios filtrados" : ""}${condicion.origen ? (condicion.origenForzado ? " — origen fijo, no se puede cambiar" : " — origen pre-seleccionado") : ""}`;
+      aviso.innerHTML = `⚠️ Franja con condición: <strong>${condicion.label}</strong>${condicion.filtro ? " — estudios filtrados" : ""}${condicion.codigo ? " — solo estudios con código " + condicion.codigo : ""}${condicion.origen ? (condicion.origenForzado ? " — origen fijo, no se puede cambiar" : " — origen pre-seleccionado") : ""}`;
       const form = document.getElementById("form-turno");
       if (form) form.insertBefore(aviso, form.firstChild);
     }
@@ -405,6 +416,9 @@ const TurnoView = (() => {
     selOrigen.style.background = "";
     selOrigen.style.borderColor = "";
     _estudiosElegidos = [];
+    _filtroCodigo = null;
+    document.getElementById("t-estudio-sel").style.borderColor = "";
+    document.getElementById("t-estudio-buscar").value = "";
     _renderChips();
     _actualizarTiempo();
     _poblarSelect();

@@ -650,6 +650,24 @@ const AgendaView = (() => {
         return `<td class="slot-franja-origen" style="background:${bg};cursor:pointer" data-fecha="${fecha}" data-mins="${mins}" data-origen="${slot.origen}" data-label="${encodeURIComponent(slot.label||"")}" title="${slot.label||""} — clic para asignar con origen preseleccionado"${rowspanAttr}><div class="slot-content"></div></td>`;
       }
     }
+    // Franja reservada por código (ej. "Solo sin contraste" SC): clickeable
+    // solo si hay al menos un estudio real con ese código — si no (ej.
+    // DESCOM, NCX, FRANJA DE NEUROLOGIA: ningún estudio del catálogo usa
+    // esos códigos), es un bloqueo total de verdad y no tiene sentido abrir
+    // el panel para no encontrar nada para elegir.
+    if (tipo === "franja" && slot.codigo) {
+      const hayEstudioConEseCodigo = _estudiosConfigCache &&
+        Object.values(_estudiosConfigCache).some(c => c.restriccion === slot.codigo);
+      if (hayEstudioConEseCodigo) {
+        const p = fecha.split("/");
+        const f = new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0]));
+        f.setHours(0,0,0,0);
+        const hoy = new Date(); hoy.setHours(0,0,0,0);
+        if (f >= hoy) {
+          return `<td class="slot-franja-codigo" style="background:${bg};cursor:pointer" data-fecha="${fecha}" data-mins="${mins}" data-codigo="${slot.codigo}" data-label="${encodeURIComponent(slot.label||"")}" title="${slot.label||""} — clic para asignar con estudios filtrados"${rowspanAttr}><div class="slot-content"></div></td>`;
+        }
+      }
+    }
     // Compresión visual (27/8/2026, a pedido): franjas/bloqueos/feriados ya
     // no repiten el texto completo en cada celda — solo el color, con el
     // detalle en el title (tooltip nativo al pasar el mouse). La leyenda
@@ -673,6 +691,16 @@ const AgendaView = (() => {
         const hora  = String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0");
         const label = td.dataset.label ? decodeURIComponent(td.dataset.label) : "";
         App.abrirTurnoConCondicion(td.dataset.fecha, hora, { origen: td.dataset.origen, label, origenForzado: true });
+      });
+    });
+
+    container.querySelectorAll(".slot-franja-codigo").forEach(td => {
+      td.addEventListener("click", () => {
+        if (_esPasado(td.dataset.fecha)) { App.toast("No se puede asignar en fechas pasadas", "error"); return; }
+        const mins  = parseInt(td.dataset.mins);
+        const hora  = String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0");
+        const label = td.dataset.label ? decodeURIComponent(td.dataset.label) : "";
+        App.abrirTurnoConCondicion(td.dataset.fecha, hora, { codigo: td.dataset.codigo, label });
       });
     });
 
