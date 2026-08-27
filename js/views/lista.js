@@ -374,29 +374,16 @@ Esta acción no se puede deshacer.`)) return;
       }
 
       // ── BLOQUEO / FRANJA ──
+      // Lista del día es para saber a quién mandar a la cola del resonador,
+      // no para agendar — las franjas/restricciones (ej. "Solo sin
+      // contraste", "Franja de descompresión") no son pacientes y no
+      // tienen que aparecer acá para ningún rol, ni siquiera como fila
+      // clickeable (bug encontrado 27/8/2026: inundaban la lista con una
+      // fila por cada slot vacío de la franja).
       if (!turno) {
+        if (slot.tipo === "franja" || slot.tipo === "franja_origen") return "";
         const bg    = slot.color || "#f5f5f5";
         const label = slot.label || slot.tipo || "";
-        const esFranja = slot.tipo === "franja" || slot.tipo === "franja_origen";
-        if (esFranja) {
-          // Detectar condición según tipo y label
-          const condicion = {
-            label,
-            tipo:    slot.tipo,
-            origen:  slot.tipo === "franja_origen" ? _detectarOrigen(label) : null,
-            filtro:  slot.tipo === "franja"        ? _detectarFiltroEstudio(label) : null
-          };
-          return `<tr class="fila-franja" data-mins="${mins}" data-fecha="${fechaStr}"
-                  data-condicion="${encodeURIComponent(JSON.stringify(condicion))}"
-                  style="cursor:pointer;background:${bg}22" title="Clic para asignar turno (${label})">
-            <td class="td-hora" style="color:#888">${hora}</td>
-            <td colspan="6" style="font-size:11px">
-              <span style="display:inline-block;background:${bg};color:#555;padding:2px 10px;border-radius:10px;font-weight:600">${label}</span>
-              <span style="color:#aaa;font-size:10px;margin-left:8px">clic para asignar</span>
-            </td>
-            <td></td><td></td>
-          </tr>`;
-        }
         // Bloqueo puro — ocultar en vista técnico
         if (esTecnico) return "";
         return `<tr style="background:${bg}18">
@@ -428,18 +415,6 @@ Esta acción no se puede deshacer.`)) return;
         </td>
       </tr>`;
     }).join("");
-
-    // ── click en franja → asignar turno con condición ──
-    tbody.querySelectorAll(".fila-franja").forEach(tr => {
-      tr.addEventListener("click", () => {
-        const mins     = parseInt(tr.dataset.mins);
-        const fecha    = tr.dataset.fecha;
-        const condicion = JSON.parse(decodeURIComponent(tr.dataset.condicion));
-        const h = String(Math.floor(mins/60)).padStart(2,"0");
-        const m = String(mins%60).padStart(2,"0");
-        App.abrirTurnoConCondicion(fecha, `${h}:${m}`, condicion);
-      });
-    });
 
     // ── click en slot libre → asignar turno ──
     tbody.querySelectorAll(".fila-libre").forEach(tr => {
@@ -535,24 +510,6 @@ Esta acción no se puede deshacer.`)) return;
     if (isPM && h < 12) h += 12;
     if (isAM && h === 12) h = 0;
     return h*60 + m;
-  }
-
-  function _detectarOrigen(label) {
-    const l = (label||"").toLowerCase();
-    if (l.includes("intern")) return "INTERNACIÓN";
-    if (l.includes("guardia")) return "GUARDIA";
-    if (l.includes("direcci")) return "DIRECCIÓN";
-    if (l.includes("traslad")) return "TRASLADO";
-    if (l.includes("delegaci") || l.includes("victor")) return "DELEGACION/VICTOR";
-    return null;
-  }
-
-  function _detectarFiltroEstudio(label) {
-    const l = (label||"").toLowerCase();
-    if (l.includes("mamari")) return "mamaria";
-    if (l.includes("cardiolog")) return "cardiolog";
-    if (l.includes("neuroci") || l.includes("neuro")) return "cerebro";
-    return null;
   }
 
   function setFecha(fechaStr) {
