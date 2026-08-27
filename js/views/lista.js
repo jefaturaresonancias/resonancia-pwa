@@ -36,7 +36,7 @@ const ListaView = (() => {
     if (hashes.length === 0) { App.toast("No se pudo identificar el turno (sin hash)", "error"); return; }
     if (!confirm(`¿Cargar a ${nombre} en Suitestensa?`)) return;
 
-    const fila = btn.closest(".row-ris, tr");
+    const fila = btn.closest(".row-ris, tr, .card-turno");
     const estadoEl = fila ? fila.querySelector(".suitestensa-estado") : null;
     const desde = new Date();
 
@@ -126,16 +126,25 @@ const ListaView = (() => {
       }
     }
 
-    // Agregar filas RIS intercaladas — excluir duplicados con agenda propia
-    // Sets de DNI y apellido de la agenda propia
-    const dnisPropios    = new Set(turnos.map(t => String(t.dni).trim().replace(/^0+/, "")));
-    const apellPropios   = new Set(turnos.map(t => (t.apellido||"").trim().toUpperCase()));
+    // Agregar filas RIS intercaladas — si coincide con un turno propio
+    // (mismo DNI o apellido), no se agrega como fila aparte: se le pegan
+    // los hashes de RIS al turno para que esa fila pueda mostrar "Cargar
+    // en Suitestensa" (antes se descartaban sin más, dejando un turno que
+    // ya tiene su estudio en RIS sin ninguna forma de mandarlo a
+    // Suitestensa — bug encontrado 27/8/2026, ver comentario de `hashes`
+    // en rpc/ris.js#api_leerRISRango: esa era la idea original).
+    const turnoPorDni      = new Map(turnos.map(t => [String(t.dni).trim().replace(/^0+/, ""), t]));
+    const turnoPorApellido = new Map(turnos.map(t => [(t.apellido||"").trim().toUpperCase(), t]));
     for (const r of risDelDia) {
       const mins = _parseMins(r.hora);
       if (mins < MIN_I || mins >= MIN_F) continue;
       const dniRIS   = String(r.documento || "").replace(/[A-Z]+\s*/i,"").trim().replace(/^0+/,"");
       const apellRIS = String(r.apellido_nombre || "").split(",")[0].trim().toUpperCase();
-      if (dnisPropios.has(dniRIS) || apellPropios.has(apellRIS)) continue;
+      const turnoCoincidente = turnoPorDni.get(dniRIS) || turnoPorApellido.get(apellRIS);
+      if (turnoCoincidente) {
+        turnoCoincidente._risHashes = [...(turnoCoincidente._risHashes || []), ...(r.hashes || [])];
+        continue;
+      }
       filas.push({ slot: { tipo: "ris" }, turno: null, mins, esRIS: true, ris: r });
     }
     // Agregar turnos que no coinciden con ningún slot del grid
@@ -249,6 +258,12 @@ const ListaView = (() => {
               const presBadge = pres
                 ? `<span class="btn-card-done">✓ Presente</span>`
                 : `<button class="btn-card-pres" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}">Presente</button>`;
+              const risHashes = turno._risHashes || [];
+              const hashesAttr = risHashes.join(",");
+              const suitestensaHtml = risHashes.length
+                ? `<span class="suitestensa-estado" data-hashes="${hashesAttr}" style="display:block;font-size:10px"></span>
+                   <button class="btn-suitestensa" data-hashes="${hashesAttr}" data-fecha="${fechaStr}" data-nombre="${turno.nombre} ${turno.apellido}">Cargar en Suitestensa</button>`
+                : "";
               cards.push(`<div class="card-turno ${pres?"presente":""} ${esInt?"card-int":""}">
                 <div>
                   <div class="hora-big ${pres?"ok":""}">${hora}</div>
@@ -263,6 +278,7 @@ const ListaView = (() => {
                   ${esInt?`<span class="origen-tag-card int">Internación</span>`:""}
                   ${presBadge}
                   <button class="btn-card-anular" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}">Anular</button>
+                  ${suitestensaHtml}
                 </div>
               </div>`);
             }
@@ -401,6 +417,17 @@ Esta acción no se puede deshacer.`)) return;
         ? `<span class="presente-badge">✅ Presente<br><span style="font-weight:400;font-size:10px;color:#666">${turno.tsPresente||""}</span></span>`
         : `<button class="btn-presente" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}">Presente</button>`;
 
+      // Turno con estudio ya reflejado en RIS (mismo DNI/apellido — ver
+      // más arriba) → puede mandarse a Suitestensa igual que una fila de
+      // RIS. Todavía no está en RIS → nada que hacer acá hasta que llegue
+      // (no hay ningún hash para inventarle, ver rpc/ris.js).
+      const risHashes = turno._risHashes || [];
+      const hashesAttr = risHashes.join(",");
+      const suitestensaHtml = risHashes.length
+        ? `<span class="suitestensa-estado" data-hashes="${hashesAttr}" style="display:block;font-size:10px;margin-top:4px"></span>
+           <button class="btn-suitestensa" data-hashes="${hashesAttr}" data-fecha="${fechaStr}" data-nombre="${turno.nombre} ${turno.apellido}" style="margin-top:2px">Cargar en Suitestensa</button>`
+        : "";
+
       return `<tr class="${rowCls}" data-fila="${turno.fila}">
         <td class="td-hora">${hora}</td>
         <td class="td-nombre">${turno.nombre}</td>
@@ -412,6 +439,7 @@ Esta acción no se puede deshacer.`)) return;
         <td>${presBadge}</td>
         <td>
           <button class="btn-sm btn-anular" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}" style="color:#c62828;border-color:#c62828">Anular</button>
+          ${suitestensaHtml}
         </td>
       </tr>`;
     }).join("");
