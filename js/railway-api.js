@@ -362,6 +362,11 @@ const RailwayAPI = (() => {
     return rpc('api_agendaConfig_obtener');
   }
 
+  async function obtenerAgendaPreviewSemanal() {
+    const data = await rpc('api_agenda_previewSemanal');
+    return data.dias;
+  }
+
   // ── Franjas preferidas por estudio (sugeridor) ──────────────────
   async function leerFranjasPreferidasSugerir() {
     const data = await rpc('api_sobreturnoSugerir_leerFranjasPreferidas');
@@ -608,6 +613,7 @@ const RailwayAPI = (() => {
     leerFranjasPreferidasSugerir, guardarFranjaPreferidaSugerir, eliminarFranjaPreferidaSugerir,
     leerCategoriasEstudio, guardarCategoriaEstudio, eliminarCategoriaEstudio,
     leerAgendaFeriados, guardarAgendaFeriado, eliminarAgendaFeriado,
+    obtenerAgendaPreviewSemanal,
     leerAgendaFranjas, guardarAgendaFranja, eliminarAgendaFranja,
     leerAgendaBloqueos, guardarAgendaBloqueo, eliminarAgendaBloqueo,
     leerAgendaRestriccionesHorarias, guardarAgendaRestriccionHoraria, eliminarAgendaRestriccionHoraria,

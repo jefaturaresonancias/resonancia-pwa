@@ -7,6 +7,7 @@ const ConfigView = (() => {
   let _limitesFranjaCount = 0;
   let _asignadoresTurno = [];
   let _agendaEspecial = {};
+  let _panoramaDias = [];
   // Panel de botones por rol (27/8/2026) — null = bloqueado; una vez
   // validado el PIN propio (rol='menu_config', distinto del de
   // jefatura/admin) guarda { pin, config } para poder guardar cambios sin
@@ -20,7 +21,7 @@ const ConfigView = (() => {
     container.innerHTML = '<div class="empty-state">Cargando configuración...</div>';
     _menuRolesEditor = null; // re-bloquear el panel de botones por rol
     try {
-      const [estudios, feriados, franjas, bloqueos, restricciones, restriccionesOrigen, restriccionesPropia, limites, limitesFranja, asignadores, agendaEspecial] = await Promise.all([
+      const [estudios, feriados, franjas, bloqueos, restricciones, restriccionesOrigen, restriccionesPropia, limites, limitesFranja, asignadores, agendaEspecial, panorama] = await Promise.all([
         RailwayAPI.leerAgendaEstudiosCatalogo(),
         RailwayAPI.leerAgendaFeriados(),
         RailwayAPI.leerAgendaFranjas(),
@@ -33,13 +34,17 @@ const ConfigView = (() => {
         RailwayAPI.leerLimitesSobreturno().catch(() => []),
         RailwayAPI.leerLimitesTurnosFranja().catch(() => []),
         RailwayAPI.leerAsignadoresTurno().catch(() => []),
-        RailwayAPI.leerAgendaEspecialConfig().catch(() => ({}))
+        RailwayAPI.leerAgendaEspecialConfig().catch(() => ({})),
+        RailwayAPI.obtenerAgendaPreviewSemanal().catch(() => [])
       ]);
       _datos = { estudios, feriados, franjas, bloqueos, restricciones, restriccionesOrigen, restriccionesPropia };
+      _limitesCache = limites;
       _limitesCount = limites.length;
+      _limitesFranjaCache = limitesFranja;
       _limitesFranjaCount = limitesFranja.length;
       _asignadoresTurno = asignadores;
       _agendaEspecial = agendaEspecial;
+      _panoramaDias = panorama;
       _render();
     } catch(err) {
       container.innerHTML = `<div class="empty-state">Error: ${err.message}</div>`;
@@ -51,6 +56,7 @@ const ConfigView = (() => {
     const d = _datos;
     const container = document.getElementById("config-container");
     container.innerHTML = `
+      ${_seccionPanoramaSemanal()}
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.5rem">
         ${_card("📚", d.estudios.length, "estudios")}
         ${_card("🗓", d.feriados.length, "feriados 2026")}
@@ -79,6 +85,103 @@ const ConfigView = (() => {
     return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:1rem">
       <div style="font-size:13px;color:var(--text-2);margin-bottom:4px">${label}</div>
       <div style="font-size:28px;font-weight:500">${num}</div>
+    </div>`;
+  }
+
+  // ── Panorama semanal (Lun-Dom × 00-24hs) ────────────────────
+  // Grilla de solo lectura, coloreada con la MISMA lógica de prioridades
+  // (bloqueo_rec > franja por código > franja por origen) que usa la
+  // agenda real (api_agenda_previewSemanal, rpc/agenda.js) — para que esta
+  // vista nunca muestre algo distinto de lo que realmente bloquea. Los
+  // límites (de sobreturno y de turnos por franja) no son bloques de
+  // horario sino topes numéricos, así que van en tablitas aparte debajo
+  // en vez de forzarlos adentro de una celda (28/8/2026, a pedido).
+  const PANORAMA_ORDEN_DIAS = [1, 2, 3, 4, 5, 6, 0];
+  const PANORAMA_DIAS_LABEL = { 0: 'Dom', 1: 'Lun', 2: 'Mar', 3: 'Mié', 4: 'Jue', 5: 'Vie', 6: 'Sáb' };
+
+  function _seccionPanoramaSemanal() {
+    if (!_panoramaDias || !_panoramaDias.length) {
+      return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem">
+        <span style="font-weight:500;font-size:15px">🗺️ Panorama semanal de la agenda</span>
+        <div style="font-size:12px;color:var(--text-3);margin-top:6px">No se pudo cargar — reintentá recargando Config</div>
+      </div>`;
+    }
+
+    const porDia = {};
+    _panoramaDias.forEach(d => { porDia[d.diaSemana] = d.slots; });
+
+    // Leyenda: un color por leyenda visible, en orden de primera aparición
+    // (recorriendo Lun→Dom y 00→24hs, mismo orden que la grilla).
+    const leyendaMap = new Map();
+    PANORAMA_ORDEN_DIAS.forEach(dia => {
+      (porDia[dia] || []).forEach(s => {
+        if (s.tipo === 'libre' || !s.label) return;
+        if (!leyendaMap.has(s.label)) leyendaMap.set(s.label, s.color);
+      });
+    });
+    const leyendaHtml = [...leyendaMap.entries()].map(([label, color]) => `
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text-2)">
+        <span style="width:11px;height:11px;border-radius:3px;background:${color};border:1px solid rgba(0,0,0,.15);flex-shrink:0"></span>${label}
+      </span>`).join("");
+
+    // Header de horas: una celda de texto cada 2 columnas (30min × 2 = 1h)
+    const headerHoras = Array.from({length: 24}, (_, h) =>
+      `<th colspan="2" style="font-weight:500;font-size:9px;color:var(--text-3);padding:2px 0;border-left:1px solid var(--border)">${String(h).padStart(2,'0')}</th>`
+    ).join("");
+
+    const filas = PANORAMA_ORDEN_DIAS.map(dia => {
+      const slots = porDia[dia] || [];
+      const celdas = slots.map((s, i) => {
+        const horaIni = String(Math.floor(s.mins/60)).padStart(2,'0') + ':' + String(s.mins%60).padStart(2,'0');
+        const bordeHora = (i % 2 === 0) ? 'border-left:1px solid var(--border);' : '';
+        const bg = s.tipo === 'libre' ? 'transparent' : s.color;
+        return `<td title="${(s.label ? s.label + ' — ' : '')}${horaIni}hs" style="width:9px;height:22px;padding:0;background:${bg};${bordeHora}"></td>`;
+      }).join("");
+      return `<tr><td style="font-size:11px;font-weight:600;color:var(--text-2);padding-right:8px;white-space:nowrap">${PANORAMA_DIAS_LABEL[dia]}</td>${celdas}</tr>`;
+    }).join("");
+
+    return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem">
+      <div style="margin-bottom:10px">
+        <span style="font-weight:500;font-size:15px">🗺️ Panorama semanal de la agenda</span>
+        <div style="font-size:12px;color:var(--text-2);margin-top:2px">Franjas y restricciones recurrentes, Lun a Dom — el mismo criterio que aplica la agenda real (pasá el mouse sobre una celda para ver el detalle)</div>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="border-collapse:collapse;min-width:100%">
+          <thead><tr><th></th>${headerHoras}</tr></thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+        ${leyendaHtml || '<span style="font-size:11px;color:var(--text-3);font-style:italic">Sin franjas ni restricciones configuradas</span>'}
+      </div>
+      ${_tablaLimitesResumen()}
+    </div>`;
+  }
+
+  // Tablitas de límites (no son horario-bloque, son topes numéricos) —
+  // debajo del panorama gráfico, mismo dato ya cargado para las secciones
+  // de más abajo (_limitesCache/_limitesFranjaCache), sin pedirlo de nuevo.
+  function _tablaLimitesResumen() {
+    const filasSobreturno = (_limitesCache || []).filter(r => r.activa !== false).map(r => `
+      <tr>
+        <td style="padding:4px 8px 4px 0;font-size:11.5px">${r.nombre}</td>
+        <td style="padding:4px 8px;font-size:11.5px;color:var(--text-2)">${_resumenLimite(r)}</td>
+      </tr>`).join("");
+    const filasFranja = (_limitesFranjaCache || []).filter(r => r.activa !== false).map(r => `
+      <tr>
+        <td style="padding:4px 8px 4px 0;font-size:11.5px">${r.nombre}</td>
+        <td style="padding:4px 8px;font-size:11.5px;color:var(--text-2)">${_resumenLimiteFranja(r)}</td>
+      </tr>`).join("");
+
+    return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <div>
+        <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:4px">🚫 Límites de sobreturno activos</div>
+        <table style="width:100%;border-collapse:collapse">${filasSobreturno || `<tr><td style="font-size:11.5px;color:var(--text-3);font-style:italic;padding:4px 0">Ninguno configurado</td></tr>`}</table>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:4px">📊 Límites de turnos por franja activos</div>
+        <table style="width:100%;border-collapse:collapse">${filasFranja || `<tr><td style="font-size:11.5px;color:var(--text-3);font-style:italic;padding:4px 0">Ninguno configurado</td></tr>`}</table>
+      </div>
     </div>`;
   }
 
