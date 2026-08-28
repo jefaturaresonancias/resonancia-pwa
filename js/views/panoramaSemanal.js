@@ -382,57 +382,54 @@ const PanoramaSemanal = (() => {
     ventana.onload = () => ventana.print();
   }
 
-  // ── Exportar a PNG (todo junto, como imagen) — técnica sin dependencias
-  // externas: renderizar el contenido real (para medir su tamaño tal cual
-  // se ve), envolverlo en un SVG con <foreignObject>, dibujarlo en un
-  // <canvas> y bajarlo como PNG. Como todo el contenido usa colores/fuentes
-  // inline (nada externo por red), el canvas no queda "tainted" y
-  // toBlob/toDataURL funcionan normalmente.
-  function exportarPNG(panoramaDias, limitesSobreturno, limitesFranja) {
-    const contenido = _contenidoExport(panoramaDias, limitesSobreturno, limitesFranja);
+  // ── Exportar a PNG (todo junto, como imagen) ────────────────
+  // Primer intento (SVG + <foreignObject> + canvas, sin dependencias) fallaba
+  // en silencio: los navegadores marcan como "tainted" un canvas donde se
+  // dibujó un SVG con HTML embebido, así que canvas.toBlob no generaba nada
+  // y no había ningún error visible para mostrar (28/8/2026, encontrado en
+  // producción). html2canvas evita ese problema — reimplementa el render
+  // del DOM directo al canvas, sin pasar por SVG — así que se carga bajo
+  // demanda (solo al tocar "Exportar", no al abrir la app) desde un CDN.
+  let _html2canvasPromise = null;
+  function _cargarHtml2Canvas() {
+    if (window.html2canvas) return Promise.resolve();
+    if (_html2canvasPromise) return _html2canvasPromise;
+    _html2canvasPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.onload = () => resolve();
+      s.onerror = () => { _html2canvasPromise = null; reject(new Error('No se pudo cargar la herramienta de exportación — ¿hay conexión a internet?')); };
+      document.head.appendChild(s);
+    });
+    return _html2canvasPromise;
+  }
 
-    const medidor = document.createElement('div');
-    medidor.style.cssText = 'position:fixed;left:-99999px;top:0;visibility:hidden';
-    medidor.innerHTML = contenido;
-    document.body.appendChild(medidor);
-    const raiz = medidor.firstElementChild;
-    const ancho = raiz.offsetWidth;
-    const alto = raiz.offsetHeight;
-    const htmlSerializado = raiz.outerHTML;
-    document.body.removeChild(medidor);
+  async function exportarPNG(panoramaDias, limitesSobreturno, limitesFranja) {
+    let wrapper;
+    try {
+      await _cargarHtml2Canvas();
 
-    if (!ancho || !alto) { App.toast('No se pudo medir el panorama para exportar', 'error'); return; }
+      const contenido = _contenidoExport(panoramaDias, limitesSobreturno, limitesFranja);
+      wrapper = document.createElement('div');
+      wrapper.style.cssText = 'position:fixed;left:-99999px;top:0';
+      wrapper.innerHTML = contenido;
+      document.body.appendChild(wrapper);
 
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${ancho}" height="${alto}">
-      <foreignObject width="100%" height="100%">${htmlSerializado.replace('<div ', '<div xmlns="http://www.w3.org/1999/xhtml" ')}</foreignObject>
-    </svg>`;
+      const canvas = await window.html2canvas(wrapper.firstElementChild, { scale: 2, backgroundColor: '#ffffff' });
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('El canvas no generó ninguna imagen');
 
-    const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
-    const img = new Image();
-    img.onload = () => {
-      const escala = 2; // nitidez tipo retina
-      const canvas = document.createElement('canvas');
-      canvas.width = ancho * escala;
-      canvas.height = alto * escala;
-      const ctx = canvas.getContext('2d');
-      ctx.scale(escala, escala);
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(0, 0, ancho, alto);
-      ctx.drawImage(img, 0, 0, ancho, alto);
-      URL.revokeObjectURL(url);
-      canvas.toBlob((blob) => {
-        if (!blob) { App.toast('No se pudo generar la imagen PNG', 'error'); return; }
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        const fecha = new Date().toISOString().slice(0, 10);
-        a.download = `panorama-semanal-${fecha}.png`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      }, 'image/png');
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); App.toast('No se pudo generar la imagen PNG — reintentá.', 'error'); };
-    img.src = url;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `panorama-semanal-${new Date().toISOString().slice(0, 10)}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      App.toast('No se pudo generar la imagen PNG: ' + err.message, 'error');
+    } finally {
+      if (wrapper) document.body.removeChild(wrapper);
+    }
   }
 
   // ── Modal (para el botón de Agenda) ─────────────────────────
