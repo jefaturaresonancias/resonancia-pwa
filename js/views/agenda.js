@@ -367,7 +367,7 @@ const AgendaView = (() => {
             data-ris-nombre="${encodeURIComponent(r.apellido_nombre)}"
             data-ris-practica="${encodeURIComponent(r.practica)}"
             data-franja-label="${esFranjaAqui ? encodeURIComponent(sFranja.label) : ''}"
-            title="${esFranjaAqui ? sFranja.label + ' — ' : ''}${r.apellido_nombre} · ${r.practica} — hasta ${horaF} — clic para sobreturno">
+            title="${esFranjaAqui ? sFranja.label + ' — ' : ''}${r.apellido_nombre} · ${r.practica} — hasta ${horaF} — clic para asignar turno">
             <div style="height:100%;display:flex;align-items:center;justify-content:space-between;pointer-events:none">
               <div style="height:1px;flex:1;border-top:1px dashed #999"></div>
               ${etiqueta}
@@ -733,12 +733,15 @@ const AgendaView = (() => {
       });
     });
 
-    // Clic directo sobre el nombre/horario exacto de un paciente de RIS ya
-    // NO abre el formulario ahí mismo (28/8/2026, a pedido — evitar cargar
-    // un sobreturno pisando exactamente ese horario sin darse cuenta). Para
-    // cargar un sobreturno hay que abrir un turno nuevo y usar "Sugerir
-    // sobreturno", que aplica los límites configurados.
-    container.querySelectorAll(".slot-ris-clickable").forEach(td => {
+    // Clic directo sobre el nombre/horario EXACTO de inicio de un paciente
+    // de RIS ya no abre el formulario ahí mismo (28/8/2026, a pedido —
+    // evitar cargar un sobreturno pisando exactamente ese horario sin darse
+    // cuenta). Para cargar un sobreturno hay que abrir un turno nuevo y usar
+    // "Sugerir sobreturno", que aplica los límites configurados. Esto NO
+    // aplica a los slots de continuación (".slot-ris-continua", la barra que
+    // sigue mostrando la duración estimada del estudio) — esos quedan
+    // libres para dar turno normalmente, solo se bloquea el slot puntual.
+    container.querySelectorAll(".slot-ris-clickable:not(.slot-ris-continua)").forEach(td => {
       td.addEventListener("click", () => {
         App.toast("Ese horario ya tiene un paciente de RIS — para sobreturno, usá \"Nuevo turno\" → \"Sugerir sobreturno\"", "error");
       });
@@ -747,6 +750,20 @@ const AgendaView = (() => {
     container.querySelectorAll(".slot-ris-side").forEach(div => {
       div.addEventListener("click", () => {
         App.toast("Ese horario ya tiene un paciente de RIS — para sobreturno, usá \"Nuevo turno\" → \"Sugerir sobreturno\"", "error");
+      });
+    });
+
+    container.querySelectorAll(".slot-ris-continua").forEach(td => {
+      td.addEventListener("click", () => {
+        const franjaLabel = td.dataset.franjaLabel ? decodeURIComponent(td.dataset.franjaLabel) : "";
+        if (/descompres/i.test(franjaLabel)) {
+          App.toast(`"${franjaLabel}" — horario bloqueado, no se puede cargar nada ahí`, "error");
+          return;
+        }
+        if (_esPasado(td.dataset.fecha)) { App.toast("No se puede asignar en fechas pasadas", "error"); return; }
+        const mins = parseInt(td.dataset.mins);
+        App.abrirTurnoConFechaHora(td.dataset.fecha,
+          String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0"));
       });
     });
 
