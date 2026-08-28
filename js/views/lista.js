@@ -67,11 +67,15 @@ const ListaView = (() => {
       const resueltos = hashes.map(h => vigentes.find(f => f.hash === h)).filter(Boolean);
 
       if (resueltos.length === hashes.length) {
-        const conError  = resueltos.some(f => f.estado === "error" || f.estado === "error_permanente");
-        const sinMapeo  = resueltos.some(f => f.estado === "sin_mapeo");
+        const filaError = resueltos.find(f => f.estado === "error" || f.estado === "error_permanente");
+        const filaSinMapeo = resueltos.find(f => f.estado === "sin_mapeo");
         btn.disabled = false;
-        if (conError)      { btn.textContent = "Reintentar"; if (estadoEl) estadoEl.textContent = "❌ error"; }
-        else if (sinMapeo) { btn.textContent = "Reintentar"; if (estadoEl) estadoEl.textContent = "⚠️ sin mapeo"; }
+        // Se muestra el detalle_error real (ej. bloqueo por horario
+        // administrativo, o el motivo puntual del fallo) en vez de un
+        // genérico "❌ error" — el técnico necesita saber POR QUÉ, no solo
+        // que falló (pedido 28/8/2026, tras sumar el bloqueo horario).
+        if (filaError)      { btn.textContent = "Reintentar"; if (estadoEl) estadoEl.textContent = "❌ " + (filaError.detalle_error || "error"); }
+        else if (filaSinMapeo) { btn.textContent = "Reintentar"; if (estadoEl) estadoEl.textContent = "⚠️ " + (filaSinMapeo.detalle_error || "sin mapeo"); }
         else               { btn.textContent = "✅ Cargado"; btn.disabled = true; }
         return;
       }
@@ -93,6 +97,94 @@ const ListaView = (() => {
     root.querySelectorAll(".btn-suitestensa").forEach(btn => {
       btn.addEventListener("click", () => _dispararCargaSuitestensa(btn));
     });
+  }
+
+  // ── excepción horaria (28/8/2026) — válvula de escape auditable para
+  // cuando falta el administrativo dentro de su propio horario. No hay
+  // login individual en esta app (Config.getRol() solo da el rol, PIN
+  // compartido) — motivo y "quién" los tipea la persona en el modal, no
+  // se pueden auto-completar. El bot decide server-side si el horario
+  // actual está bloqueado (_sinAdministrativo); acá no se replica esa
+  // regla, el botón de activar queda siempre disponible — activarla
+  // fuera de horario bloqueado simplemente no tiene efecto (el bot ni la
+  // consulta si ya está en horario técnico permitido). ──────────────────
+  async function _cargarBannerExcepcion() {
+    const cont = document.getElementById("lista-excepcion-suitestensa");
+    if (!cont) return;
+    let excepcion = null;
+    try { excepcion = await RailwayAPI.estadoExcepcionSuitestensa(); } catch (e) { /* deja el banner anterior */ return; }
+
+    if (excepcion) {
+      const vence = new Date(excepcion.expira_en).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+      cont.innerHTML = `
+        <div class="excepcion-banner-activa">
+          ⚠️ Excepción horaria activa por <strong>${excepcion.activado_por}</strong>: "${excepcion.motivo}" — vence a las ${vence}
+          <button id="btn-excepcion-desactivar" class="btn-sm">Desactivar</button>
+        </div>`;
+      document.getElementById("btn-excepcion-desactivar").addEventListener("click", _desactivarExcepcion);
+    } else {
+      cont.innerHTML = `<button id="btn-excepcion-activar" class="btn-sm">⚠️ Activar excepción horaria (falta el administrativo)</button>`;
+      document.getElementById("btn-excepcion-activar").addEventListener("click", _abrirModalExcepcion);
+    }
+  }
+
+  function _abrirModalExcepcion() {
+    document.getElementById("excepcion-modal-titulo").textContent = "Activar excepción horaria";
+    document.getElementById("excepcion-modal-body").innerHTML = `
+      <p style="color:var(--text-3);font-size:.85rem;margin-bottom:.75rem">
+        Usar solo cuando el administrativo no está disponible en su propio horario —
+        se registra quién la activa y por qué, y vence sola en 3 horas.
+      </p>
+      <div class="form-group" style="margin-bottom:.75rem">
+        <label>Tu nombre</label>
+        <input type="text" id="excepcion-form-nombre" placeholder="¿Quién activa la excepción?">
+      </div>
+      <div class="form-group">
+        <label>Motivo</label>
+        <textarea id="excepcion-form-motivo" rows="3" placeholder="¿Por qué falta el administrativo?"></textarea>
+      </div>`;
+    document.getElementById("excepcion-modal-footer").innerHTML = `
+      <button class="btn-sm" id="btn-excepcion-cancelar">Cancelar</button>
+      <button class="btn-primary" id="btn-excepcion-confirmar">Activar por 3hs</button>`;
+    document.getElementById("btn-excepcion-cancelar").addEventListener("click", _cerrarModalExcepcion);
+    document.getElementById("btn-excepcion-confirmar").addEventListener("click", _confirmarExcepcion);
+    document.getElementById("excepcion-modal-overlay").classList.remove("hidden");
+  }
+
+  function _cerrarModalExcepcion() {
+    document.getElementById("excepcion-modal-overlay").classList.add("hidden");
+  }
+
+  async function _confirmarExcepcion() {
+    const nombre = document.getElementById("excepcion-form-nombre").value.trim();
+    const motivo = document.getElementById("excepcion-form-motivo").value.trim();
+    if (!nombre) { App.toast("Falta tu nombre", "error"); return; }
+    if (!motivo) { App.toast("Falta el motivo", "error"); return; }
+
+    const btn = document.getElementById("btn-excepcion-confirmar");
+    btn.disabled = true;
+    try {
+      await RailwayAPI.activarExcepcionSuitestensa(motivo, nombre);
+      _cerrarModalExcepcion();
+      App.toast("Excepción horaria activada por 3hs", "ok");
+      await _cargarBannerExcepcion();
+    } catch (err) {
+      App.toast("Error al activar: " + err.message, "error");
+      btn.disabled = false;
+    }
+  }
+
+  async function _desactivarExcepcion() {
+    const nombre = prompt("Tu nombre (para el registro):");
+    if (nombre === null) return;
+    if (!confirm("¿Desactivar la excepción horaria ahora?")) return;
+    try {
+      await RailwayAPI.desactivarExcepcionSuitestensa(nombre.trim() || "sin especificar");
+      App.toast("Excepción horaria desactivada", "ok");
+      await _cargarBannerExcepcion();
+    } catch (err) {
+      App.toast("Error al desactivar: " + err.message, "error");
+    }
   }
 
   // ── render combinado: slots de agenda + turnos ────────────
@@ -510,6 +602,7 @@ Esta acción no se puede deshacer.`)) return;
       const risDelDia = risPorFecha[fechaStr] || [];
       const agendaDia = agendaArr && agendaArr[0] ? agendaArr[0] : null;
       _render(agendaDia, turnos, filtro, risDelDia);
+      _cargarBannerExcepcion();
     } catch(err) {
       App.toast("Error cargando lista: "+err.message, "error");
       document.getElementById("lista-tbody").innerHTML = "";
@@ -557,6 +650,11 @@ Esta acción no se puede deshacer.`)) return;
       _fecha = new Date(); _fecha.setHours(0,0,0,0); cargar();
     };
     document.getElementById("lista-filtro").addEventListener("input", () => cargar());
+
+    document.getElementById("btn-excepcion-modal-cerrar").addEventListener("click", _cerrarModalExcepcion);
+    document.getElementById("excepcion-modal-overlay").addEventListener("click", (e) => {
+      if (e.target.id === "excepcion-modal-overlay") _cerrarModalExcepcion();
+    });
   }
 
   return { init, cargar, setFecha };

@@ -377,6 +377,18 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
   font-size: .8rem; color: var(--text-2); background: var(--surface);
   border-bottom: 1px solid var(--border); flex-shrink: 0;
 }
+#lista-excepcion-suitestensa:empty { display: none; }
+#lista-excepcion-suitestensa { padding: 0 1.25rem; flex-shrink: 0; }
+#lista-excepcion-suitestensa > .btn-sm {
+  margin: .5rem 0; background: #fff8e1; border-color: #c9a000; color: #7a4f00;
+}
+.excepcion-banner-activa {
+  display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
+  padding: .6rem 1rem; margin: .5rem 0;
+  background: #fff8e1; border: 1px solid #c9a000; color: #7a4f00;
+  border-radius: var(--radius); font-size: .82rem;
+}
+.excepcion-banner-activa .btn-sm { margin-left: auto; }
 #lista-container { flex: 1; overflow: auto; }
 #tabla-turnos {
   width: 100%; border-collapse: collapse; font-size: 13px;
