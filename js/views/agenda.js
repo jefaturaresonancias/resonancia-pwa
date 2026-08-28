@@ -733,45 +733,20 @@ const AgendaView = (() => {
       });
     });
 
+    // Clic directo sobre el nombre/horario exacto de un paciente de RIS ya
+    // NO abre el formulario ahí mismo (28/8/2026, a pedido — evitar cargar
+    // un sobreturno pisando exactamente ese horario sin darse cuenta). Para
+    // cargar un sobreturno hay que abrir un turno nuevo y usar "Sugerir
+    // sobreturno", que aplica los límites configurados.
     container.querySelectorAll(".slot-ris-clickable").forEach(td => {
       td.addEventListener("click", () => {
-        const franjaLabel = td.dataset.franjaLabel ? decodeURIComponent(td.dataset.franjaLabel) : "";
-        if (/descompres/i.test(franjaLabel)) {
-          App.toast(`"${franjaLabel}" — horario bloqueado, no se puede cargar nada ahí`, "error");
-          return;
-        }
-        const mins     = parseInt(td.dataset.mins);
-        const nombre   = decodeURIComponent(td.dataset.risNombre || "");
-        const practica = decodeURIComponent(td.dataset.risPractica || "");
-        const hora     = String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0");
-        if (_esPasado(td.dataset.fecha)) { App.toast("No se puede asignar en fechas pasadas", "error"); return; }
-        App.abrirTurnoConRIS(td.dataset.fecha, hora, nombre, practica);
+        App.toast("Ese horario ya tiene un paciente de RIS — para sobreturno, usá \"Nuevo turno\" → \"Sugerir sobreturno\"", "error");
       });
     });
 
     container.querySelectorAll(".slot-ris-side").forEach(div => {
       div.addEventListener("click", () => {
-        // Franjas con bloqueo total (ej. descompresión): ningún estudio
-        // real puede entrar ahí, así que ni siquiera vale la pena abrir el
-        // panel — el resto de las franjas (mamarias, internación, etc.)
-        // son reservas por código/origen, no bloqueos absolutos, y siguen
-        // dejando abrir el panel normalmente (el backend valida al confirmar).
-        const franjaLabel = div.dataset.franjaLabel ? decodeURIComponent(div.dataset.franjaLabel) : "";
-        if (/descompres/i.test(franjaLabel)) {
-          App.toast(`"${franjaLabel}" — horario bloqueado, no se puede cargar nada ahí`, "error");
-          return;
-        }
-        // Ya hay un sobreturno propio exactamente en este horario — no
-        // apilar otro encima haciendo clic de nuevo en el lado RIS.
-        if (div.dataset.yaSobreturno === "1") {
-          App.toast("Ya hay un sobreturno en este horario", "error");
-          return;
-        }
-        const mins     = parseInt(div.dataset.mins);
-        const nombre   = decodeURIComponent(div.dataset.risNombre || "");
-        const practica = decodeURIComponent(div.dataset.risPractica || "");
-        const hora     = String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0");
-        App.abrirTurnoConRIS(div.dataset.fecha, hora, nombre, practica);
+        App.toast("Ese horario ya tiene un paciente de RIS — para sobreturno, usá \"Nuevo turno\" → \"Sugerir sobreturno\"", "error");
       });
     });
 

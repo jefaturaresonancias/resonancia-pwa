@@ -513,11 +513,6 @@ const App = (() => {
     });
   }
 
-  // Abrir formulario con aviso de RIS en ese horario
-  function abrirTurnoConRIS(fecha, hora, risNombre, risPractica) {
-    TurnoView.abrirPanel(fecha, hora, null, { nombre: risNombre, practica: risPractica });
-  }
-
   function irAListaDia(fechaStr) {
     ListaView.setFecha(fechaStr);
     showView("lista");
@@ -527,7 +522,7 @@ const App = (() => {
     TurnoView.abrirPanel(fecha, hora, condicion);
   }
 
-  return { init, toast, showView, abrirTurnoConFechaHora, abrirTurnoConCondicion, abrirTurnoConRIS, mostrarOpcionesTurno, cerrarOpcionesTurno, refrescarAgenda, irAListaDia };
+  return { init, toast, showView, abrirTurnoConFechaHora, abrirTurnoConCondicion, mostrarOpcionesTurno, cerrarOpcionesTurno, refrescarAgenda, irAListaDia };
 })();
 
 // Arrancar cuando el DOM esté listo
