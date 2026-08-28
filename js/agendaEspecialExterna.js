@@ -87,19 +87,33 @@
     sel.innerHTML = '';
     const desde = _horaAMin(_ventana.horaDesde);
     const hasta = _horaAMin(_ventana.horaHasta);
-    for (let m = desde; m < hasta; m += 20) {
+
+    // Horario adaptativo (28/8/2026, a pedido): antes se ofrecían siempre
+    // los mismos horarios cada 20 min, aunque un estudio anterior durara
+    // más (ej. 30 min) — el próximo horario "libre" recién aparecía en el
+    // siguiente múltiplo de 20, desperdiciando esos minutos de sobra. Ahora
+    // el próximo candidato salta directo al final real del turno que
+    // ocupa, aunque no caiga en un múltiplo de 20 — así un estudio de 30
+    // min ocupa exactamente su lugar, no dos turnos de 20.
+    let m = desde;
+    while (m < hasta) {
       const finNueva = m + duracionNueva;
-      const solapa = ocupados.some((t) => {
+      const choque = ocupados.find((t) => {
         const durOcupado = _duracionEstudios[t.estudio] || 20;
         return m < t.mins + durOcupado && finNueva > t.mins;
       });
+      if (choque) {
+        const durOcupado = _duracionEstudios[choque.estudio] || 20;
+        m = choque.mins + durOcupado;
+        continue;
+      }
       const opt = document.createElement('option');
       opt.value = _minAHora(m);
-      opt.textContent = _minAHora(m) + (solapa ? ' — ocupado' : '');
-      opt.disabled = solapa;
+      opt.textContent = _minAHora(m);
       sel.appendChild(opt);
+      m += 20;
     }
-    const sigueDisponible = [...sel.options].some((o) => o.value === valorPrevio && !o.disabled);
+    const sigueDisponible = [...sel.options].some((o) => o.value === valorPrevio);
     if (sigueDisponible) sel.value = valorPrevio;
   }
 
