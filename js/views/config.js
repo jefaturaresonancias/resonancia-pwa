@@ -157,7 +157,7 @@ const ConfigView = (() => {
       return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;background:var(--bg)">
         <div style="width:12px;height:12px;border-radius:50%;background:${f.color};flex-shrink:0"></div>
         <div style="flex:1">
-          <div style="font-size:13px;font-weight:500">${f.concepto}</div>
+          <div style="font-size:13px;font-weight:500">${f.concepto}${f.bloquea === false ? ' <span style="font-weight:400;font-size:10px;color:var(--text-3)">(ℹ️ informativa, no bloquea)</span>' : ''}</div>
           <div style="font-size:11px;color:var(--text-2)">${dias} · ${f.horaDesde}–${f.horaHasta}</div>
         </div>
         <button class="cfg-edit-franja" data-idx="${i}" style="background:none;border:none;color:var(--text-2);cursor:pointer;font-size:14px" aria-label="Editar">✏️</button>
@@ -704,7 +704,7 @@ const ConfigView = (() => {
   function _editarFranja(idx) {
     const nuevo = idx === -1;
     const f = nuevo
-      ? { diasSemana:[], horaDesde:"", horaHasta:"", concepto:"", color:"#e06666" }
+      ? { diasSemana:[], horaDesde:"", horaHasta:"", concepto:"", color:"#e06666", bloquea:true }
       : {..._datos.franjas[idx]};
     const concepto = prompt("Concepto (ej: Franja Exclusiva Neurología):", f.concepto);
     if (!concepto) return;
@@ -715,7 +715,14 @@ const ConfigView = (() => {
     const horaHasta = prompt("Hora hasta (HH:MM):", f.horaHasta);
     if (!horaHasta) return;
     const color = prompt("Color hex (ej: #e06666):", f.color || "#e06666");
-    _guardarSeccion(RailwayAPI.guardarAgendaFranja, { id: f.id, diasSemana, horaDesde, horaHasta, concepto, color: color||"#e06666" }, "Franja guardada");
+    // Franja puramente informativa (ej. "Internados CEDETAC"): se sigue
+    // viendo con su color en la agenda pero no rechaza ningún alta.
+    const bloquea = confirm(
+      `¿Esta franja tiene que BLOQUEAR turnos ahí (salvo que el origen/código de estudio la tenga reservada)?\n\n` +
+      `Aceptar = bloquea (lo normal)\nCancelar = solo informativa, no bloquea nada\n\n` +
+      `Ahora mismo: ${f.bloquea === false ? "solo informativa" : "bloquea"}`
+    );
+    _guardarSeccion(RailwayAPI.guardarAgendaFranja, { id: f.id, diasSemana, horaDesde, horaHasta, concepto, color: color||"#e06666", bloquea }, "Franja guardada");
   }
 
   // ── Restricciones (código / origen / ventana propia) ──────
