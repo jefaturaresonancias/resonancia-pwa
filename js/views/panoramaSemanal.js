@@ -237,7 +237,7 @@ const PanoramaSemanal = (() => {
           <div style="font-size:12.5px;color:var(--text-2);margin-top:4px;max-width:640px">Franjas, bloqueos y cupos recurrentes de Lun a Dom, 00 a 24hs. Cada bloque indica qué se puede agendar (pasá el mouse para el detalle) — mismo criterio que aplica la agenda real.</div>
         </div>`}
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">
-          ${opts.botonExportarId ? `<button id="${opts.botonExportarId}" style="font-size:12px">📄 Exportar PDF</button>` : ''}
+          ${opts.botonExportarId ? `<button id="${opts.botonExportarId}" style="font-size:12px">🖼️ Exportar PNG</button>` : ''}
           <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${_renderLeyenda()}</div>
         </div>
       </div>`;
@@ -269,11 +269,11 @@ const PanoramaSemanal = (() => {
     return { panoramaDias, limitesSobreturno, limitesFranja };
   }
 
-  // ── Exportar a PDF (misma técnica que reportes de Validaciones: pestaña
-  // nueva + Ctrl+P → Guardar como PDF, sin dependencias externas). Usa
-  // colores concretos en vez de var(--...) porque la pestaña nueva no
-  // hereda el stylesheet de la app.
-  function _exportarHTML(panoramaDias, limitesSobreturno, limitesFranja) {
+  // ── Contenido compartido por PDF y PNG — colores concretos en vez de
+  // var(--...) (la pestaña de impresión y el lienzo del PNG no heredan el
+  // stylesheet de la app) y TODO en estilos inline (sin <style>/clases),
+  // para que sirva tal cual también adentro de un <foreignObject> de SVG.
+  function _contenidoExport(panoramaDias, limitesSobreturno, limitesFranja) {
     const porDia = {};
     (panoramaDias || []).forEach(d => { porDia[d.diaSemana] = d.slots; });
     const totalH = ROW_H * 24;
@@ -339,48 +339,100 @@ const PanoramaSemanal = (() => {
         <div style="margin-left:auto;color:#8a8279;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap">${r.horaDesde}–${r.horaHasta} · ${_diasAbrev(r.dias)}</div>
       </div>`).join("");
 
-    return `<!doctype html><html><head><meta charset="utf-8"><title>Panorama semanal de la agenda</title>
+    const cardEstilo = 'border:1px solid #e2ddd6;border-radius:6px;padding:14px 16px 18px;margin-bottom:16px';
+
+    return `<div style="display:inline-block;background:#fff;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#211f1d;padding:20px 24px;box-sizing:border-box">
+      <h1 style="margin:0;font-size:19px;font-weight:650">Panorama semanal de la agenda</h1>
+      <div style="margin:5px 0 0;font-size:12px;color:#6b645c;max-width:760px">Franjas, bloqueos y cupos recurrentes de Lun a Dom, 00 a 24hs — mismo criterio que aplica la agenda real.</div>
+      <div style="margin:4px 0 16px;font-size:10.5px;color:#999">Generado el ${ahora} — RMN Santojanni</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">${leyenda}</div>
+      <div style="${cardEstilo}">
+        <div style="display:flex;align-items:flex-end;gap:0;padding-left:40px;margin-bottom:6px">
+          <div style="flex:1;display:flex;gap:5px">${headerDias}</div>
+          ${cabecerasCupos}
+        </div>
+        <div style="display:flex;align-items:stretch">
+          <div style="width:40px;flex-shrink:0;position:relative;height:${totalH}px">${gutter.join("")}</div>
+          <div style="flex:1;display:flex;gap:5px">${columnas}</div>
+          ${columnasCupos}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div style="${cardEstilo}"><h2 style="margin:0 0 6px;font-size:12px;font-weight:650">🚫 Límites de sobreturno activos</h2>${filasSobreturno || '<div style="font-size:11px;color:#999;font-style:italic">Ninguno configurado</div>'}</div>
+        <div style="${cardEstilo}"><h2 style="margin:0 0 6px;font-size:12px;font-weight:650">📊 Límites de turnos por franja activos</h2>${filasFranja || '<div style="font-size:11px;color:#999;font-style:italic">Ninguno configurado</div>'}</div>
+      </div>
+    </div>`;
+  }
+
+  // ── Exportar a PDF (misma técnica que reportes de Validaciones: pestaña
+  // nueva + Ctrl+P → Guardar como PDF, sin dependencias externas).
+  function exportarPDF(panoramaDias, limitesSobreturno, limitesFranja) {
+    const contenido = _contenidoExport(panoramaDias, limitesSobreturno, limitesFranja);
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Panorama semanal de la agenda</title>
       <style>
-        body{margin:0;background:#fff;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;color:#211f1d;padding:20px 24px}
-        h1{margin:0;font-size:19px;font-weight:650}
-        .sub{margin:5px 0 0;font-size:12px;color:#6b645c;max-width:760px}
-        .gen{margin:4px 0 16px;font-size:10.5px;color:#999}
-        .card{border:1px solid #e2ddd6;border-radius:6px;padding:14px 16px 18px;margin-bottom:16px}
-        .panels{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-        .panel h2{margin:0 0 6px;font-size:12px;font-weight:650}
+        body{margin:0}
         @page{size:landscape;margin:10mm}
         @media print{ body{-webkit-print-color-adjust:exact;print-color-adjust:exact} * {-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important} }
       </style></head>
-      <body>
-        <h1>Panorama semanal de la agenda</h1>
-        <div class="sub">Franjas, bloqueos y cupos recurrentes de Lun a Dom, 00 a 24hs — mismo criterio que aplica la agenda real.</div>
-        <div class="gen">Generado el ${ahora} — RMN Santojanni</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">${leyenda}</div>
-        <div class="card">
-          <div style="display:flex;align-items:flex-end;gap:0;padding-left:40px;margin-bottom:6px">
-            <div style="flex:1;display:flex;gap:5px">${headerDias}</div>
-            ${cabecerasCupos}
-          </div>
-          <div style="display:flex;align-items:stretch">
-            <div style="width:40px;flex-shrink:0;position:relative;height:${totalH}px">${gutter.join("")}</div>
-            <div style="flex:1;display:flex;gap:5px">${columnas}</div>
-            ${columnasCupos}
-          </div>
-        </div>
-        <div class="panels">
-          <div class="card panel"><h2>🚫 Límites de sobreturno activos</h2>${filasSobreturno || '<div style="font-size:11px;color:#999;font-style:italic">Ninguno configurado</div>'}</div>
-          <div class="card panel"><h2>📊 Límites de turnos por franja activos</h2>${filasFranja || '<div style="font-size:11px;color:#999;font-style:italic">Ninguno configurado</div>'}</div>
-        </div>
-      </body></html>`;
-  }
-
-  function exportarPDF(panoramaDias, limitesSobreturno, limitesFranja) {
-    const html = _exportarHTML(panoramaDias, limitesSobreturno, limitesFranja);
+      <body>${contenido}</body></html>`;
     const ventana = window.open('', '_blank');
     if (!ventana) { App.toast('El navegador bloqueó la ventana del PDF — habilitá pop-ups para este sitio.', 'error'); return; }
     ventana.document.write(html);
     ventana.document.close();
     ventana.onload = () => ventana.print();
+  }
+
+  // ── Exportar a PNG (todo junto, como imagen) — técnica sin dependencias
+  // externas: renderizar el contenido real (para medir su tamaño tal cual
+  // se ve), envolverlo en un SVG con <foreignObject>, dibujarlo en un
+  // <canvas> y bajarlo como PNG. Como todo el contenido usa colores/fuentes
+  // inline (nada externo por red), el canvas no queda "tainted" y
+  // toBlob/toDataURL funcionan normalmente.
+  function exportarPNG(panoramaDias, limitesSobreturno, limitesFranja) {
+    const contenido = _contenidoExport(panoramaDias, limitesSobreturno, limitesFranja);
+
+    const medidor = document.createElement('div');
+    medidor.style.cssText = 'position:fixed;left:-99999px;top:0;visibility:hidden';
+    medidor.innerHTML = contenido;
+    document.body.appendChild(medidor);
+    const raiz = medidor.firstElementChild;
+    const ancho = raiz.offsetWidth;
+    const alto = raiz.offsetHeight;
+    const htmlSerializado = raiz.outerHTML;
+    document.body.removeChild(medidor);
+
+    if (!ancho || !alto) { App.toast('No se pudo medir el panorama para exportar', 'error'); return; }
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${ancho}" height="${alto}">
+      <foreignObject width="100%" height="100%">${htmlSerializado.replace('<div ', '<div xmlns="http://www.w3.org/1999/xhtml" ')}</foreignObject>
+    </svg>`;
+
+    const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
+    const img = new Image();
+    img.onload = () => {
+      const escala = 2; // nitidez tipo retina
+      const canvas = document.createElement('canvas');
+      canvas.width = ancho * escala;
+      canvas.height = alto * escala;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(escala, escala);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, ancho, alto);
+      ctx.drawImage(img, 0, 0, ancho, alto);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((blob) => {
+        if (!blob) { App.toast('No se pudo generar la imagen PNG', 'error'); return; }
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        const fecha = new Date().toISOString().slice(0, 10);
+        a.download = `panorama-semanal-${fecha}.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }, 'image/png');
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); App.toast('No se pudo generar la imagen PNG — reintentá.', 'error'); };
+    img.src = url;
   }
 
   // ── Modal (para el botón de Agenda) ─────────────────────────
@@ -408,11 +460,11 @@ const PanoramaSemanal = (() => {
     document.getElementById('panorama-modal-overlay').addEventListener('click', (e) => {
       if (e.target.id === 'panorama-modal-overlay') cerrarModal();
     });
-    document.getElementById('btn-panorama-exportar-pdf').addEventListener('click', () => {
+    document.getElementById('btn-panorama-exportar-png').addEventListener('click', () => {
       if (!_datosModal) return;
-      exportarPDF(_datosModal.panoramaDias, _datosModal.limitesSobreturno, _datosModal.limitesFranja);
+      exportarPNG(_datosModal.panoramaDias, _datosModal.limitesSobreturno, _datosModal.limitesFranja);
     });
   }
 
-  return { renderCompleto, cargarDatos, exportarPDF, abrirModal, cerrarModal, initModal };
+  return { renderCompleto, cargarDatos, exportarPDF, exportarPNG, abrirModal, cerrarModal, initModal };
 })();

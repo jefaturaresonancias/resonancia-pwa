@@ -95,7 +95,7 @@ const ConfigView = (() => {
   // cargados en cargar().
   function _seccionPanoramaSemanal() {
     return `<div style="margin-bottom:1.5rem">
-      ${PanoramaSemanal.renderCompleto(_panoramaDias, _limitesCache, _limitesFranjaCache, { botonExportarId: 'cfg-btn-panorama-pdf' })}
+      ${PanoramaSemanal.renderCompleto(_panoramaDias, _limitesCache, _limitesFranjaCache, { botonExportarId: 'cfg-btn-panorama-png' })}
     </div>`;
   }
 
@@ -644,9 +644,9 @@ const ConfigView = (() => {
       });
     });
 
-    // Panorama semanal — exportar PDF
-    document.getElementById("cfg-btn-panorama-pdf").addEventListener("click", () => {
-      PanoramaSemanal.exportarPDF(_panoramaDias, _limitesCache, _limitesFranjaCache);
+    // Panorama semanal — exportar PNG
+    document.getElementById("cfg-btn-panorama-png").addEventListener("click", () => {
+      PanoramaSemanal.exportarPNG(_panoramaDias, _limitesCache, _limitesFranjaCache);
     });
 
     // Límites de sobreturno
