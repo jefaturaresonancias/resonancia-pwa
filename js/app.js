@@ -463,6 +463,7 @@ const App = (() => {
     _initRol();
     _initNav();
     AgendaView.init();
+    PanoramaSemanal.initModal();
     ListaView.init();
     TurnoView.init();
     BuscarView.init();

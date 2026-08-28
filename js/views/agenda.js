@@ -1126,6 +1126,8 @@ const AgendaView = (() => {
 
     document.getElementById("btn-modo-semana").onclick = () => _setModo("semana");
     document.getElementById("btn-modo-mes").onclick    = () => _setModo("mes");
+
+    document.getElementById("btn-agenda-panorama").onclick = () => PanoramaSemanal.abrirModal();
   }
 
   return { init, cargar };

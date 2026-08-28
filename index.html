@@ -196,6 +196,7 @@
           <div class="view-header">
             <h2>Agenda</h2>
             <div class="agenda-controls">
+              <button id="btn-agenda-panorama" class="btn-ghost" title="Ver franjas, bloqueos y límites de la semana">🗺️ Panorama semanal</button>
               <div class="modo-toggle">
                 <button id="btn-modo-semana" class="modo-btn modo-activo">📅 Semana</button>
                 <button id="btn-modo-mes"    class="modo-btn">🗓 Mes</button>
@@ -670,6 +671,20 @@
     </div>
   </div>
 
+  <!-- MODAL — PANORAMA SEMANAL (botón en Agenda) ── -->
+  <div id="panorama-modal-overlay" class="modal-overlay hidden">
+    <div class="modal-box" style="max-width:1100px">
+      <div class="modal-header">
+        <h3>🗺️ Panorama semanal de la agenda</h3>
+        <button class="modal-close" id="btn-panorama-modal-cerrar">✕</button>
+      </div>
+      <div class="modal-body" id="panorama-modal-body" style="overflow-x:auto"></div>
+      <div class="modal-footer">
+        <button id="btn-panorama-exportar-pdf" class="btn-primary">📄 Exportar PDF</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL — RESTRICCIONES (código / origen / ventana propia) ── -->
   <div id="rest-modal-overlay" class="modal-overlay hidden">
     <div class="modal-box">
@@ -701,6 +716,7 @@
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
   <script src="js/railway-api.js"></script>
+  <script src="js/views/panoramaSemanal.js"></script>
   <script src="js/views/agenda.js"></script>
   <script src="js/views/lista.js"></script>
   <script src="js/views/turno.js"></script>
