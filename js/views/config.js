@@ -861,10 +861,11 @@ const ConfigView = (() => {
   // ── Modal: gestionar límites de sobreturno (lista ↔ formulario) ────
   const DIAS_LABEL = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
   const AMBITOS = {
-    paciente:   'Por paciente (mismo DNI) por día',
-    region:     'Por región por día',
-    estudio:    'Por estudio (palabra clave) + día',
-    global_dia: 'Tope diario global de regiones'
+    paciente:      'Por paciente (mismo DNI) por día',
+    region:        'Por región por día',
+    estudio:       'Por estudio (palabra clave) + día',
+    global_dia:    'Tope diario global de regiones',
+    pacientes_dia: 'Tope diario de pacientes de sobreturno'
   };
   // Copia de EST_REGIONES (sistema2-node/lib/clasificacion.js) para el
   // dropdown — si se agrega/renombra una región allá, actualizar acá.
