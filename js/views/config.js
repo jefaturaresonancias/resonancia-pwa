@@ -124,31 +124,39 @@ const ConfigView = (() => {
         <span style="width:11px;height:11px;border-radius:3px;background:${color};border:1px solid rgba(0,0,0,.15);flex-shrink:0"></span>${label}
       </span>`).join("");
 
-    // Header de horas: una celda de texto cada 2 columnas (30min × 2 = 1h)
-    const headerHoras = Array.from({length: 24}, (_, h) =>
-      `<th colspan="2" style="font-weight:500;font-size:9px;color:var(--text-3);padding:2px 0;border-left:1px solid var(--border)">${String(h).padStart(2,'0')}</th>`
+    // Header: días Lun→Dom en columnas, arriba de todo.
+    const headerDias = PANORAMA_ORDEN_DIAS.map(dia =>
+      `<th style="font-weight:600;font-size:11px;color:var(--text-2);padding:2px 6px;border-left:1px solid var(--border)">${PANORAMA_DIAS_LABEL[dia]}</th>`
     ).join("");
 
-    const filas = PANORAMA_ORDEN_DIAS.map(dia => {
-      const slots = porDia[dia] || [];
-      const celdas = slots.map((s, i) => {
-        const horaIni = String(Math.floor(s.mins/60)).padStart(2,'0') + ':' + String(s.mins%60).padStart(2,'0');
-        const bordeHora = (i % 2 === 0) ? 'border-left:1px solid var(--border);' : '';
-        const bg = s.tipo === 'libre' ? 'transparent' : s.color;
-        return `<td title="${(s.label ? s.label + ' — ' : '')}${horaIni}hs" style="width:9px;height:22px;padding:0;background:${bg};${bordeHora}"></td>`;
+    // Filas: una por cada slot de 30min (00:00 a 23:30) — la hora en punto
+    // se etiqueta en la primera de sus dos filas (la de :30 queda muda),
+    // para leer "00, 01, 02..." bajando por la izquierda.
+    const totalSlots = (porDia[PANORAMA_ORDEN_DIAS[0]] || []).length;
+    const filas = [];
+    for (let i = 0; i < totalSlots; i++) {
+      const mins = i * 30;
+      const esHoraEnPunto = mins % 60 === 0;
+      const horaLabel = esHoraEnPunto ? String(Math.floor(mins/60)).padStart(2,'0') : '';
+      const horaIni = String(Math.floor(mins/60)).padStart(2,'0') + ':' + String(mins%60).padStart(2,'0');
+      const bordeHora = esHoraEnPunto ? 'border-top:1px solid var(--border);' : '';
+      const celdas = PANORAMA_ORDEN_DIAS.map(dia => {
+        const s = (porDia[dia] || [])[i] || {};
+        const bg = (!s.tipo || s.tipo === 'libre') ? 'transparent' : s.color;
+        return `<td title="${PANORAMA_DIAS_LABEL[dia]} ${horaIni}hs${s.label ? ' — ' + s.label : ''}" style="width:34px;height:9px;padding:0;background:${bg};border-left:1px solid var(--border);${bordeHora}"></td>`;
       }).join("");
-      return `<tr><td style="font-size:11px;font-weight:600;color:var(--text-2);padding-right:8px;white-space:nowrap">${PANORAMA_DIAS_LABEL[dia]}</td>${celdas}</tr>`;
-    }).join("");
+      filas.push(`<tr><td style="font-size:9px;color:var(--text-3);text-align:right;padding-right:6px;${bordeHora}">${horaLabel}</td>${celdas}</tr>`);
+    }
 
     return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem">
       <div style="margin-bottom:10px">
         <span style="font-weight:500;font-size:15px">🗺️ Panorama semanal de la agenda</span>
-        <div style="font-size:12px;color:var(--text-2);margin-top:2px">Franjas y restricciones recurrentes, Lun a Dom — el mismo criterio que aplica la agenda real (pasá el mouse sobre una celda para ver el detalle)</div>
+        <div style="font-size:12px;color:var(--text-2);margin-top:2px">Franjas y restricciones recurrentes, Lun a Dom, 00 a 24hs — el mismo criterio que aplica la agenda real (pasá el mouse sobre una celda para ver el detalle)</div>
       </div>
       <div style="overflow-x:auto">
-        <table style="border-collapse:collapse;min-width:100%">
-          <thead><tr><th></th>${headerHoras}</tr></thead>
-          <tbody>${filas}</tbody>
+        <table style="border-collapse:collapse">
+          <thead><tr><th></th>${headerDias}</tr></thead>
+          <tbody>${filas.join("")}</tbody>
         </table>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
