@@ -126,24 +126,24 @@ const ConfigView = (() => {
 
     // Header: días Lun→Dom en columnas, arriba de todo.
     const headerDias = PANORAMA_ORDEN_DIAS.map(dia =>
-      `<th style="font-weight:600;font-size:11px;color:var(--text-2);padding:2px 6px;border-left:1px solid var(--border)">${PANORAMA_DIAS_LABEL[dia]}</th>`
+      `<th style="font-weight:600;font-size:12px;color:var(--text-2);padding:4px 10px;border-left:1px solid var(--border)">${PANORAMA_DIAS_LABEL[dia]}</th>`
     ).join("");
 
-    // Filas: una por cada slot de 30min (00:00 a 23:30) — la hora en punto
-    // se etiqueta en la primera de sus dos filas (la de :30 queda muda),
-    // para leer "00, 01, 02..." bajando por la izquierda.
+    // Filas: una por cada slot de 30min (00:00 a 23:30) — la hora se
+    // etiqueta cada 2hs (en la primera de sus 4 filas), para leer
+    // "00, 02, 04..." bajando por la izquierda sin quedar amontonado.
     const totalSlots = (porDia[PANORAMA_ORDEN_DIAS[0]] || []).length;
     const filas = [];
     for (let i = 0; i < totalSlots; i++) {
       const mins = i * 30;
-      const esHoraEnPunto = mins % 60 === 0;
-      const horaLabel = esHoraEnPunto ? String(Math.floor(mins/60)).padStart(2,'0') : '';
+      const esMarcaHora = mins % 120 === 0;
+      const horaLabel = esMarcaHora ? String(Math.floor(mins/60)).padStart(2,'0') : '';
       const horaIni = String(Math.floor(mins/60)).padStart(2,'0') + ':' + String(mins%60).padStart(2,'0');
-      const bordeHora = esHoraEnPunto ? 'border-top:1px solid var(--border);' : '';
+      const bordeHora = esMarcaHora ? 'border-top:1px solid var(--border);' : '';
       const celdas = PANORAMA_ORDEN_DIAS.map(dia => {
         const s = (porDia[dia] || [])[i] || {};
         const bg = (!s.tipo || s.tipo === 'libre') ? 'transparent' : s.color;
-        return `<td title="${PANORAMA_DIAS_LABEL[dia]} ${horaIni}hs${s.label ? ' — ' + s.label : ''}" style="width:34px;height:9px;padding:0;background:${bg};border-left:1px solid var(--border);${bordeHora}"></td>`;
+        return `<td title="${PANORAMA_DIAS_LABEL[dia]} ${horaIni}hs${s.label ? ' — ' + s.label : ''}" style="width:60px;height:9px;padding:0;background:${bg};border-left:1px solid var(--border);${bordeHora}"></td>`;
       }).join("");
       filas.push(`<tr><td style="font-size:9px;color:var(--text-3);text-align:right;padding-right:6px;${bordeHora}">${horaLabel}</td>${celdas}</tr>`);
     }
@@ -153,7 +153,7 @@ const ConfigView = (() => {
         <span style="font-weight:500;font-size:15px">🗺️ Panorama semanal de la agenda</span>
         <div style="font-size:12px;color:var(--text-2);margin-top:2px">Franjas y restricciones recurrentes, Lun a Dom, 00 a 24hs — el mismo criterio que aplica la agenda real (pasá el mouse sobre una celda para ver el detalle)</div>
       </div>
-      <div style="overflow-x:auto">
+      <div style="overflow-x:auto;display:flex;justify-content:center">
         <table style="border-collapse:collapse">
           <thead><tr><th></th>${headerDias}</tr></thead>
           <tbody>${filas.join("")}</tbody>
