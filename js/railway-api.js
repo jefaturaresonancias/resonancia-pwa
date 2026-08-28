@@ -308,6 +308,19 @@ const RailwayAPI = (() => {
     return rpc('api_limitesSobreturno_eliminar', [{ id }]);
   }
 
+  async function leerLimitesTurnosFranja() {
+    const data = await rpc('api_limitesTurnosFranja_leer');
+    return data.limites;
+  }
+
+  async function guardarLimiteTurnosFranja(limite) {
+    return rpc('api_limitesTurnosFranja_guardar', [limite]);
+  }
+
+  async function eliminarLimiteTurnosFranja(id) {
+    return rpc('api_limitesTurnosFranja_eliminar', [{ id }]);
+  }
+
   // ── Sugeridor de horario de sobreturno ──────────────────────────
   // Recomendación, no bloqueo: reusa el mismo verificarLimite/reglas que
   // ya corren server-side, más una heurística de "no encadenar dos
@@ -586,7 +599,9 @@ const RailwayAPI = (() => {
     estadoExcepcionSuitestensa, activarExcepcionSuitestensa, desactivarExcepcionSuitestensa,
     modificar, turnos, buscar, agenda, slots,
     leerValidacionesAgenda, marcarValidacionReportada, leerReglasAgenda, guardarReglaAgenda, eliminarReglaAgenda,
-    leerLimitesSobreturno, guardarLimiteSobreturno, eliminarLimiteSobreturno, sugerirSobreturno,
+    leerLimitesSobreturno, guardarLimiteSobreturno, eliminarLimiteSobreturno,
+    leerLimitesTurnosFranja, guardarLimiteTurnosFranja, eliminarLimiteTurnosFranja,
+    sugerirSobreturno,
     leerConfigSugerirSobreturno, guardarConfigSugerirSobreturno,
     leerReglasSugerirSobreturno, guardarReglaSugerirSobreturno, eliminarReglaSugerirSobreturno,
     obtenerAgendaConfig, leerAsignadoresTurno, guardarAsignadoresTurno,

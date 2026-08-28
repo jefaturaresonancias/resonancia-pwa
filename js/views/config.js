@@ -4,6 +4,7 @@ const ConfigView = (() => {
   let _datos = null;
   let _estudiosEditados = [];
   let _limitesCount = 0;
+  let _limitesFranjaCount = 0;
   let _asignadoresTurno = [];
   let _agendaEspecial = {};
   // Panel de botones por rol (27/8/2026) — null = bloqueado; una vez
@@ -19,7 +20,7 @@ const ConfigView = (() => {
     container.innerHTML = '<div class="empty-state">Cargando configuración...</div>';
     _menuRolesEditor = null; // re-bloquear el panel de botones por rol
     try {
-      const [estudios, feriados, franjas, bloqueos, restricciones, restriccionesOrigen, restriccionesPropia, limites, asignadores, agendaEspecial] = await Promise.all([
+      const [estudios, feriados, franjas, bloqueos, restricciones, restriccionesOrigen, restriccionesPropia, limites, limitesFranja, asignadores, agendaEspecial] = await Promise.all([
         RailwayAPI.leerAgendaEstudiosCatalogo(),
         RailwayAPI.leerAgendaFeriados(),
         RailwayAPI.leerAgendaFranjas(),
@@ -30,11 +31,13 @@ const ConfigView = (() => {
         // Límites vive en Railway (como Reglas Agenda) — si falla no debe
         // tumbar el resto de Config, solo el contador.
         RailwayAPI.leerLimitesSobreturno().catch(() => []),
+        RailwayAPI.leerLimitesTurnosFranja().catch(() => []),
         RailwayAPI.leerAsignadoresTurno().catch(() => []),
         RailwayAPI.leerAgendaEspecialConfig().catch(() => ({}))
       ]);
       _datos = { estudios, feriados, franjas, bloqueos, restricciones, restriccionesOrigen, restriccionesPropia };
       _limitesCount = limites.length;
+      _limitesFranjaCount = limitesFranja.length;
       _asignadoresTurno = asignadores;
       _agendaEspecial = agendaEspecial;
       _render();
@@ -63,6 +66,7 @@ const ConfigView = (() => {
         </div>
         ${_seccionRestricciones(d.restricciones, d.restriccionesOrigen||[], d.restriccionesPropia||[])}
         ${_seccionLimites()}
+        ${_seccionLimitesFranja()}
         ${_seccionSugerirSobreturno()}
         ${_seccionAsignadoresTurno()}
         ${_seccionAgendaEspecial()}
@@ -255,6 +259,23 @@ const ConfigView = (() => {
           <div style="font-size:12px;color:var(--text-2);margin-top:2px">${_limitesCount} regla${_limitesCount === 1 ? "" : "s"} configurada${_limitesCount === 1 ? "" : "s"} — bloquean la carga real, no son solo un aviso</div>
         </div>
         <button id="cfg-btn-limites-gestionar" style="font-size:12px">⚙️ Gestionar límites</button>
+      </div>
+    </div>`;
+  }
+
+  // ── Sección Límites de turnos por franja horaria ────────────
+  // A diferencia de "Límites de sobreturno" (arriba, solo cuenta turnos
+  // que pisan un paciente de RIS), esto cuenta TODOS los turnos activos
+  // del día en la ventana — capacidad real del resonador por franja
+  // (28/8/2026, a pedido).
+  function _seccionLimitesFranja() {
+    return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:1rem 1.25rem">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <span style="font-weight:500;font-size:15px">📊 Límites de turnos por franja horaria</span>
+          <div style="font-size:12px;color:var(--text-2);margin-top:2px">${_limitesFranjaCount} regla${_limitesFranjaCount === 1 ? "" : "s"} configurada${_limitesFranjaCount === 1 ? "" : "s"} — tope de TODOS los turnos (no solo sobreturno) por horario y día</div>
+        </div>
+        <button id="cfg-btn-limites-franja-gestionar" style="font-size:12px">⚙️ Gestionar límites</button>
       </div>
     </div>`;
   }
@@ -608,6 +629,9 @@ const ConfigView = (() => {
 
     // Límites de sobreturno
     document.getElementById("cfg-btn-limites-gestionar").addEventListener("click", _abrirModalLimites);
+
+    // Límites de turnos por franja horaria
+    document.getElementById("cfg-btn-limites-franja-gestionar").addEventListener("click", _abrirModalLimitesFranja);
 
     // Reglas de asignación de sobreturno
     document.getElementById("cfg-btn-sugerir-gestionar").addEventListener("click", _abrirModalSugerir);
@@ -1070,6 +1094,166 @@ const ConfigView = (() => {
     document.getElementById('btn-limites-modal-cerrar').addEventListener('click', () => { _cerrarModalLimites(); _render(); });
     document.getElementById('limites-modal-overlay').addEventListener('click', (e) => {
       if (e.target.id === 'limites-modal-overlay') { _cerrarModalLimites(); _render(); }
+    });
+  }
+
+  // ── Modal: gestionar límites de turnos por franja horaria ──────────
+  // Mismo patrón que el modal de arriba, pero sin ámbito/valor — acá el
+  // filtro es directo horaDesde/horaHasta + días, y el límite cuenta TODOS
+  // los turnos de la ventana (0 es un valor válido, a diferencia del otro).
+  let _limitesFranjaCache = [];
+  let _idLimiteFranjaEditando = null;
+
+  function _abrirModalLimitesFranja() {
+    document.getElementById('limites-franja-modal-overlay').classList.remove('hidden');
+    _cargarLimitesFranjaModal();
+  }
+
+  function _cerrarModalLimitesFranja() {
+    document.getElementById('limites-franja-modal-overlay').classList.add('hidden');
+  }
+
+  async function _cargarLimitesFranjaModal() {
+    document.getElementById('limites-franja-modal-titulo').textContent = 'Límites de turnos por franja horaria';
+    document.getElementById('limites-franja-modal-body').innerHTML =
+      '<div style="text-align:center;padding:2rem;color:var(--text-3)">⏳ Cargando…</div>';
+    document.getElementById('limites-franja-modal-footer').innerHTML = '';
+    try {
+      _limitesFranjaCache = await RailwayAPI.leerLimitesTurnosFranja();
+      _limitesFranjaCount = _limitesFranjaCache.length;
+      _renderListaLimitesFranja();
+    } catch (err) {
+      document.getElementById('limites-franja-modal-body').innerHTML = `<div style="color:#c62828">Error: ${err.message}</div>`;
+    }
+  }
+
+  function _resumenLimiteFranja(r) {
+    const dias = (r.dias && r.dias.length) ? r.dias.map(d => DIAS_LABEL[d]).join('/') : 'todos los días';
+    return `Máx ${r.limite} turno(s) entre ${r.horaDesde} y ${r.horaHasta} — ${dias}`;
+  }
+
+  function _renderListaLimitesFranja() {
+    document.getElementById('limites-franja-modal-titulo').textContent = 'Límites de turnos por franja horaria';
+
+    const filas = _limitesFranjaCache.map(r => `
+      <div style="display:flex;align-items:center;gap:.75rem;padding:.75rem;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:.5rem;${r.activa === false ? 'opacity:.55' : ''}">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:.9rem">${r.nombre}${r.activa === false ? ' <span style="font-weight:400;color:var(--text-3)">(inactiva)</span>' : ''}</div>
+          <div style="font-size:.75rem;color:var(--text-3);margin-top:.15rem">${_resumenLimiteFranja(r)}</div>
+        </div>
+        <button class="btn-sm" data-editar="${r.id}">✏️</button>
+        <button class="btn-sm" data-eliminar="${r.id}" style="color:var(--danger)">🗑</button>
+      </div>`).join('');
+
+    document.getElementById('limites-franja-modal-body').innerHTML = filas ||
+      '<div style="text-align:center;padding:2rem;color:var(--text-3)">Sin límites configurados todavía — los turnos se cargan sin tope de cantidad</div>';
+
+    document.getElementById('limites-franja-modal-footer').innerHTML = `
+      <button class="btn-sm" id="btn-limites-franja-cancelar-lista">Cerrar</button>
+      <button class="btn-primary" id="btn-limites-franja-nuevo">+ Nuevo límite</button>`;
+
+    document.getElementById('limites-franja-modal-body').querySelectorAll('[data-editar]').forEach(btn => {
+      btn.addEventListener('click', () => _abrirFormularioLimiteFranja(_limitesFranjaCache.find(r => r.id === btn.dataset.editar)));
+    });
+    document.getElementById('limites-franja-modal-body').querySelectorAll('[data-eliminar]').forEach(btn => {
+      btn.addEventListener('click', () => _eliminarLimiteFranja(btn.dataset.eliminar));
+    });
+    document.getElementById('btn-limites-franja-cancelar-lista').addEventListener('click', () => { _cerrarModalLimitesFranja(); _render(); });
+    document.getElementById('btn-limites-franja-nuevo').addEventListener('click', () => _abrirFormularioLimiteFranja(null));
+  }
+
+  async function _eliminarLimiteFranja(id) {
+    const regla = _limitesFranjaCache.find(r => r.id === id);
+    if (!confirm(`¿Eliminar el límite "${regla ? regla.nombre : id}"? Esta acción no se puede deshacer.`)) return;
+    try {
+      await RailwayAPI.eliminarLimiteTurnosFranja(id);
+      App.toast('Límite eliminado', 'ok');
+      _cargarLimitesFranjaModal();
+    } catch (err) {
+      App.toast('Error: ' + err.message, 'error');
+    }
+  }
+
+  function _abrirFormularioLimiteFranja(regla) {
+    _idLimiteFranjaEditando = regla ? regla.id : null;
+    const diasActuales = regla ? (regla.dias || []) : [];
+
+    document.getElementById('limites-franja-modal-titulo').textContent = regla ? 'Editar límite' : 'Nuevo límite';
+
+    document.getElementById('limites-franja-modal-body').innerHTML = `
+      <div class="form-group" style="margin-bottom:.75rem">
+        <label>Nombre</label>
+        <input type="text" id="limites-franja-form-nombre" value="${regla ? regla.nombre.replace(/"/g,'&quot;') : ''}" placeholder="Ej: Entre semana 08-12hs">
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:.75rem">
+        <div class="form-group" style="flex:1">
+          <label>Hora desde</label>
+          <input type="time" id="limites-franja-form-desde" value="${regla ? regla.horaDesde : '08:00'}">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label>Hora hasta</label>
+          <input type="time" id="limites-franja-form-hasta" value="${regla ? regla.horaHasta : '12:00'}">
+        </div>
+      </div>
+      <div style="font-size:.72rem;color:var(--text-3);margin:-.5rem 0 .75rem">"00:00" como hora hasta = fin del día (ventana de 24hs, ej. sábado completo)</div>
+      <div class="form-group" style="margin-bottom:.75rem">
+        <label>Límite (máximo de turnos en la ventana — 0 cierra la franja del todo)</label>
+        <input type="number" id="limites-franja-form-limite" min="0" step="1" value="${regla ? regla.limite : 2}">
+      </div>
+      <div style="margin-bottom:.75rem">
+        <label style="font-size:.85rem;display:block;margin-bottom:4px">Días de la semana (vacío = todos los días)</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${DIAS_LABEL.map((lbl, d) => `
+            <label style="display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--text-2);cursor:pointer">
+              <input type="checkbox" class="limite-franja-dia" value="${d}" ${diasActuales.includes(d) ? 'checked' : ''}>
+              ${lbl}
+            </label>`).join('')}
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;margin-bottom:1rem;cursor:pointer">
+        <input type="checkbox" id="limites-franja-form-activa" ${!regla || regla.activa !== false ? 'checked' : ''}> Límite activo
+      </label>
+      <div id="limites-franja-form-error" style="color:#c62828;font-size:.8rem;margin-top:.5rem"></div>
+    `;
+
+    document.getElementById('limites-franja-modal-footer').innerHTML = `
+      <button class="btn-sm" id="btn-limites-franja-cancelar-form">Cancelar</button>
+      <button class="btn-primary" id="btn-limites-franja-guardar">Guardar</button>`;
+
+    document.getElementById('btn-limites-franja-cancelar-form').addEventListener('click', _renderListaLimitesFranja);
+    document.getElementById('btn-limites-franja-guardar').addEventListener('click', _guardarFormularioLimiteFranja);
+  }
+
+  async function _guardarFormularioLimiteFranja() {
+    const errorEl = document.getElementById('limites-franja-form-error');
+    errorEl.textContent = '';
+
+    const nombre = document.getElementById('limites-franja-form-nombre').value.trim();
+    const horaDesde = document.getElementById('limites-franja-form-desde').value;
+    const horaHasta = document.getElementById('limites-franja-form-hasta').value;
+    const limite = parseInt(document.getElementById('limites-franja-form-limite').value, 10);
+    const activa = document.getElementById('limites-franja-form-activa').checked;
+    const dias = [...document.querySelectorAll('.limite-franja-dia:checked')].map(cb => parseInt(cb.value, 10));
+
+    if (!nombre) { errorEl.textContent = 'Completá el nombre.'; return; }
+    if (!horaDesde || !horaHasta) { errorEl.textContent = 'Completá hora desde y hora hasta.'; return; }
+    if (!Number.isInteger(limite) || limite < 0) { errorEl.textContent = 'El límite tiene que ser un número entero mayor o igual a 0.'; return; }
+
+    const regla = { id: _idLimiteFranjaEditando || undefined, nombre, horaDesde, horaHasta, limite, activa, dias };
+
+    try {
+      await RailwayAPI.guardarLimiteTurnosFranja(regla);
+      App.toast('Límite guardado', 'ok');
+      await _cargarLimitesFranjaModal();
+    } catch (err) {
+      errorEl.textContent = 'Error: ' + err.message;
+    }
+  }
+
+  function _initModalLimitesFranja() {
+    document.getElementById('btn-limites-franja-modal-cerrar').addEventListener('click', () => { _cerrarModalLimitesFranja(); _render(); });
+    document.getElementById('limites-franja-modal-overlay').addEventListener('click', (e) => {
+      if (e.target.id === 'limites-franja-modal-overlay') { _cerrarModalLimitesFranja(); _render(); }
     });
   }
 
@@ -1675,6 +1859,7 @@ const ConfigView = (() => {
 
   function _init() {
     _initModalLimites();
+    _initModalLimitesFranja();
     _initModalSugerir();
     _initModalRestriccion();
   }
