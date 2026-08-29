@@ -532,6 +532,17 @@ const RailwayAPI = (() => {
     return rpc('api_agendaRefrescar_marcar');
   }
 
+  // ── Forzar recarga completa de la app en todas las ventanas (28/8/2026)
+  // — a diferencia de lo de arriba (solo refresca datos de agenda), esto
+  // hace location.reload() real en cada ventana abierta. Usar solo tras
+  // un deploy de la PWA. ───────────────────────────────────────────────
+  async function leerPwaRecargarPublico() {
+    return _rpcPublico('api_pwaRecargar_leer');
+  }
+  async function marcarPwaRecargar() {
+    return rpc('api_pwaRecargar_marcar');
+  }
+
   // ── Agendas especiales NCX/Neurología (26/8/2026) ───────────────
   // Uso desde el SPA principal (login normal, sesión ya abierta) — para
   // Config (editar ventana) y "Verificar agendas especiales" (sidebar).
@@ -625,6 +636,7 @@ const RailwayAPI = (() => {
     leerAgendaEspecialConfig, guardarAgendaEspecialConfig, leerAgendaEspecialTurnos, marcarAgendaEspecialCargado,
     agendaEspecialConfigPublico, agendaEspecialEstudiosPublico, agendaEspecialPropiosPublico, agendaEspecialAsignarPublico,
     leerMenuRolesPublico, guardarMenuRoles, cambiarPinMenuRoles,
-    leerAgendaRefrescarPublico, marcarAgendaRefrescar
+    leerAgendaRefrescarPublico, marcarAgendaRefrescar,
+    leerPwaRecargarPublico, marcarPwaRecargar
   };
 })();

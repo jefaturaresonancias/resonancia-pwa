@@ -42,6 +42,20 @@ const App = (() => {
     } catch (e) { /* sin conexión momentánea, se reintenta en el próximo poll */ }
   }
 
+  // Forzar recarga completa de la app (28/8/2026) — a diferencia de lo de
+  // arriba, esto SIEMPRE hace location.reload() apenas ve un timestamp más
+  // nuevo, sin importar en qué vista esté cada uno. Se usa tras un deploy
+  // de resonancia-pwa para que los técnicos con la app ya abierta no se
+  // queden con el HTML/JS viejo hasta acordarse de F5 a mano.
+  let _ultimoRecargaTs = 0;
+  async function _chequearRecargaRemota() {
+    try {
+      const { ts } = await RailwayAPI.leerPwaRecargarPublico();
+      if (_ultimoRecargaTs === 0) { _ultimoRecargaTs = ts; return; } // baseline, no recargar al abrir
+      if (ts > _ultimoRecargaTs) { location.reload(); }
+    } catch (e) { /* sin conexión momentánea, se reintenta en el próximo poll */ }
+  }
+
   // ── Toast global ──────────────────────────────────────────
   function toast(msg, tipo = "") {
     const el = document.getElementById("toast");
@@ -445,6 +459,15 @@ const App = (() => {
         toast("Aviso enviado — las ventanas abiertas van a actualizarse solas en menos de un minuto", "ok");
       } catch (e) { toast("Error: " + e.message, "error"); }
     });
+
+    document.getElementById("btn-recargar-todos").addEventListener("click", async () => {
+      if (!confirm("¿Forzar recarga completa en TODAS las ventanas abiertas?\n\nUsar solo tras un deploy de la app — cualquier cosa sin guardar en esas ventanas se pierde.")) return;
+      try {
+        const r = await RailwayAPI.marcarPwaRecargar();
+        _ultimoRecargaTs = r.ts;
+        toast("Recarga enviada — las ventanas abiertas se van a recargar solas en menos de un minuto", "ok");
+      } catch (e) { toast("Error: " + e.message, "error"); }
+    });
   }
 
   // ── Topbar fecha ──────────────────────────────────────────
@@ -484,6 +507,9 @@ const App = (() => {
     _chequearRefrescoRemoto();
     setInterval(_chequearRefrescoRemoto, POLL_REFRESCO_MS);
     setInterval(() => { if (_viewActual === "agenda") AgendaView.cargar(true); }, REFRESCO_PERIODICO_MS);
+
+    _chequearRecargaRemota();
+    setInterval(_chequearRecargaRemota, POLL_REFRESCO_MS);
 
     // Si ya tiene URL guardada, saltar el setup
     if (Config.isReady()) {
