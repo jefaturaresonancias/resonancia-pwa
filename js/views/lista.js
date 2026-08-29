@@ -310,7 +310,16 @@ const ListaView = (() => {
             const turno = g.turnos[i] || null;
             const ris   = g.ris[i]   || null;
 
-            // Si hay turno + RIS → tarjeta dividida
+            // Si hay turno + RIS → tarjeta dividida. OJO: este `ris` NO está
+            // correlacionado con `turno` (el matcheo real por DNI/apellido ya
+            // pasó más arriba y le pegó sus hashes a `turno._risHashes`) — acá
+            // solo cayeron en el mismo índice de columna porque comparten
+            // horario. Son dos pacientes distintos mostrados lado a lado.
+            // Bug real 28/8/2026: esta tarjeta nunca tuvo botón de Suitestensa
+            // para el lado RIS, así que un paciente sin turno propio que
+            // compartía horario con otro que sí lo tenía quedaba sin forma de
+            // cargarse — y si había 2 turnos + 2 RIS en el mismo horario,
+            // AMBOS RIS cabían en tarjetas divididas y ninguno tenía botón.
             if (turno && ris) {
               const pres   = turno.presente === "Presente";
               const origenUp = (turno.origen||"").toUpperCase();
@@ -318,6 +327,7 @@ const ListaView = (() => {
               const presBadge = pres
                 ? `<span class="btn-card-done">✓ Presente</span>`
                 : `<button class="btn-card-pres" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}">Presente</button>`;
+              const hashesAttrRis = (ris.hashes || []).join(",");
               cards.push(`<div class="card-turno card-split ${pres?"presente":""} ${esInt?"card-int":""}">
                 <div>
                   <div class="hora-big ${pres?"ok":""}">${hora}</div>
@@ -333,6 +343,8 @@ const ListaView = (() => {
                     <div style="font-size:9px;font-weight:700;color:#aaa;margin-bottom:2px">RIS</div>
                     <div class="card-nombre" style="font-size:12px;font-style:italic;color:#888">${ris.apellido_nombre}</div>
                     <div class="card-estudio" style="color:#aaa">${ris.practica}</div>
+                    <span class="suitestensa-estado" data-hashes="${hashesAttrRis}" style="display:block;font-size:10px"></span>
+                    <button class="btn-suitestensa" data-hashes="${hashesAttrRis}" data-fecha="${fechaStr}" data-nombre="${ris.apellido_nombre}" style="margin-top:2px">Cargar en Suitestensa</button>
                   </div>
                 </div>
                 <div class="card-right">
