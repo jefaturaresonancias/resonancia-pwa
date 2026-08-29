@@ -12,7 +12,11 @@ const PanoramaSemanal = (() => {
   const ROW_H = 30; // px por hora — altura total = 24 * ROW_H
 
   const STYLES = {
-    bloqueo: { bg: 'repeating-linear-gradient(45deg,#d96a67 0 5px,#c85451 5px 10px)', border: '1px solid #b94b48', fg: '#fff' },
+    // Antes rayado (repeating-linear-gradient) — html2canvas (exportar PNG)
+    // no lo renderiza bien y queda transparente, dejando el texto blanco
+    // invisible sobre fondo blanco. Color sólido: se ve igual de "cerrado"
+    // y funciona en los tres lugares (grilla en vivo, PDF, PNG).
+    bloqueo: { bg: '#c85451', border: '1px solid #b94b48', fg: '#fff' },
     tipo:    { bg: '#f7dc9a', border: '1px solid #e0b445', fg: '#5d4614' },
     tipoAlt: { bg: '#f6c545', border: '1px solid #d9a41e', fg: '#4d3a08' },
     neuro:   { bg: '#b6acea', border: '1px solid #8b7ad6', fg: '#2f2560' },
