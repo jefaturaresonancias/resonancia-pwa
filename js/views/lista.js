@@ -54,7 +54,13 @@ const ListaView = (() => {
     }
     btn.textContent = "Cargando…";
 
-    const TIMEOUT_MS = 120000, INTERVALO_MS = 5000;
+    // 120s se quedaba corto (bug real 2026-08-29/30, DNI 25434659: cargó
+    // bien pero tardó 134s de punta a punta) — más margen tras subir el
+    // timeout de navegación de Suitestensa de 40s a 60s (ver
+    // resonancia-bot, config.js#TIMEOUT_NAV_SUITESTENSA) para tolerar la
+    // red lenta del hospital: un caso lento-pero-exitoso ahora puede
+    // superar los 2 minutos.
+    const TIMEOUT_MS = 180000, INTERVALO_MS = 5000;
 
     const poll = async () => {
       let filas = [];
