@@ -382,6 +382,18 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 #lista-excepcion-suitestensa > .btn-sm {
   margin: .5rem 0; background: #fff8e1; border-color: #c9a000; color: #7a4f00;
 }
+
+/* Barra de progreso del botón "Cargar en Suitestensa" (30/8/2026) —
+   referencia visual de cuánto falta para el timeout del polling, no el
+   progreso real del bot (no hay forma de saberlo desde acá). */
+.suitestensa-progress {
+  width: 100%; max-width: 110px; height: 4px; margin-top: 3px;
+  background: var(--border); border-radius: 2px; overflow: hidden;
+}
+.suitestensa-progress-fill {
+  height: 100%; width: 0%; background: var(--accent);
+  transition: width linear;
+}
 .excepcion-banner-activa {
   display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
   padding: .6rem 1rem; margin: .5rem 0;

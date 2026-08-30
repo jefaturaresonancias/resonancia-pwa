@@ -42,7 +42,7 @@ const ListaView = (() => {
 
     btn.disabled = true;
     btn.textContent = "Encolando…";
-    if (estadoEl) estadoEl.textContent = "";
+    if (estadoEl) estadoEl.innerHTML = "";
 
     try {
       await RailwayAPI.cargarEnSuitestensa(hashes, fecha);
@@ -58,9 +58,24 @@ const ListaView = (() => {
     // bien pero tardó 134s de punta a punta) — más margen tras subir el
     // timeout de navegación de Suitestensa de 40s a 60s (ver
     // resonancia-bot, config.js#TIMEOUT_NAV_SUITESTENSA) para tolerar la
-    // red lenta del hospital: un caso lento-pero-exitoso ahora puede
-    // superar los 2 minutos.
-    const TIMEOUT_MS = 180000, INTERVALO_MS = 5000;
+    // red lenta del hospital, pero sin llegar a los 3 minutos (pedido
+    // 30/8/2026, se sentía muy largo desde la PWA).
+    const TIMEOUT_MS = 150000, INTERVALO_MS = 5000;
+
+    // Barra de progreso (pedido 30/8/2026): se llena a un ritmo constante
+    // durante los TIMEOUT_MS de espera — no refleja el progreso real del
+    // bot (no hay forma de saberlo desde acá), es una referencia visual de
+    // cuánto falta para el timeout. Un solo <div> con transición CSS,
+    // arrancada en el siguiente frame para que el navegador registre el
+    // ancho inicial (0%) antes de animar a 100%.
+    if (estadoEl) {
+      estadoEl.innerHTML = '<div class="suitestensa-progress"><div class="suitestensa-progress-fill"></div></div>';
+      const fill = estadoEl.querySelector(".suitestensa-progress-fill");
+      requestAnimationFrame(() => {
+        fill.style.transitionDuration = TIMEOUT_MS + "ms";
+        fill.style.width = "100%";
+      });
+    }
 
     const poll = async () => {
       let filas = [];
@@ -82,7 +97,7 @@ const ListaView = (() => {
         // que falló (pedido 28/8/2026, tras sumar el bloqueo horario).
         if (filaError)      { btn.textContent = "Reintentar"; if (estadoEl) estadoEl.textContent = "❌ " + (filaError.detalle_error || "error"); }
         else if (filaSinMapeo) { btn.textContent = "Reintentar"; if (estadoEl) estadoEl.textContent = "⚠️ " + (filaSinMapeo.detalle_error || "sin mapeo"); }
-        else               { btn.textContent = "✅ Cargado"; btn.disabled = true; }
+        else               { btn.textContent = "✅ Cargado"; btn.disabled = true; if (estadoEl) estadoEl.textContent = "✅ OK"; }
         return;
       }
 
