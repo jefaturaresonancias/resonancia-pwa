@@ -83,9 +83,21 @@ function _bdCentral() {
 // ─────────────────────────────────────────────────────────────
 const PWA_URL = "https://jefaturaresonancias.github.io/resonancia-pwa/";
 const PORTADA_BYPASS_PASSWORD = "Admin950";
+const PORTADA_BYPASS_CACHE_KEY = "portada_bypass_ok";
+const PORTADA_BYPASS_TTL_SEG = 21600; // 6hs — máximo que permite CacheService
 
-/** true si puede seguir (bypass correcto), false si hay que frenar acá. */
+/** Pase ya otorgado para este usuario (no volver a pedir la contraseña). */
+function _tienePaseBypass() {
+  return CacheService.getUserCache().get(PORTADA_BYPASS_CACHE_KEY) === "1";
+}
+function _otorgarPaseBypass() {
+  CacheService.getUserCache().put(PORTADA_BYPASS_CACHE_KEY, "1", PORTADA_BYPASS_TTL_SEG);
+}
+
+/** true si puede seguir (ya tenía pase, o bypass correcto ahora), false si hay que frenar acá. */
 function _verificarPortadaHabilitada() {
+  if (_tienePaseBypass()) return true;
+
   const ui = SpreadsheetApp.getUi();
   const resp = ui.prompt(
     "🚫 Portada ya no está habilitada",
@@ -94,7 +106,9 @@ function _verificarPortadaHabilitada() {
     ui.ButtonSet.OK_CANCEL
   );
   if (resp.getSelectedButton() !== ui.Button.OK) return false;
-  return resp.getResponseText().trim() === PORTADA_BYPASS_PASSWORD;
+  const ok = resp.getResponseText().trim() === PORTADA_BYPASS_PASSWORD;
+  if (ok) _otorgarPaseBypass();
+  return ok;
 }
 
 /** Busca en BD central la fila con un turnoId dado. Devuelve el número de fila o -1. */
@@ -1104,14 +1118,20 @@ function limpiarPortada() {
 // ─────────────────────────────────────────────────────────────
 
 function onOpen() {
-  SpreadsheetApp.getUi().alert(
-    "🚫 Portada fuera de servicio",
-    "Los turnos ahora se cargan desde la PWA. Dirigite a:\n" + PWA_URL,
-    SpreadsheetApp.getUi().ButtonSet.OK
-  );
+  const ui = SpreadsheetApp.getUi();
+  if (!_tienePaseBypass()) {
+    const resp = ui.prompt(
+      "🚫 Portada fuera de servicio",
+      "Los turnos ahora se cargan desde la PWA:\n" + PWA_URL +
+        "\n\nSi necesitás usar Portada igual (ej. la PWA está caída), ingresá la contraseña de emergencia. Si solo vas a ver reportes, dejalo en blanco.",
+      ui.ButtonSet.OK_CANCEL
+    );
+    if (resp.getSelectedButton() === ui.Button.OK && resp.getResponseText().trim() === PORTADA_BYPASS_PASSWORD) {
+      _otorgarPaseBypass();
+    }
+  }
 
-  SpreadsheetApp.getUi()
-    .createMenu("📅 Agenda")
+  ui.createMenu("📅 Agenda")
     .addItem("Generar agenda del día", "generarAgendaC")
     .addItem("Limpiar Portada", "limpiarPortada")
     .addItem("Actualizar vista previa", "vistaPrevia")
