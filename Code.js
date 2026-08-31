@@ -74,6 +74,29 @@ function _bdCentral() {
   return ss.getSheetByName("BD");
 }
 
+// ─────────────────────────────────────────────────────────────
+//  CORTE DE PORTADA (28/8/2026, a pedido) — Portada deja de poder
+//  tocar turnos (cargar, reprogramar, anular): los tres caminos pasan
+//  por generarAgendaC() o modificarTurno(), así que alcanza con guardar
+//  esas dos entradas. Con contraseña de emergencia para jefatura si hace
+//  falta usar Portada igual (ej. caída de la PWA/Railway).
+// ─────────────────────────────────────────────────────────────
+const PWA_URL = "https://jefaturaresonancias.github.io/resonancia-pwa/";
+const PORTADA_BYPASS_PASSWORD = "Admin950";
+
+/** true si puede seguir (bypass correcto), false si hay que frenar acá. */
+function _verificarPortadaHabilitada() {
+  const ui = SpreadsheetApp.getUi();
+  const resp = ui.prompt(
+    "🚫 Portada ya no está habilitada",
+    "Los turnos ahora se cargan desde la PWA:\n" + PWA_URL +
+      "\n\nSi necesitás usar Portada igual (ej. la PWA está caída), ingresá la contraseña de emergencia:",
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (resp.getSelectedButton() !== ui.Button.OK) return false;
+  return resp.getResponseText().trim() === PORTADA_BYPASS_PASSWORD;
+}
+
 /** Busca en BD central la fila con un turnoId dado. Devuelve el número de fila o -1. */
 function _buscarFilaBDCentral(hoja, turnoId) {
   const ultima = Math.max(hoja.getLastRow(), 2);
@@ -558,6 +581,8 @@ function generarAgendaC(params) {
   const portada = ss.getSheetByName("Portada");
   const tz      = Session.getScriptTimeZone();
 
+  if (!_verificarPortadaHabilitada()) { portada.getRange("H8").clearContent(); return; }
+
   // Si se reciben params directos (desde verProximoDia), usarlos; si no, leer Portada
   let nombre, apellido, dni, estudio, origen, observaciones, fecha, fechaStr;
 
@@ -938,6 +963,10 @@ function confirmarTurno(filaAgendaC) {
   const agendaC   = ss.getSheetByName("AgendaC");
   const baseDatos = ss.getSheetByName("Base de datos");
   const tz        = Session.getScriptTimeZone();
+
+  // Segunda barrera (además de generarAgendaC) — por si queda una AgendaC
+  // vieja ya generada de antes del corte con los "Ok" todavía clickeables.
+  if (!_verificarPortadaHabilitada()) { agendaC.getRange(filaAgendaC, 8).clearContent(); return; }
 
   const datosFila  = agendaC.getRange(filaAgendaC, 1, 1, 2).getValues()[0];
   const fechaTurno = datosFila[0];
@@ -1437,6 +1466,8 @@ function modificarTurno() {
   const baseDatos = ss.getSheetByName("Base de datos");
   const ui        = SpreadsheetApp.getUi();
   const tz        = Session.getScriptTimeZone();
+
+  if (!_verificarPortadaHabilitada()) { portada.getRange("L8").clearContent(); return; }
 
   const apellidoBusq = str(portada.getRange("J8").getValue());
   const dniBusq      = str(portada.getRange("K8").getValue());
