@@ -70,7 +70,8 @@
 
 .ae-grilla-libre { background: #eaf7ec; color: #2e7d32; cursor: pointer; font-style: italic; }
 .ae-grilla-libre:hover { background: #d3efd8; }
-.ae-grilla-ocupada { background: #fde8e8; color: var(--danger); font-weight: 600; font-style: normal; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+.ae-grilla-ocupada { background: #fde8e8; color: var(--danger); font-weight: 600; font-style: normal; overflow: hidden; text-overflow: ellipsis; max-width: 120px; cursor: pointer; transition: background .15s; }
+.ae-grilla-ocupada:hover { background: #fad2d2; }
 
 .ae-item {
   padding: .5rem .6rem;
@@ -78,11 +79,151 @@
   background: var(--bg);
   margin-bottom: 6px;
   font-size: .82rem;
+  cursor: pointer;
+  transition: background .15s;
 }
+.ae-item:hover { background: #e2e8f0; }
 .ae-item-fecha { font-weight: 700; color: var(--navy); font-size: .78rem; }
 .ae-item-nombre { font-weight: 600; }
 .ae-item-dni { font-weight: 400; color: var(--text-2); }
 .ae-item-estudio { color: var(--text-2); font-size: .78rem; }
+
+/* ── Aviso de turno en modificación ────────────────────────── */
+.ae-aviso-modificar {
+  background: #fff8e1;
+  border-left: 4px solid #f0c040;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #7a4f00;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .75rem;
+  margin-bottom: .5rem;
+}
+.ae-aviso-modificar strong { color: #5a3800; }
+.ae-btn-cancelar {
+  background: transparent;
+  border: 1px solid #c89520;
+  color: #7a4f00;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ae-btn-cancelar:hover { background: rgba(240, 192, 64, 0.25); }
+
+/* ── Modal Opciones Turno ───────────────────────────────────── */
+.ae-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 1rem;
+  animation: aeFadeIn .15s ease-out;
+}
+.ae-modal-box {
+  background: var(--surface);
+  border-radius: var(--radius-lg, 16px);
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: aeSlideUp .18s ease-out;
+}
+.ae-modal-header {
+  background: var(--navy);
+  color: #fff;
+  padding: 1rem 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.ae-modal-header h3 {
+  font-size: 1.05rem;
+  margin: 0;
+  color: #fff;
+}
+.ae-modal-close {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 1.2rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 4px;
+  opacity: .8;
+}
+.ae-modal-close:hover { opacity: 1; background: rgba(255,255,255,.1); }
+.ae-modal-body {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+.ae-modal-info {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .9rem 1rem;
+  font-size: .88rem;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+.ae-modal-info-paciente {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--navy);
+  margin-bottom: 4px;
+}
+.ae-modal-info-detalle {
+  font-size: .85rem;
+  color: var(--text-2);
+}
+.ae-modal-info-obs {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+  font-size: .82rem;
+  color: var(--text-1);
+}
+.ae-modal-footer {
+  padding: 0 1.25rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+}
+.btn-danger-outline {
+  padding: 10px;
+  font-size: 14px;
+  border-radius: 6px;
+  border: 1.5px solid var(--danger);
+  background: transparent;
+  color: var(--danger);
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  transition: all .15s;
+}
+.btn-danger-outline:hover { background: #fde8e8; }
+
+@keyframes aeFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes aeSlideUp {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
 
 .ae-toast {
   position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);

@@ -609,6 +609,12 @@ const RailwayAPI = (() => {
   async function agendaEspecialAsignarPublico(datos) {
     return _rpcPublico('api_turnos_asignarEspecialPublico', [datos]);
   }
+  async function agendaEspecialAnularPublico(tipo, pin, id) {
+    return _rpcPublico('api_turnos_anularEspecialPublico', [{ tipo, pin, id }]);
+  }
+  async function agendaEspecialModificarPublico(datos) {
+    return _rpcPublico('api_turnos_modificarEspecialPublico', [datos]);
+  }
 
   return {
     rpc, leerRISRango, leerCardiologia, asignar, anular, presente, cargarEnSuitestensa, estadoSuitestensa,
@@ -635,6 +641,7 @@ const RailwayAPI = (() => {
     verificarParteRIS, escribirParteRIS, actualizarEstadosParteRIS, actualizarPracticasParteRIS,
     leerAgendaEspecialConfig, guardarAgendaEspecialConfig, leerAgendaEspecialTurnos, marcarAgendaEspecialCargado,
     agendaEspecialConfigPublico, agendaEspecialEstudiosPublico, agendaEspecialPropiosPublico, agendaEspecialAsignarPublico,
+    agendaEspecialAnularPublico, agendaEspecialModificarPublico,
     leerMenuRolesPublico, guardarMenuRoles, cambiarPinMenuRoles,
     leerAgendaRefrescarPublico, marcarAgendaRefrescar,
     leerPwaRecargarPublico, marcarPwaRecargar

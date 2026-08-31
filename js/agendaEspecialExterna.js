@@ -1,7 +1,7 @@
 // js/agendaEspecialExterna.js — Lógica compartida de ncx.html/neurologia.html
 // (26/8/2026). Páginas propias para coordinadores externos de NCX/
-// Neurología: solo cargan un turno nuevo dentro de su franja reservada y
-// ven lo que ya cargaron — sin acceso al resto de la agenda. Autenticadas
+// Neurología: cargan, modifican y anulan turnos dentro de su franja reservada
+// y ven lo que ya cargaron — sin acceso al resto de la agenda. Autenticadas
 // con el PIN de su especialidad (pin_roles), nunca con el login de
 // Railway (RailwayAPI.agendaEspecial*Publico va sin token de sesión).
 // window.AGENDA_ESPECIAL_TIPO ('NCX'|'NEUROLOGIA') lo define cada HTML.
@@ -12,6 +12,8 @@
   let _ventana = null;
   let _propios = [];             // todos los turnos ya cargados para esta especialidad (desde hoy)
   let _duracionEstudios = {};    // { nombre: minutos }
+  let _turnoSeleccionado = null; // turno abierto en el modal de opciones
+  let _turnoEnEdicion = null;    // turno en proceso de modificación en el formulario
 
   function _minAHora(m) {
     return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
@@ -50,12 +52,15 @@
   }
 
   // ── Ocupados del día elegido + horas disponibles ────────────────
-  // Sin esto no hay forma de saber qué horario está libre — se cargaba a
-  // ciegas (encontrado 26/8/2026, a pedido). Se recalcula al cambiar la
-  // fecha o el estudio (la duración del estudio nuevo también entra en el
-  // cálculo de superposición).
+  // Sin esto no hay forma de saber qué horario está libre — se recalculan al
+  // cambiar fecha o estudio. Si se está modificando un turno, se excluye dicho
+  // turno de los ocupados para permitir conservar su horario original o cambiarlo.
   function _ocupadosDelDia(fechaISO) {
-    return _propios.filter((t) => t.fecha === fechaISO).sort((a, b) => a.mins - b.mins);
+    return _propios.filter((t) => {
+      if (t.fecha !== fechaISO) return false;
+      if (_turnoEnEdicion && t.id === _turnoEnEdicion.id) return false;
+      return true;
+    }).sort((a, b) => a.mins - b.mins);
   }
 
   function _renderOcupadosDia(ocupados, fechaISO) {
@@ -66,11 +71,19 @@
       return;
     }
     cont.innerHTML = `<div class="ae-ocupados-titulo">Ya cargado ese día:</div>` + ocupados.map((t) => `
-      <div class="ae-item">
+      <div class="ae-item" data-id="${t.id}">
         <div class="ae-item-fecha">${_minAHora(t.mins)}</div>
         <div class="ae-item-nombre">${t.apellido}, ${t.nombre}</div>
         <div class="ae-item-estudio">${t.estudio}</div>
       </div>`).join('');
+
+    cont.querySelectorAll('.ae-item').forEach((item) => {
+      item.addEventListener('click', () => {
+        const id = parseInt(item.dataset.id, 10);
+        const t = _propios.find((x) => x.id === id);
+        if (t) _abrirModalTurno(t);
+      });
+    });
   }
 
   function _actualizarDisponibilidad() {
@@ -88,13 +101,6 @@
     const desde = _horaAMin(_ventana.horaDesde);
     const hasta = _horaAMin(_ventana.horaHasta);
 
-    // Horario adaptativo (28/8/2026, a pedido): antes se ofrecían siempre
-    // los mismos horarios cada 20 min, aunque un estudio anterior durara
-    // más (ej. 30 min) — el próximo horario "libre" recién aparecía en el
-    // siguiente múltiplo de 20, desperdiciando esos minutos de sobra. Ahora
-    // el próximo candidato salta directo al final real del turno que
-    // ocupa, aunque no caiga en un múltiplo de 20 — así un estudio de 30
-    // min ocupa exactamente su lugar, no dos turnos de 20.
     let m = desde;
     while (m < hasta) {
       const finNueva = m + duracionNueva;
@@ -125,22 +131,26 @@
     } else {
       cont.innerHTML = turnos.map((t) => {
         const [y, m, d] = t.fecha.split('-');
-        return `<div class="ae-item">
+        return `<div class="ae-item" data-id="${t.id}" title="Hacé clic para ver opciones o modificar este turno">
           <div class="ae-item-fecha">${d}/${m}/${y} · ${_minAHora(t.mins)}</div>
           <div class="ae-item-nombre">${t.apellido}, ${t.nombre} <span class="ae-item-dni">(DNI ${t.dni})</span></div>
           <div class="ae-item-estudio">${t.estudio}</div>
         </div>`;
       }).join('');
+
+      cont.querySelectorAll('.ae-item').forEach((item) => {
+        item.addEventListener('click', () => {
+          const id = parseInt(item.dataset.id, 10);
+          const t = _propios.find((x) => x.id === id);
+          if (t) _abrirModalTurno(t);
+        });
+      });
     }
     _actualizarDisponibilidad();
     _renderGrilla();
   }
 
-  // ── Grilla visual (26/8/2026, a pedido) — mismo criterio que la agenda
-  // real: columnas por fecha, filas por horario, celda ocupada/libre. Se
-  // arma enteramente con datos que ya se tienen en el navegador (_propios,
-  // _ventana) — no hace falta ningún endpoint nuevo. Clic en una celda
-  // libre precarga fecha+hora en el formulario de abajo.
+  // ── Grilla visual de próximos horarios ──────────────────────────
   const CANTIDAD_FECHAS_GRILLA = 6;
 
   function _proximasFechas(n) {
@@ -178,18 +188,15 @@
     for (let m = desde; m < hasta; m += 20) {
       html += `<tr><td class="ae-grilla-hora">${_minAHora(m)}</td>`;
       fechas.forEach((f) => {
-        // Ocupado si ESTE slot cae dentro de un turno ya cargado, tenga en
-        // cuenta su duración real (no solo si arranca justo acá) — antes
-        // un estudio largo (ej. 40 min) dejaba "libre" el slot siguiente,
-        // mismo bug que ya se había corregido en el desplegable de horarios.
         const ocupado = _propios.find((t) => {
           if (t.fecha !== f) return false;
+          if (_turnoEnEdicion && t.id === _turnoEnEdicion.id) return false;
           const dur = _duracionEstudios[t.estudio] || 20;
           return m < t.mins + dur && (m + 20) > t.mins;
         });
         if (ocupado) {
           const esInicio = ocupado.mins === m;
-          html += `<td class="ae-grilla-celda ae-grilla-ocupada" title="${ocupado.estudio}">${esInicio ? ocupado.apellido : ''}</td>`;
+          html += `<td class="ae-grilla-celda ae-grilla-ocupada" data-id="${ocupado.id}" title="${ocupado.estudio} — Hacé clic para ver opciones o modificar">${esInicio ? ocupado.apellido : ''}</td>`;
         } else {
           html += `<td class="ae-grilla-celda ae-grilla-libre" data-fecha="${f}" data-hora="${_minAHora(m)}">libre</td>`;
         }
@@ -199,6 +206,7 @@
     html += '</tbody></table>';
     cont.innerHTML = html;
 
+    // Clic en libre -> precarga fecha y hora en el formulario
     cont.querySelectorAll('.ae-grilla-libre').forEach((celda) => {
       celda.addEventListener('click', () => {
         document.getElementById('ae-fecha').value = celda.dataset.fecha;
@@ -211,6 +219,114 @@
         document.getElementById('ae-nombre').scrollIntoView({ behavior: 'smooth', block: 'center' });
       });
     });
+
+    // Clic en ocupado -> abre opciones del turno (modificar/anular)
+    cont.querySelectorAll('.ae-grilla-ocupada').forEach((celda) => {
+      celda.addEventListener('click', () => {
+        const id = parseInt(celda.dataset.id, 10);
+        const turno = _propios.find((t) => t.id === id);
+        if (turno) _abrirModalTurno(turno);
+      });
+    });
+  }
+
+  // ── Modal de Opciones del Turno (Modificar / Anular) ────────────
+  function _abrirModalTurno(turno) {
+    _turnoSeleccionado = turno;
+    const [y, m, d] = turno.fecha.split('-');
+    const horaStr = _minAHora(turno.mins);
+    const body = document.getElementById('ae-modal-body');
+    body.innerHTML = `
+      <div class="ae-modal-info">
+        <div class="ae-modal-info-paciente">${turno.apellido}, ${turno.nombre}</div>
+        <div class="ae-modal-info-detalle"><strong>DNI:</strong> ${turno.dni}</div>
+        <div class="ae-modal-info-detalle"><strong>Fecha y Hora:</strong> ${d}/${m}/${y} · ${horaStr} hs</div>
+        <div class="ae-modal-info-detalle"><strong>Estudio:</strong> ${turno.estudio}</div>
+        ${turno.observaciones ? `<div class="ae-modal-info-obs"><strong>Observaciones:</strong> ${turno.observaciones}</div>` : ''}
+      </div>
+    `;
+    document.getElementById('ae-modal-overlay').classList.remove('hidden');
+  }
+
+  function _cerrarModalTurno() {
+    document.getElementById('ae-modal-overlay').classList.add('hidden');
+    _turnoSeleccionado = null;
+  }
+
+  async function _anularTurno() {
+    if (!_turnoSeleccionado) return;
+    const t = _turnoSeleccionado;
+    const [y, m, d] = t.fecha.split('-');
+    const horaStr = _minAHora(t.mins);
+    const resumen = `${t.apellido}, ${t.nombre}\nDNI: ${t.dni}\nFecha: ${d}/${m}/${y} ${horaStr} hs\nEstudio: ${t.estudio}`;
+    if (!confirm(`¿Anular este turno?\n\n${resumen}\n\nEsta acción no se puede deshacer.`)) return;
+
+    const btnAnular = document.getElementById('ae-btn-op-anular');
+    btnAnular.disabled = true; btnAnular.textContent = 'Anulando…';
+    try {
+      await RailwayAPI.agendaEspecialAnularPublico(TIPO, _pin, t.id);
+      _toast('Turno anulado correctamente.', 'ok');
+      _cerrarModalTurno();
+      if (_turnoEnEdicion && _turnoEnEdicion.id === t.id) {
+        _cancelarModificacion();
+      }
+      await _refrescarPropios();
+    } catch (err) {
+      _toast('Error al anular: ' + err.message, 'error');
+    } finally {
+      btnAnular.disabled = false; btnAnular.textContent = '🗑 Anular turno';
+    }
+  }
+
+  function _iniciarModificacion(turno) {
+    _cerrarModalTurno();
+    _turnoEnEdicion = turno;
+
+    document.getElementById('ae-nombre').value = turno.nombre;
+    document.getElementById('ae-apellido').value = turno.apellido;
+    document.getElementById('ae-dni').value = turno.dni;
+    document.getElementById('ae-estudio').value = turno.estudio;
+    document.getElementById('ae-fecha').value = turno.fecha;
+    document.getElementById('ae-observaciones').value = turno.observaciones || '';
+
+    const [y, m, d] = turno.fecha.split('-');
+    const horaStr = _minAHora(turno.mins);
+    const aviso = document.getElementById('ae-aviso-modificar');
+    aviso.innerHTML = `
+      <div>✏️ Modificando turno de <strong>${turno.apellido}, ${turno.nombre}</strong> (${d}/${m}/${y} ${horaStr} hs)</div>
+      <button type="button" id="ae-btn-cancelar-mod" class="ae-btn-cancelar">Cancelar</button>
+    `;
+    aviso.classList.remove('hidden');
+    document.getElementById('ae-btn-cancelar-mod').addEventListener('click', _cancelarModificacion);
+
+    document.getElementById('ae-btn-confirmar').textContent = '✓ Guardar cambios';
+
+    _validarFecha();
+    _actualizarDisponibilidad();
+
+    const selHora = document.getElementById('ae-hora');
+    if ([...selHora.options].some((o) => o.value === horaStr)) {
+      selHora.value = horaStr;
+    }
+
+    _renderGrilla();
+    aviso.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function _cancelarModificacion() {
+    _turnoEnEdicion = null;
+    const aviso = document.getElementById('ae-aviso-modificar');
+    aviso.classList.add('hidden');
+    aviso.innerHTML = '';
+    document.getElementById('ae-btn-confirmar').textContent = 'Cargar turno';
+
+    const fechaPrevia = document.getElementById('ae-fecha').value;
+    document.getElementById('ae-form').reset();
+    document.getElementById('ae-fecha').value = fechaPrevia;
+    document.getElementById('ae-fecha-error').textContent = '';
+
+    _actualizarDisponibilidad();
+    _renderGrilla();
   }
 
   async function _refrescarPropios() {
@@ -276,6 +392,29 @@
       return;
     }
 
+    if (_turnoEnEdicion) {
+      const [yO, mO, dO] = _turnoEnEdicion.fecha.split('-');
+      const horaOrig = _minAHora(_turnoEnEdicion.mins);
+      const confirmar = confirm(`¿Modificar turno?\n\nDE: ${_turnoEnEdicion.apellido}, ${_turnoEnEdicion.nombre} — ${dO}/${mO}/${yO} ${horaOrig} hs (${_turnoEnEdicion.estudio})\n\nA: ${apellido}, ${nombre} — ${fecha} ${hora} hs (${estudio})\n\n¿Confirmás?`);
+      if (!confirmar) return;
+
+      btn.disabled = true; btn.textContent = 'Modificando…';
+      try {
+        await RailwayAPI.agendaEspecialModificarPublico({
+          tipo: TIPO, pin: _pin, id: _turnoEnEdicion.id,
+          nombre, apellido, dni, estudio, fecha, hora, observaciones
+        });
+        _toast('Turno modificado correctamente.', 'ok');
+        _cancelarModificacion();
+        await _refrescarPropios();
+      } catch (err) {
+        _toast('Error al modificar: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+      return;
+    }
+
     btn.disabled = true; btn.textContent = 'Guardando…';
     try {
       await RailwayAPI.agendaEspecialAsignarPublico({ tipo: TIPO, pin: _pin, nombre, apellido, dni, estudio, fecha, hora, observaciones });
@@ -305,6 +444,16 @@
     document.getElementById('ae-fecha').addEventListener('change', () => { _validarFecha(); _actualizarDisponibilidad(); });
     document.getElementById('ae-estudio').addEventListener('change', _actualizarDisponibilidad);
     document.getElementById('ae-fecha').min = new Date().toISOString().slice(0, 10);
+
+    // Modal de opciones
+    document.getElementById('ae-btn-modal-cerrar').addEventListener('click', _cerrarModalTurno);
+    document.getElementById('ae-modal-overlay').addEventListener('click', (e) => {
+      if (e.target.id === 'ae-modal-overlay') _cerrarModalTurno();
+    });
+    document.getElementById('ae-btn-op-modificar').addEventListener('click', () => {
+      if (_turnoSeleccionado) _iniciarModificacion(_turnoSeleccionado);
+    });
+    document.getElementById('ae-btn-op-anular').addEventListener('click', _anularTurno);
   }
 
   document.addEventListener('DOMContentLoaded', init);
