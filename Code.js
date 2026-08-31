@@ -1104,6 +1104,12 @@ function limpiarPortada() {
 // ─────────────────────────────────────────────────────────────
 
 function onOpen() {
+  SpreadsheetApp.getUi().alert(
+    "🚫 Portada fuera de servicio",
+    "Los turnos ahora se cargan desde la PWA. Dirigite a:\n" + PWA_URL,
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+
   SpreadsheetApp.getUi()
     .createMenu("📅 Agenda")
     .addItem("Generar agenda del día", "generarAgendaC")
