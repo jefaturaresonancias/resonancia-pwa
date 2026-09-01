@@ -7,7 +7,7 @@ const ASSETS = [
   "./js/views/parte.js", "./js/views/pami.js",
   "./js/views/config.js", "./js/views/validaciones.js",
   "./manifest.json",
-  "./icons/Icon-192.png", "./icons/Icon-512.png"
+  "./icons/Icon-192.png", "./icons/Icon-512.png", "./icons/loading.jpg"
 ];
 
 self.addEventListener("install", e => {

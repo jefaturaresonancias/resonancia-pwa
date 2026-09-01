@@ -517,6 +517,7 @@ const App = (() => {
 
     // Si ya tiene URL guardada, saltar el setup
     if (Config.isReady()) {
+      document.getElementById("screen-loading").classList.add("hidden");
       // Verificar conexión en segundo plano
       API.ping().catch(() => {
         toast("⚠️ No se pudo conectar con el servidor. Verificá la conexión.", "error");

@@ -15,6 +15,15 @@
 <body>
 
   <!-- ══════════════════════════════════════════════
+       LOADING SCREEN — mientras init() decide qué pantalla mostrar
+       (rol guardado, PIN, o elegir rol). Sin esto quedaba un blanco
+       en ese instante, ya que screen-setup arrancaba oculta (29/8/2026).
+  ═══════════════════════════════════════════════ -->
+  <div id="screen-loading" class="screen">
+    <img src="icons/loading.jpg" alt="Estamos trabajando para usted" style="max-width:min(90vw,320px);max-height:85vh;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.35)">
+  </div>
+
+  <!-- ══════════════════════════════════════════════
        SETUP SCREEN — primera vez / cambiar URL
   ═══════════════════════════════════════════════ -->
   <div id="screen-setup" class="screen hidden">
