@@ -103,9 +103,13 @@ const App = (() => {
     const tip = tooltipEncoded ? decodeURIComponent(tooltipEncoded) : "";
     _turnoSeleccionado = { fila: parseInt(fila), tooltip: tip, fecha, mins };
 
+    // "NO ASIGNADO EN RIS" viaja como texto plano dentro de tip (también se
+    // usa tal cual en el confirm() nativo de "Anular", que no interpreta
+    // HTML) — acá sí se renderiza como HTML, así que se resalta en rojo.
+    const tipHtml = tip.replace("NO ASIGNADO EN RIS", '<span style="color:#c62828;font-weight:700">NO ASIGNADO EN RIS</span>');
     const body = document.getElementById("panel-opciones-body");
     body.innerHTML = `
-      <div style="background:var(--bg);border-radius:8px;padding:1rem;font-size:13px;white-space:pre-line;color:var(--text-2)">${tip}</div>
+      <div style="background:var(--bg);border-radius:8px;padding:1rem;font-size:13px;white-space:pre-line;color:var(--text-2)">${tipHtml}</div>
       <button id="btn-op-modificar" class="btn-primary" style="padding:12px;font-size:14px">✏️ Modificar turno</button>
       <button id="btn-op-anular" style="padding:12px;font-size:14px;border-radius:6px;border:2px solid var(--danger);background:transparent;color:var(--danger);font-weight:700;cursor:pointer">🗑 Anular turno</button>
     `;

@@ -607,7 +607,6 @@ const AgendaView = (() => {
     if (tipo === "turno") {
       const col  = _coloresOrigen(slot.origen);
       const pres = slot.presente === "Presente" ? "✅" : "";
-      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${slot.tecnicoAsigno?"\n🧑‍⚕️ Asignó: "+slot.tecnicoAsigno:""}${pres?"\n✅ Presente":""}`;
 
       // Cruce turno↔RIS (28/8/2026): ya viene resuelto desde el backend
       // (api_agenda_grilla hace el JOIN real contra `estudios` en
@@ -624,6 +623,14 @@ const AgendaView = (() => {
       const iconRIS   = atendido ? `<span style="color:#2e7d32;font-weight:700;margin-right:2px">✓</span>`
                       : ausente  ? `<span style="color:#c62828;font-weight:700;margin-right:2px">✗</span>`
                       : "";
+      // Línea de RIS para el tooltip/"Opciones del turno" (29/8/2026, a
+      // pedido) — texto plano a propósito (nada de HTML acá): esta misma
+      // cadena también se muestra tal cual dentro de un confirm() nativo
+      // al anular, que no interpreta HTML. El resaltado en rojo de "NO
+      // ASIGNADO EN RIS" se aplica después, solo donde sí se renderiza
+      // como HTML (ver _posTip/mostrarOpcionesTurno).
+      const risLinea = estRIS ? `\n🏥 RIS: ${estRIS}` : `\n🚫 NO ASIGNADO EN RIS`;
+      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${slot.tecnicoAsigno?"\n🧑‍⚕️ Asignó: "+slot.tecnicoAsigno:""}${pres?"\n✅ Presente":""}${risLinea}`;
       // Mismo texto que ve el estado real de RIS (ej. "Asignado") — antes
       // acá solo decía "RIS" genérico, sin decir si ya está confirmado o
       // no en el sistema del hospital.
@@ -773,7 +780,8 @@ const AgendaView = (() => {
       td.addEventListener("mouseenter", e => {
         tip = document.createElement("div");
         tip.className = "tooltip-turno";
-        tip.innerHTML = decodeURIComponent(td.dataset.tooltip).replace(/\n/g,"<br>");
+        tip.innerHTML = decodeURIComponent(td.dataset.tooltip).replace(/\n/g,"<br>")
+          .replace("NO ASIGNADO EN RIS", '<span style="color:#e05a5a;font-weight:700">NO ASIGNADO EN RIS</span>');
         document.body.appendChild(tip);
         _posTip(e, tip);
       });

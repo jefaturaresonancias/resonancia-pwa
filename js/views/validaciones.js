@@ -8,6 +8,7 @@ const ValidacionesView = (() => {
     miercoles_cardio:           { label: 'Franja cardio', color: '#1a3a5c' },
     espectroscopia_horario:     { label: 'Horario espectroscopía', color: '#e65100' },
     pelvis_ginecologica_horario:{ label: 'Horario pelvis ginecológica', color: '#6a1b9a' },
+    NO_CARGADO_RIS:             { label: 'No cargado en RIS', color: '#c62828' },
   };
 
   let _filas = [];
@@ -654,6 +655,14 @@ const ValidacionesView = (() => {
     _abrirReporte(_reporteHTML(filas, 'Reporte semanal de turnos a corregir', `Turnos con problemas de agenda del ${desdeStr} al ${hastaStr}`));
   }
 
+  function _reporteMensual() {
+    const inicio = new Date(); inicio.setHours(0, 0, 0, 0);
+    const fin = new Date(inicio); fin.setDate(fin.getDate() + 29);
+    const filas = _filas.filter(f => { const d = _aFecha(f.fecha); return d >= inicio && d <= fin && !f.reportado; });
+    const desdeStr = API.fechaAStr(inicio), hastaStr = API.fechaAStr(fin);
+    _abrirReporte(_reporteHTML(filas, 'Reporte mensual de turnos a corregir', `Turnos con problemas de agenda del ${desdeStr} al ${hastaStr}`));
+  }
+
   async function cargar() {
     const loading = document.getElementById('validaciones-loading');
     const cont    = document.getElementById('validaciones-container');
@@ -680,6 +689,7 @@ const ValidacionesView = (() => {
     document.getElementById('btn-validaciones-recargar').addEventListener('click', cargar);
     document.getElementById('btn-reporte-diario').addEventListener('click', _reporteDiario);
     document.getElementById('btn-reporte-semanal').addEventListener('click', _reporteSemanal);
+    document.getElementById('btn-reporte-mensual').addEventListener('click', _reporteMensual);
     document.getElementById('validaciones-regla').addEventListener('change', _render);
     document.getElementById('validaciones-buscar').addEventListener('input', _render);
     document.getElementById('validaciones-mostrar-reportados').addEventListener('change', (e) => {
