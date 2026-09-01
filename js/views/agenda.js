@@ -462,7 +462,13 @@ const AgendaView = (() => {
     if (tipo === "turno" && tieneRIS) {
       const col = _coloresOrigen(slot.origen);
       const pres = slot.presente === "Presente" ? "✅" : "";
-      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${slot.tecnicoAsigno?"\n🧑‍⚕️ Asignó: "+slot.tecnicoAsigno:""}`;
+      // slot.risEstado es el cruce por DNI (¿este turno YA está en RIS?),
+      // resuelto por el backend — distinto de `ris` acá arriba, que es el
+      // registro de RIS que coincide por HORARIO (de otro paciente, el
+      // "sobreturno" que arma la celda dividida). Mismo texto que usa la
+      // celda de turno normal, para que sea consistente en toda la agenda.
+      const risLinea = slot.risEstado ? `\n🏥 RIS: ${slot.risEstado}` : `\n🚫 NO ASIGNADO EN RIS`;
+      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${slot.tecnicoAsigno?"\n🧑‍⚕️ Asignó: "+slot.tecnicoAsigno:""}${risLinea}`;
       let horaFinBadge = "";
       if (rowspan > 1) {
         const hasta = mins + (slot.duracion || _paso);
