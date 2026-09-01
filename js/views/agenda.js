@@ -591,7 +591,6 @@ const AgendaView = (() => {
   }
 
   function _renderSlot(slot, fecha, mins, risDelDia, rowspan = 1) {
-    slot._risDelDia = risDelDia || [];
     const tipo = slot.tipo || "libre";
     const bg   = slot.color || "#fff";
     const rowspanAttr = rowspan > 1 ? ` rowspan="${rowspan}"` : "";
@@ -610,13 +609,12 @@ const AgendaView = (() => {
       const pres = slot.presente === "Presente" ? "✅" : "";
       const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${slot.tecnicoAsigno?"\n🧑‍⚕️ Asignó: "+slot.tecnicoAsigno:""}${pres?"\n✅ Presente":""}`;
 
-      // Buscar en RIS por DNI para mostrar estado y badge
-      const dniLimpio = String(slot.dni||"").trim().replace(/^0+/,"");
-      const risMatch  = (slot._risDelDia||[]).find(r => {
-        const dniR = String(r.documento||"").replace(/[A-Za-z]+/,"").trim().replace(/^0+/,"");
-        return dniR === dniLimpio;
-      });
-      const estRIS    = risMatch ? (risMatch.estado||"") : "";
+      // Cruce turno↔RIS (28/8/2026): ya viene resuelto desde el backend
+      // (api_agenda_grilla hace el JOIN real contra `estudios` en
+      // Postgres) — antes esto matcheaba por DNI del lado del cliente
+      // contra slot._risDelDia, una segunda fuente de verdad separada de
+      // la que ya usa lista.js para lo mismo.
+      const estRIS    = slot.risEstado || "";
       const hoy       = new Date(); hoy.setHours(0,0,0,0);
       const fp        = fecha.split("/");
       const fDate     = new Date(parseInt(fp[2]), parseInt(fp[1])-1, parseInt(fp[0]));
@@ -626,7 +624,10 @@ const AgendaView = (() => {
       const iconRIS   = atendido ? `<span style="color:#2e7d32;font-weight:700;margin-right:2px">✓</span>`
                       : ausente  ? `<span style="color:#c62828;font-weight:700;margin-right:2px">✗</span>`
                       : "";
-      const badgeRIS  = risMatch ? `<span style="background:#888;color:#fff;border-radius:3px;padding:0 2px;font-size:8px;font-weight:700;margin-left:2px">RIS</span>` : "";
+      // Mismo texto que ve el estado real de RIS (ej. "Asignado") — antes
+      // acá solo decía "RIS" genérico, sin decir si ya está confirmado o
+      // no en el sistema del hospital.
+      const badgeRIS  = estRIS ? `<span style="background:#888;color:#fff;border-radius:3px;padding:0 4px;font-size:7px;font-weight:700;margin-left:2px">${estRIS}</span>` : "";
 
       let horaFinBadge = "";
       if (rowspan > 1) {
