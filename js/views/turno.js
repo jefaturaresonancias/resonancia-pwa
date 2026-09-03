@@ -362,6 +362,13 @@ const TurnoView = (() => {
     if (_estudiosElegidos.length === 0) { App.toast("Agregá al menos un estudio.", "error"); return; }
     if (!_slotSeleccionado)             { App.toast("Seleccioná un horario.", "error"); return; }
 
+    // Aviso de solicitud digital (29/8/2026, a pedido) — no bloquea la
+    // carga, solo obliga a confirmar conscientemente que se está cargando
+    // sin ella si el checkbox quedó sin marcar.
+    if (!document.getElementById("t-solicitud-digital").checked) {
+      if (!confirm("⚠️ Se está cargando el turno SIN SOLICITUD DIGITAL.\n\n¿Confirmás que querés continuar igual?")) return;
+    }
+
     const nombre        = document.getElementById("t-nombre").value.trim();
     const apellido      = document.getElementById("t-apellido").value.trim();
     const dni           = document.getElementById("t-dni").value.trim();
