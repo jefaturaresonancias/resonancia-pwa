@@ -115,14 +115,28 @@ const App = (() => {
       <button id="btn-op-anular" style="padding:12px;font-size:14px;border-radius:6px;border:2px solid var(--danger);background:transparent;color:var(--danger);font-weight:700;cursor:pointer">🗑 Anular turno</button>
     `;
 
-    document.getElementById("btn-op-anular").addEventListener("click", async () => {
+    document.getElementById("btn-op-anular").addEventListener("click", async (ev) => {
       if (!confirm(`¿Anular este turno?\n\n${tip}\n\nEsta acción no se puede deshacer.`)) return;
+      // Fila capturada ahora, no leída de _turnoSeleccionado después del
+      // await — y botones deshabilitados mientras está en curso, para que
+      // un click doble (o un PIN de sesión vencido pidiéndose de nuevo por
+      // detrás del confirm()) no deje todo en un estado raro sin avisar.
+      const filaAAnular = _turnoSeleccionado.fila;
+      const btnAnular = ev.currentTarget;
+      const btnModificar = document.getElementById("btn-op-modificar");
+      btnAnular.disabled = true; btnModificar.disabled = true;
+      btnAnular.textContent = "Anulando…";
       try {
-        await RailwayAPI.anular(_turnoSeleccionado.fila);
+        await RailwayAPI.anular(filaAAnular);
         toast("Turno anulado", "ok");
         cerrarOpcionesTurno();
         refrescarAgenda();
-      } catch(e) { toast("Error: "+e.message, "error"); }
+      } catch(e) {
+        console.error("Error anulando turno:", e);
+        toast("Error al anular: " + e.message, "error");
+        btnAnular.disabled = false; btnModificar.disabled = false;
+        btnAnular.textContent = "🗑 Anular turno";
+      }
     });
 
     document.getElementById("btn-op-modificar").addEventListener("click", () => {
@@ -143,9 +157,12 @@ const App = (() => {
     _turnoSeleccionado = null;
   }
 
-  // ── Refrescar agenda tras asignar turno ───────────────────
+  // ── Refrescar agenda tras asignar/anular/modificar turno ──
+  // forzar=true a propósito: aunque asignar/anular/modificar ya invalidan
+  // la cache de sessionStorage antes de llamar al RPC, forzar acá es un
+  // resguardo barato para no depender de ese orden si algo cambia.
   function refrescarAgenda() {
-    if (_viewActual === "agenda") AgendaView.cargar();
+    if (_viewActual === "agenda") AgendaView.cargar(true);
   }
 
   // ── Actualizar label del rol en topbar ───────────────────
