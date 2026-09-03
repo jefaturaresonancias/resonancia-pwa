@@ -469,7 +469,8 @@ const AgendaView = (() => {
       // celda de turno normal, para que sea consistente en toda la agenda.
       const risLinea = slot.risEstado ? `\n🏥 RIS: ${slot.risEstado}` : `\n🚫 NO ASIGNADO EN RIS`;
       const sinSolicitudLinea = slot.solicitudDigital === false ? `\n🚫 SIN SOLICITUD DIGITAL` : "";
-      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${slot.tecnicoAsigno?"\n🧑‍⚕️ Asignó: "+slot.tecnicoAsigno:""}${risLinea}${sinSolicitudLinea}`;
+      const creadoLinea = slot.creadoEn ? `\n🗓️ Cargado el: ${slot.creadoEn}` : "";
+      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${slot.tecnicoAsigno?"\n🧑‍⚕️ Asignó: "+slot.tecnicoAsigno:""}${risLinea}${sinSolicitudLinea}${creadoLinea}`;
       let horaFinBadge = "";
       if (rowspan > 1) {
         const hasta = mins + (slot.duracion || _paso);
@@ -645,7 +646,8 @@ const AgendaView = (() => {
       // tooltip/"Opciones del turno".
       const sinSolicitud = slot.solicitudDigital === false;
       const sinSolicitudLinea = sinSolicitud ? `\n🚫 SIN SOLICITUD DIGITAL` : "";
-      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${slot.tecnicoAsigno?"\n🧑‍⚕️ Asignó: "+slot.tecnicoAsigno:""}${pres?"\n✅ Presente":""}${risLinea}${sinSolicitudLinea}`;
+      const creadoLinea = slot.creadoEn ? `\n🗓️ Cargado el: ${slot.creadoEn}` : "";
+      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${slot.tecnicoAsigno?"\n🧑‍⚕️ Asignó: "+slot.tecnicoAsigno:""}${pres?"\n✅ Presente":""}${risLinea}${sinSolicitudLinea}${creadoLinea}`;
       // Mismo texto que ve el estado real de RIS (ej. "Asignado") — antes
       // acá solo decía "RIS" genérico, sin decir si ya está confirmado o
       // no en el sistema del hospital.
