@@ -359,6 +359,7 @@ const ListaView = (() => {
                     <div class="card-nombre ${pres?"ok":""}">${turno.apellido}, ${turno.nombre}</div>
                     <div class="card-estudio">${turno.estudio}</div>
                     <div class="card-meta"><span class="card-dni">${turno.dni}</span>${turno.observaciones?`<span class="card-obs">${turno.observaciones}</span>`:""}</div>
+                    ${turno.creadoEn?`<div class="card-obs" style="opacity:.6">🗓️ Cargado el: ${turno.creadoEn}</div>`:""}
                   </div>
                   <div class="card-body" style="flex:1;opacity:.7">
                     <div style="font-size:9px;font-weight:700;color:#aaa;margin-bottom:2px">RIS</div>
@@ -398,6 +399,7 @@ const ListaView = (() => {
                   <div class="card-nombre ${pres?"ok":""}">${turno.apellido}, ${turno.nombre}</div>
                   <div class="card-estudio">${turno.estudio}</div>
                   <div class="card-meta"><span class="card-dni">${turno.dni}</span>${turno.observaciones?`<span class="card-obs">${turno.observaciones}</span>`:""}</div>
+                  ${turno.creadoEn?`<div class="card-obs" style="opacity:.6">🗓️ Cargado el: ${turno.creadoEn}</div>`:""}
                 </div>
                 <div class="card-right">
                   ${esInt?`<span class="origen-tag-card int">Internación</span>`:""}
