@@ -106,7 +106,8 @@ const App = (() => {
     // "NO ASIGNADO EN RIS" viaja como texto plano dentro de tip (también se
     // usa tal cual en el confirm() nativo de "Anular", que no interpreta
     // HTML) — acá sí se renderiza como HTML, así que se resalta en rojo.
-    const tipHtml = tip.replace("NO ASIGNADO EN RIS", '<span style="color:#c62828;font-weight:700">NO ASIGNADO EN RIS</span>');
+    const tipHtml = tip.replace("NO ASIGNADO EN RIS", '<span style="color:#c62828;font-weight:700">NO ASIGNADO EN RIS</span>')
+      .replace("SIN SOLICITUD DIGITAL", '<span style="color:#c62828;font-weight:700">SIN SOLICITUD DIGITAL</span>');
     const body = document.getElementById("panel-opciones-body");
     body.innerHTML = `
       <div style="background:var(--bg);border-radius:8px;padding:1rem;font-size:13px;white-space:pre-line;color:var(--text-2)">${tipHtml}</div>

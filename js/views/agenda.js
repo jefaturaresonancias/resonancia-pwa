@@ -468,19 +468,22 @@ const AgendaView = (() => {
       // "sobreturno" que arma la celda dividida). Mismo texto que usa la
       // celda de turno normal, para que sea consistente en toda la agenda.
       const risLinea = slot.risEstado ? `\n🏥 RIS: ${slot.risEstado}` : `\n🚫 NO ASIGNADO EN RIS`;
-      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${slot.tecnicoAsigno?"\n🧑‍⚕️ Asignó: "+slot.tecnicoAsigno:""}${risLinea}`;
+      const sinSolicitudLinea = slot.solicitudDigital === false ? `\n🚫 SIN SOLICITUD DIGITAL` : "";
+      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${slot.tecnicoAsigno?"\n🧑‍⚕️ Asignó: "+slot.tecnicoAsigno:""}${risLinea}${sinSolicitudLinea}`;
       let horaFinBadge = "";
       if (rowspan > 1) {
         const hasta = mins + (slot.duracion || _paso);
         const horaF = String(Math.floor(hasta/60)).padStart(2,"0")+":"+String(hasta%60).padStart(2,"0");
         horaFinBadge = `<span style="color:${col.text};opacity:.7;font-size:9px;font-weight:700;margin-left:3px">→${horaF}</span>`;
       }
-      return `<td${rowspanAttr} style="padding:0;border:1px solid #e4e8ee;height:36px">
+      const sinSolicitudBadge = slot.solicitudDigital === false
+        ? `<span style="background:#c62828;color:#fff;border-radius:3px;padding:0 4px;font-size:7px;font-weight:700;margin-left:3px">SIN SOLICITUD</span>` : "";
+      return `<td${rowspanAttr} style="padding:0;border:1px solid #e4e8ee;height:36px${slot.solicitudDigital === false ? ";box-shadow:inset 0 0 0 2px #c62828" : ""}">
         <div style="display:flex;height:100%;gap:1px">
           <div class="slot-turno slot-content" style="flex:1;background:${slot.color||"#a8d5a2"};border-left:3px solid ${col.border};cursor:pointer;overflow:hidden"
             data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}"
             data-fturno="1" data-origen="${slot.origen||""}" data-presente="${slot.presente==="Presente"?"1":"0"}" data-estudio="${(slot.estudio||"").toLowerCase()}">
-            <span class="slot-nombre" style="color:${col.text}">${slot.apellido}, ${slot.nombre} ${pres}${horaFinBadge}</span>
+            <span class="slot-nombre" style="color:${col.text}">${slot.apellido}, ${slot.nombre} ${pres}${horaFinBadge}${sinSolicitudBadge}</span>
             <span class="slot-estudio" style="color:${col.text}">${slot.estudio}</span>
           </div>
           <div class="slot-ris-side slot-content" style="flex:1;background:#f0f0f0;border-left:2px dashed #bbb;cursor:pointer;overflow:hidden"
@@ -636,11 +639,19 @@ const AgendaView = (() => {
       // ASIGNADO EN RIS" se aplica después, solo donde sí se renderiza
       // como HTML (ver _posTip/mostrarOpcionesTurno).
       const risLinea = estRIS ? `\n🏥 RIS: ${estRIS}` : `\n🚫 NO ASIGNADO EN RIS`;
-      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${slot.tecnicoAsigno?"\n🧑‍⚕️ Asignó: "+slot.tecnicoAsigno:""}${pres?"\n✅ Presente":""}${risLinea}`;
+      // "SIN SOLICITUD DIGITAL" (29/8/2026, a pedido) — checkbox del panel
+      // de turno; se guarda en Postgres y se muestra bien visible acá:
+      // borde rojo en toda la celda + badge junto al nombre + línea en el
+      // tooltip/"Opciones del turno".
+      const sinSolicitud = slot.solicitudDigital === false;
+      const sinSolicitudLinea = sinSolicitud ? `\n🚫 SIN SOLICITUD DIGITAL` : "";
+      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${slot.tecnicoAsigno?"\n🧑‍⚕️ Asignó: "+slot.tecnicoAsigno:""}${pres?"\n✅ Presente":""}${risLinea}${sinSolicitudLinea}`;
       // Mismo texto que ve el estado real de RIS (ej. "Asignado") — antes
       // acá solo decía "RIS" genérico, sin decir si ya está confirmado o
       // no en el sistema del hospital.
       const badgeRIS  = estRIS ? `<span style="background:#888;color:#fff;border-radius:3px;padding:0 4px;font-size:7px;font-weight:700;margin-left:2px">${estRIS}</span>` : "";
+      const sinSolicitudBadge = sinSolicitud
+        ? `<span style="background:#c62828;color:#fff;border-radius:3px;padding:0 4px;font-size:7px;font-weight:700;margin-left:3px">SIN SOLICITUD</span>` : "";
 
       let horaFinBadge = "";
       if (rowspan > 1) {
@@ -655,14 +666,14 @@ const AgendaView = (() => {
       // en vez de esconderla detrás del tooltip al pasar el mouse.
       const contenido = rowspan > 1
         ? `<div class="slot-content slot-content-expandido">
-            <span class="slot-nombre" style="color:${col.text}">${iconRIS}${slot.apellido}, ${slot.nombre} ${pres}${horaFinBadge}</span>
+            <span class="slot-nombre" style="color:${col.text}">${iconRIS}${slot.apellido}, ${slot.nombre} ${pres}${horaFinBadge}${sinSolicitudBadge}</span>
             ${dniTexto ? `<span class="slot-detalle" style="color:${col.text}">${dniTexto}</span>` : ""}
             <span class="slot-estudio-full" style="color:${col.text}">${slot.estudio}${badgeRIS}</span>
             <span class="slot-origen-badge" style="color:${col.text}">${slot.origen||""}</span>
           </div>`
-        : `<div class="slot-content"><span class="slot-nombre" style="color:${col.text}">${iconRIS}${slot.apellido}, ${slot.nombre} ${pres}</span><span class="slot-estudio" style="color:${col.text}">${slot.estudio}${badgeRIS}</span></div>`;
+        : `<div class="slot-content"><span class="slot-nombre" style="color:${col.text}">${iconRIS}${slot.apellido}, ${slot.nombre} ${pres}${sinSolicitudBadge}</span><span class="slot-estudio" style="color:${col.text}">${slot.estudio}${badgeRIS}</span></div>`;
 
-      return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border}" data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}"${rowspanAttr}
+      return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border}${sinSolicitud ? ";box-shadow:inset 0 0 0 2px #c62828" : ""}" data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}"${rowspanAttr}
         data-fturno="1" data-origen="${slot.origen||""}" data-presente="${slot.presente==="Presente"?"1":"0"}" data-estudio="${(slot.estudio||"").toLowerCase()}"
         >${contenido}</td>`;
     }
@@ -787,7 +798,8 @@ const AgendaView = (() => {
         tip = document.createElement("div");
         tip.className = "tooltip-turno";
         tip.innerHTML = decodeURIComponent(td.dataset.tooltip).replace(/\n/g,"<br>")
-          .replace("NO ASIGNADO EN RIS", '<span style="color:#e05a5a;font-weight:700">NO ASIGNADO EN RIS</span>');
+          .replace("NO ASIGNADO EN RIS", '<span style="color:#e05a5a;font-weight:700">NO ASIGNADO EN RIS</span>')
+          .replace("SIN SOLICITUD DIGITAL", '<span style="color:#e05a5a;font-weight:700">SIN SOLICITUD DIGITAL</span>');
         document.body.appendChild(tip);
         _posTip(e, tip);
       });

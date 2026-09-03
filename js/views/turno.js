@@ -364,8 +364,10 @@ const TurnoView = (() => {
 
     // Aviso de solicitud digital (29/8/2026, a pedido) — no bloquea la
     // carga, solo obliga a confirmar conscientemente que se está cargando
-    // sin ella si el checkbox quedó sin marcar.
-    if (!document.getElementById("t-solicitud-digital").checked) {
+    // sin ella si el checkbox quedó sin marcar. Se manda al backend
+    // (solicitudDigital) para que quede guardado y se vea en la Agenda.
+    const solicitudDigital = document.getElementById("t-solicitud-digital").checked;
+    if (!solicitudDigital) {
       if (!confirm("⚠️ Se está cargando el turno SIN SOLICITUD DIGITAL.\n\n¿Confirmás que querés continuar igual?")) return;
     }
 
@@ -396,11 +398,11 @@ const TurnoView = (() => {
         if (!confirmar) { btn.disabled = false; btn.textContent = "✓ Confirmar turno"; return; }
         const estudioOriginal = document.getElementById("form-turno").dataset.estudioOriginal || "";
         const tipo = estudio !== estudioOriginal ? "Estudio" : "Fecha";
-        await RailwayAPI.modificar(filaOriginal, { tipo, nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs, tecnicoAsigno });
+        await RailwayAPI.modificar(filaOriginal, { tipo, nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs, tecnicoAsigno, solicitudDigital });
         document.getElementById("form-turno").dataset.filaOriginal = "";
         document.getElementById("form-turno").dataset.estudioOriginal = "";
       } else {
-        await RailwayAPI.asignar({ nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs, tecnicoAsigno });
+        await RailwayAPI.asignar({ nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs, tecnicoAsigno, solicitudDigital });
       }
       App.toast(`Turno asignado: ${apellido} — ${_slotSeleccionado.hora} hs`, "ok");
       cerrarPanel();
