@@ -623,6 +623,7 @@ const BuscarView = (() => {
             <span>🔬 ${t.estudio}</span>
             <span><span class="origen-tag" style="background:${est.bg};border-color:${est.border};color:${est.text}">${t.origen}</span></span>
             ${t.observaciones ? `<span>📝 ${t.observaciones}</span>` : ""}
+            ${t.tecnicoAsigno ? `<span>🧑‍⚕️ Asignó: ${t.tecnicoAsigno}</span>` : ""}
             ${t.presente === "Presente" ? '<span>✅ Presente</span>' : ""}
           </div>
           ${t.tipoMod === "" ? `<div style="margin-top:.5rem"><button class="btn-sm btn-anular-busq" data-fila="${t.fila}" data-nombre="${t.apellido}, ${t.nombre}" style="color:#c62828;border-color:#c62828">Anular turno</button></div>` : ""}

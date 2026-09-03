@@ -497,6 +497,7 @@ Esta acción no se puede deshacer.`)) return;
           <td class="ris-estudio">${r.practica}</td>
           <td><span class="ris-badge">RIS</span></td>
           <td><span class="suitestensa-estado" data-hashes="${hashesAttr}"></span></td>
+          <td></td>
           <td><button class="btn-suitestensa" data-hashes="${hashesAttr}" data-fecha="${r.fecha}" data-nombre="${nombre} ${apellido}">Cargar en Suitestensa</button></td>
           <td></td>
         </tr>`;
@@ -510,7 +511,7 @@ Esta acción no se puede deshacer.`)) return;
           <td colspan="6" style="color:#bbb;font-style:italic;font-size:12px">
             <span style="color:#4a9e5c;font-weight:600">+ Libre</span> — clic para asignar turno
           </td>
-          <td></td><td></td>
+          <td></td><td></td><td></td>
         </tr>`;
       }
 
@@ -530,7 +531,7 @@ Esta acción no se puede deshacer.`)) return;
         return `<tr style="background:${bg}18">
           <td class="td-hora" style="color:#bbb">${hora}</td>
           <td colspan="6" style="color:#bbb;font-size:11px;font-style:italic">${label}</td>
-          <td></td><td></td>
+          <td></td><td></td><td></td>
         </tr>`;
       }
 
@@ -561,6 +562,7 @@ Esta acción no se puede deshacer.`)) return;
         <td>${turno.estudio}</td>
         <td><span class="origen-tag" style="background:${est.bg};border-color:${est.border};color:${est.text}">${turno.origen}</span></td>
         <td class="td-obs">${turno.observaciones||""}</td>
+        <td class="td-asigno" style="font-size:12px;color:var(--text-2)">${turno.tecnicoAsigno||""}</td>
         <td>${presBadge}</td>
         <td>
           <button class="btn-sm btn-anular" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}" style="color:#c62828;border-color:#c62828">Anular</button>
