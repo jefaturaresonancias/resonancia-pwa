@@ -386,6 +386,21 @@ const TurnoView = (() => {
     const fecha = `${d}/${m}/${y}`;
     const estudio = _estudiosElegidos.join(", ");
 
+    // Excepción de límites (jefatura/admin) — la valida de verdad el
+    // servidor (rpc/turnos.js, _validarExcepcionLimites); acá solo se
+    // exige que no viaje vacía.
+    const excepcionTildada = document.getElementById("t-excepcion-toggle").checked;
+    let datosExcepcion = {};
+    if (excepcionTildada) {
+      const excepcionPin = document.getElementById("t-excepcion-pin").value.trim();
+      if (!excepcionPin) { App.toast("Ingresá el PIN de excepción.", "error"); return; }
+      datosExcepcion = {
+        excepcionLimites: true,
+        excepcionRol: document.getElementById("t-excepcion-rol").value,
+        excepcionPin,
+      };
+    }
+
     const btn = document.getElementById("btn-confirmar");
     btn.disabled = true; btn.textContent = "Guardando…";
     document.getElementById("turno-result").classList.add("hidden");
@@ -398,11 +413,11 @@ const TurnoView = (() => {
         if (!confirmar) { btn.disabled = false; btn.textContent = "✓ Confirmar turno"; return; }
         const estudioOriginal = document.getElementById("form-turno").dataset.estudioOriginal || "";
         const tipo = estudio !== estudioOriginal ? "Estudio" : "Fecha";
-        await RailwayAPI.modificar(filaOriginal, { tipo, nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs, tecnicoAsigno, solicitudDigital });
+        await RailwayAPI.modificar(filaOriginal, { tipo, nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs, tecnicoAsigno, solicitudDigital, ...datosExcepcion });
         document.getElementById("form-turno").dataset.filaOriginal = "";
         document.getElementById("form-turno").dataset.estudioOriginal = "";
       } else {
-        await RailwayAPI.asignar({ nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs, tecnicoAsigno, solicitudDigital });
+        await RailwayAPI.asignar({ nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs, tecnicoAsigno, solicitudDigital, ...datosExcepcion });
       }
       App.toast(`Turno asignado: ${apellido} — ${_slotSeleccionado.hora} hs`, "ok");
       cerrarPanel();
@@ -422,6 +437,8 @@ const TurnoView = (() => {
     document.getElementById("form-turno").reset();
     document.getElementById("t-pegar-datos").value = "";
     document.getElementById("t-pegar-wrap").classList.add("hidden");
+    document.getElementById("t-excepcion-pin").value = "";
+    document.getElementById("t-excepcion-wrap").classList.add("hidden");
     const selOrigen = document.getElementById("t-origen");
     selOrigen.disabled = false;
     selOrigen.style.background = "";
@@ -470,6 +487,11 @@ const TurnoView = (() => {
       const wrap = document.getElementById("t-pegar-wrap");
       wrap.classList.toggle("hidden", !e.target.checked);
       if (e.target.checked) document.getElementById("t-pegar-datos").focus();
+    });
+    document.getElementById("t-excepcion-toggle").addEventListener("change", (e) => {
+      const wrap = document.getElementById("t-excepcion-wrap");
+      wrap.classList.toggle("hidden", !e.target.checked);
+      if (e.target.checked) document.getElementById("t-excepcion-pin").focus();
     });
     // Agregar estudio al hacer clic en el botón o cambiar select
     document.getElementById("btn-agregar-estudio").addEventListener("click", () => {

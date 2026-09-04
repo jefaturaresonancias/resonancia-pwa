@@ -620,6 +620,19 @@
             <span style="font-weight:800;letter-spacing:.02em;color:#7a4f00;font-size:13px">TIENE SOLICITUD DIGITAL</span>
           </label>
         </div>
+        <div class="form-row" style="flex-direction:column;gap:6px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;color:#c62828;cursor:pointer">
+            <input type="checkbox" id="t-excepcion-toggle" style="width:16px;height:16px">
+            ⚠️ EXCEPCIÓN — saltear límites de agenda (requiere PIN jefatura/admin)
+          </label>
+          <div id="t-excepcion-wrap" class="hidden" style="display:flex;gap:8px">
+            <select id="t-excepcion-rol" style="font-size:12px">
+              <option value="jefatura">Jefatura</option>
+              <option value="admin">Admin</option>
+            </select>
+            <input type="password" id="t-excepcion-pin" placeholder="PIN" style="flex:1;font-size:12px" autocomplete="off">
+          </div>
+        </div>
         <div class="form-row">
           <button type="button" id="btn-sugerir-sobreturno" class="btn-sm" style="width:100%">💡 Sugerir horario de sobreturno</button>
         </div>
