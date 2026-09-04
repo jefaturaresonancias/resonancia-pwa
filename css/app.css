@@ -307,6 +307,13 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
   background: #e8eaf0; font-weight: 700; color: var(--text-2);
   font-size: 11px; text-align: center; white-space: nowrap;
   border-right: 2px solid var(--border); padding: 3px 6px;
+  transition: background .1s, color .1s;
+}
+/* Al pasar el mouse por cualquier celda de la fila (aunque sea la del
+   domingo, lejos de la columna de horas) resalta la hora correspondiente
+   — así no hay que ir con la vista hasta la izquierda para ubicarse. */
+.agenda-table tbody tr:hover td.col-hora {
+  background: var(--accent); color: #fff;
 }
 
 /* Slot types */
