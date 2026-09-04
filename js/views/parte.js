@@ -40,7 +40,7 @@ const ParteView = (() => {
   // ══════════════════════════════════════════════════════════
 
   const RE_HORA   = /(?<!\d)(\d{1,2}:\d{2})(?!\d)/g;
-  const RE_DOC    = /(DNI|CIBO|RP)\s+(\d+)/i;
+  const RE_DOC    = /(DNI|CIBO|RP)\s*:?\s*(\d+)/i;
   const RE_NOMBRE = /\b([A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,})*,\s*[A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,})*)\b/;
   const RE_PRAC   = /((?:RESONANCIA|ANGIORRESON|COLANGIO|TOMOGRAF|ECOGRAF|DENSITOM|RX\b|TAC\b).+?)(?=\bDNI\b|\bCIBO\b|\bRP\b|\bTURNO\b|\bSOBRETURNO\b|$)/is;
   const RE_EMAIL  = /\S+@\S+/g;
@@ -158,16 +158,22 @@ const partes = String(practica).split(/\s*·\s*|\s*-\s*/);
 
   // Busca "FECHA: dd/mm/yyyy" (tolera saltos de línea entre la etiqueta y el
   // valor, como en las confirmaciones de turno online tipo "Fecha:\n
-  // 06/09/2026 12:10") y, si no hay etiqueta, cualquier fecha suelta.
-  function _extraerFecha(texto) {
-    let m = /FECHA[:\s]+(\d{1,2}\/\d{1,2}\/\d{4})/i.exec(texto);
+  // 06/09/2026 12:10"). Con conFallback=true, si no hay etiqueta "FECHA"
+  // toma cualquier fecha suelta del texto — sirve para el Parte Diario,
+  // donde casi siempre hay una sola fecha en todo el documento. NUNCA usar
+  // ese fallback para "pegar datos de paciente": ahí puede haber otras
+  // fechas sueltas (ej. fecha de nacimiento) y agarrar la que no es sería
+  // completar la fecha del turno con un dato equivocado.
+  function _extraerFecha(texto, conFallback) {
+    const m = /FECHA[:\s]+(\d{1,2}\/\d{1,2}\/\d{4})/i.exec(texto);
     if (m) return m[1];
-    m = /\b(\d{1,2}\/\d{1,2}\/\d{4})\b/.exec(texto);
-    return m ? m[1] : "";
+    if (!conFallback) return "";
+    const mSuelta = /\b(\d{1,2}\/\d{1,2}\/\d{4})\b/.exec(texto);
+    return mSuelta ? mSuelta[1] : "";
   }
 
   function _parsearTexto(texto) {
-    const fecha = _extraerFecha(texto);
+    const fecha = _extraerFecha(texto, true);
 
     // Dividir por hora
     const textoPlano = _limpiar(texto);
@@ -205,6 +211,7 @@ const partes = String(practica).split(/\s*·\s*|\s*-\s*/);
   // el nombre — en ese caso dni/apellido/nombre quedan vacíos y solo se
   // completa la fecha).
   function extraerDatosPegados(texto) {
+    const textoOriginal = String(texto || "");
     texto = _limpiar(texto);
     const fecha = _extraerFecha(texto);
 
@@ -230,8 +237,34 @@ const partes = String(practica).split(/\s*·\s*|\s*-\s*/);
     }
 
     const coma = apellidoNombre.indexOf(",");
-    const apellido = coma >= 0 ? apellidoNombre.slice(0, coma).trim() : apellidoNombre;
-    const nombre   = coma >= 0 ? apellidoNombre.slice(coma + 1).trim() : "";
+    let apellido = coma >= 0 ? apellidoNombre.slice(0, coma).trim() : apellidoNombre;
+    let nombre   = coma >= 0 ? apellidoNombre.slice(coma + 1).trim() : "";
+
+    // Sin coma (ej. "DANIEL ALEJANDRO BLANCO NIZ", nombre completo corrido):
+    // mismo criterio que parsearPegadoPaciente en
+    // turnos-informes-backend/public/js/gsr-shim.js — se toma la línea que
+    // sigue a "Paciente:" si existe esa etiqueta (confirmaciones de turno
+    // online), o si no la primera línea del texto (formato HIS con el
+    // nombre solo, sin etiqueta), y si no tiene dígitos se parte a la
+    // mitad: la primera mitad de palabras es nombre, el resto apellido.
+    // Es una aproximación a propósito — nombres compuestos de largo
+    // variable no se pueden separar con certeza sin un delimitador, la
+    // persona revisa y corrige antes de confirmar el turno.
+    if (!apellido && !nombre) {
+      const mPaciente = /PACIENTE[:\s]*([^\n]+)/i.exec(textoOriginal);
+      const lineaNombre = mPaciente
+        ? mPaciente[1].trim()
+        : (textoOriginal.split("\n").map(l => l.trim()).find(Boolean) || "");
+      const palabras = lineaNombre.split(/\s+/).filter(Boolean);
+      // Todo mayúsculas (como vienen los nombres en estos sistemas) — evita
+      // que un renglón cualquiera de texto normal (minúsculas, sin nombre)
+      // se confunda con un nombre de paciente.
+      if (palabras.length > 1 && /^[A-ZÁÉÍÓÚÑ\s]+$/.test(lineaNombre)) {
+        const mitad = Math.floor(palabras.length / 2);
+        nombre = palabras.slice(0, mitad).join(" ");
+        apellido = palabras.slice(mitad).join(" ");
+      }
+    }
 
     return { dni, apellido, nombre, fecha };
   }
