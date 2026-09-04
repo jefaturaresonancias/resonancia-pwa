@@ -441,16 +441,22 @@ const TurnoView = (() => {
   }
 
   // ── Pegar datos del paciente ──────────────────────────────
-  // Reusa ParteView.extraerNombreDni (mismas regex que el lector de Parte
-  // Diario) para no reimplementar el parseo de "APELLIDO, NOMBRE DNI 123..."
+  // Reusa ParteView.extraerDatosPegados (mismas regex que el lector de
+  // Parte Diario) para no reimplementar el parseo — sirve tanto para texto
+  // tipo HIS/SIGEHOS ("APELLIDO, NOMBRE DNI 123...") como para
+  // confirmaciones de turno online (traen "Fecha:" pero no DNI).
   function _pegarDatosPaciente(e) {
     const texto = (e.clipboardData || window.clipboardData).getData("text/plain");
     if (!texto || !texto.trim()) return;
-    const { dni, apellido, nombre } = ParteView.extraerNombreDni(texto);
+    const { dni, apellido, nombre, fecha } = ParteView.extraerDatosPegados(texto);
     if (dni)      document.getElementById("t-dni").value = dni;
     if (apellido) document.getElementById("t-apellido").value = apellido;
     if (nombre)   document.getElementById("t-nombre").value = nombre;
-    if (dni || apellido) {
+    if (fecha) {
+      const [d, m, y] = fecha.split("/");
+      document.getElementById("t-fecha").value = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+    }
+    if (dni || apellido || fecha) {
       App.toast("Datos autocompletados — revisalos antes de confirmar", "ok");
     } else {
       App.toast("No se pudieron reconocer los datos, completalos a mano", "error");

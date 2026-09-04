@@ -156,15 +156,18 @@ const partes = String(practica).split(/\s*·\s*|\s*-\s*/);
     return resultado.join(" · ");
   }
 
+  // Busca "FECHA: dd/mm/yyyy" (tolera saltos de línea entre la etiqueta y el
+  // valor, como en las confirmaciones de turno online tipo "Fecha:\n
+  // 06/09/2026 12:10") y, si no hay etiqueta, cualquier fecha suelta.
+  function _extraerFecha(texto) {
+    let m = /FECHA[:\s]+(\d{1,2}\/\d{1,2}\/\d{4})/i.exec(texto);
+    if (m) return m[1];
+    m = /\b(\d{1,2}\/\d{1,2}\/\d{4})\b/.exec(texto);
+    return m ? m[1] : "";
+  }
+
   function _parsearTexto(texto) {
-    // Fecha
-    let fecha = "";
-    let mF = /FECHA[:\s]+(\d{1,2}\/\d{1,2}\/\d{4})/i.exec(texto);
-    if (mF) fecha = mF[1];
-    else {
-      mF = /\b(\d{1,2}\/\d{1,2}\/\d{4})\b/.exec(texto);
-      if (mF) fecha = mF[1];
-    }
+    const fecha = _extraerFecha(texto);
 
     // Dividir por hora
     const textoPlano = _limpiar(texto);
@@ -193,11 +196,17 @@ const partes = String(practica).split(/\s*·\s*|\s*-\s*/);
     return { fecha, filas: unicos };
   }
 
-  // Extrae DNI + apellido/nombre de un texto pegado con los datos de UN
-  // paciente (ej. copiado de HIS/SIGEHOS) — reusa las mismas regex que el
-  // parser del Parte Diario (RE_DOC, RE_NOMBRE) para no duplicar lógica.
-  function extraerNombreDni(texto) {
+  // Extrae DNI + apellido/nombre + fecha de turno de un texto pegado con
+  // los datos de UN paciente — reusa las mismas regex/helpers que el
+  // parser del Parte Diario (RE_DOC, RE_NOMBRE, _extraerFecha) para no
+  // duplicar lógica. Sirve tanto para texto tipo HIS/SIGEHOS ("GONZALEZ,
+  // JUAN DNI 30123456") como para confirmaciones de turno online ("Fecha:
+  // \n06/09/2026 12:10 ... Paciente:\nJUAN GONZALEZ", sin DNI ni coma en
+  // el nombre — en ese caso dni/apellido/nombre quedan vacíos y solo se
+  // completa la fecha).
+  function extraerDatosPegados(texto) {
     texto = _limpiar(texto);
+    const fecha = _extraerFecha(texto);
 
     const mDoc = RE_DOC.exec(texto);
     const dni = mDoc ? mDoc[2] : "";
@@ -224,7 +233,7 @@ const partes = String(practica).split(/\s*·\s*|\s*-\s*/);
     const apellido = coma >= 0 ? apellidoNombre.slice(0, coma).trim() : apellidoNombre;
     const nombre   = coma >= 0 ? apellidoNombre.slice(coma + 1).trim() : "";
 
-    return { dni, apellido, nombre };
+    return { dni, apellido, nombre, fecha };
   }
 
   // ── Extraer texto del PDF ─────────────────────────────────
@@ -769,5 +778,5 @@ Solo se modificará la columna ESTADO en BD_RIS.`)) return;
     });
   }
 
-  return { init, extraerNombreDni };
+  return { init, extraerDatosPegados };
 })();
