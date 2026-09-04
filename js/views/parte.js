@@ -193,6 +193,40 @@ const partes = String(practica).split(/\s*·\s*|\s*-\s*/);
     return { fecha, filas: unicos };
   }
 
+  // Extrae DNI + apellido/nombre de un texto pegado con los datos de UN
+  // paciente (ej. copiado de HIS/SIGEHOS) — reusa las mismas regex que el
+  // parser del Parte Diario (RE_DOC, RE_NOMBRE) para no duplicar lógica.
+  function extraerNombreDni(texto) {
+    texto = _limpiar(texto);
+
+    const mDoc = RE_DOC.exec(texto);
+    const dni = mDoc ? mDoc[2] : "";
+    // Sacar "DNI 12345678" del texto antes de buscar el nombre: si el
+    // documento viene DESPUÉS del nombre (ej. "GONZALEZ, JUAN DNI 123..."),
+    // la regex de nombre (corridas de mayúsculas) se comía "DNI" como si
+    // fuera parte del nombre de pila.
+    const textoSinDoc = mDoc
+      ? texto.slice(0, mDoc.index) + " " + texto.slice(mDoc.index + mDoc[0].length)
+      : texto;
+
+    const textoSinEmail = textoSinDoc.replace(RE_EMAIL, "");
+    const reN = new RegExp(RE_NOMBRE.source, "g");
+    let apellidoNombre = "";
+    let m;
+    while ((m = reN.exec(textoSinEmail)) !== null) {
+      const candidato = _limpiar(m[1]);
+      if (candidato.length > 4 && !IGNORAR.some(ig => candidato.toUpperCase().includes(ig))) {
+        apellidoNombre = candidato; break;
+      }
+    }
+
+    const coma = apellidoNombre.indexOf(",");
+    const apellido = coma >= 0 ? apellidoNombre.slice(0, coma).trim() : apellidoNombre;
+    const nombre   = coma >= 0 ? apellidoNombre.slice(coma + 1).trim() : "";
+
+    return { dni, apellido, nombre };
+  }
+
   // ── Extraer texto del PDF ─────────────────────────────────
   async function _extraerTexto(arrayBuffer) {
     const lib  = await _cargarPDFJS();
@@ -735,5 +769,5 @@ Solo se modificará la columna ESTADO en BD_RIS.`)) return;
     });
   }
 
-  return { init };
+  return { init, extraerNombreDni };
 })();

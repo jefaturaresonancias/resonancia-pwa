@@ -564,6 +564,13 @@
     <div style="flex:1;overflow-y:auto;padding:1.25rem">
       <form id="form-turno" autocomplete="off">
         <div class="form-row">
+          <div class="form-group" style="width:100%">
+            <label>Pegar datos del paciente (opcional)</label>
+            <textarea id="t-pegar-datos" rows="2" style="width:100%;font-size:12px;resize:vertical"
+              placeholder="Pegá acá nombre, apellido y DNI copiados de HIS/SIGEHOS — autocompleta los campos de abajo"></textarea>
+          </div>
+        </div>
+        <div class="form-row">
           <div class="form-group"><label>Nombre *</label><input type="text" id="t-nombre" required placeholder="Nombre del paciente"></div>
           <div class="form-group"><label>Apellido *</label><input type="text" id="t-apellido" required placeholder="Apellido"></div>
         </div>

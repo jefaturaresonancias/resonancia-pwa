@@ -420,6 +420,7 @@ const TurnoView = (() => {
 
   function _resetForm() {
     document.getElementById("form-turno").reset();
+    document.getElementById("t-pegar-datos").value = "";
     const selOrigen = document.getElementById("t-origen");
     selOrigen.disabled = false;
     selOrigen.style.background = "";
@@ -439,7 +440,25 @@ const TurnoView = (() => {
     _horaPrefill  = null;
   }
 
+  // ── Pegar datos del paciente ──────────────────────────────
+  // Reusa ParteView.extraerNombreDni (mismas regex que el lector de Parte
+  // Diario) para no reimplementar el parseo de "APELLIDO, NOMBRE DNI 123..."
+  function _pegarDatosPaciente(e) {
+    const texto = (e.clipboardData || window.clipboardData).getData("text/plain");
+    if (!texto || !texto.trim()) return;
+    const { dni, apellido, nombre } = ParteView.extraerNombreDni(texto);
+    if (dni)      document.getElementById("t-dni").value = dni;
+    if (apellido) document.getElementById("t-apellido").value = apellido;
+    if (nombre)   document.getElementById("t-nombre").value = nombre;
+    if (dni || apellido) {
+      App.toast("Datos autocompletados — revisalos antes de confirmar", "ok");
+    } else {
+      App.toast("No se pudieron reconocer los datos, completalos a mano", "error");
+    }
+  }
+
   function init() {
+    document.getElementById("t-pegar-datos").addEventListener("paste", _pegarDatosPaciente);
     // Agregar estudio al hacer clic en el botón o cambiar select
     document.getElementById("btn-agregar-estudio").addEventListener("click", () => {
       const sel = document.getElementById("t-estudio-sel");
