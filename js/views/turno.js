@@ -421,6 +421,7 @@ const TurnoView = (() => {
   function _resetForm() {
     document.getElementById("form-turno").reset();
     document.getElementById("t-pegar-datos").value = "";
+    document.getElementById("t-pegar-wrap").classList.add("hidden");
     const selOrigen = document.getElementById("t-origen");
     selOrigen.disabled = false;
     selOrigen.style.background = "";
@@ -465,6 +466,11 @@ const TurnoView = (() => {
 
   function init() {
     document.getElementById("t-pegar-datos").addEventListener("paste", _pegarDatosPaciente);
+    document.getElementById("t-pegar-toggle").addEventListener("change", (e) => {
+      const wrap = document.getElementById("t-pegar-wrap");
+      wrap.classList.toggle("hidden", !e.target.checked);
+      if (e.target.checked) document.getElementById("t-pegar-datos").focus();
+    });
     // Agregar estudio al hacer clic en el botón o cambiar select
     document.getElementById("btn-agregar-estudio").addEventListener("click", () => {
       const sel = document.getElementById("t-estudio-sel");
