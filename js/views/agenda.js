@@ -5,67 +5,44 @@ const AgendaView = (() => {
   let _fechaDesde = _lunesDeHoy();
   let _mesBase    = _primeroDeMes(new Date());
    let _paso              = 20;
-  let _estudiosConfigCache = null;
+  let _estudiosConfigCache = null; // config de "estudios" (duracion/restriccion por nombre) — usado para el filtro de restricciones, ver línea ~680
   let _filtroOrigenes = new Set(); // vacío = todos
   let _filtroEstados  = new Set(); // vacío = todos
   let _filtroEstudio  = "";
   let _ocultarRIS     = false; // true = mostrar solo los sobreturnos, ocultar lo que viene de BD_RIS sin turno propio
 
-  // ── Calcular duración real de práctica RIS (Config − 10 min) ──
+  // Cache de duracion estimada por texto de practica de RIS (evita pedir
+  // de nuevo lo mismo en cada re-render de la semana). El calculo en si
+  // vive en el backend (api_tiempoPractica_estimarDuraciones, misma
+  // formula ya confirmada por el usuario el 14/8/2026 para el sugeridor
+  // de sobreturno) porque requiere clasificar cada tramo a su region
+  // (lib/clasificacion.js), logica que solo existe del lado de Node.
+  // Reemplaza la version anterior (fuzzy-match contra agendaConfig.estudios,
+  // ver git log) que daba la mitad de la duracion real contra los casos
+  // reales confirmados el 9/9/2026 ("cerebro con contraste" 20min en vez
+  // de 40min) -- mismo bug ya encontrado y corregido en lista.js, esta
+  // vista lo tenia tambien. MARGEN_ENTRE_ESTUDIOS_MIN cubre el cambio de
+  // paciente/sala entre un estudio y el siguiente, que ningun calculo de
+  // duracion de escaneo va a capturar nunca (confirmado por el usuario
+  // contra 2 casos reales mas, DNI 12106879 y 96365423).
+  const MARGEN_ENTRE_ESTUDIOS_MIN = 10;
+  const _duracionRISCache = new Map();
+
+  async function _cargarDuracionesRIS(risMap) {
+    const practicas = new Set();
+    Object.values(risMap || {}).forEach(dia => (dia || []).forEach(r => { if (r.practica) practicas.add(r.practica); }));
+    const faltantes = Array.from(practicas).filter(p => !_duracionRISCache.has(p));
+    if (faltantes.length === 0) return;
+    try {
+      const duraciones = await RailwayAPI.estimarDuracionesPractica(faltantes);
+      faltantes.forEach((p, i) => _duracionRISCache.set(p, (duraciones[i] || 20) + MARGEN_ENTRE_ESTUDIOS_MIN));
+    } catch (_) {
+      faltantes.forEach(p => _duracionRISCache.set(p, 20 + MARGEN_ENTRE_ESTUDIOS_MIN)); // fallback conservador, no bloquea el render
+    }
+  }
+
   function _duracionRIS(practica) {
-    if (!_estudiosConfigCache || !practica) return 20;
-    // Normalizar texto para comparación
-    function norm(s) {
-      return s.toLowerCase()
-        .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
-        .replace(/\bgado\b/g,"contraste")
-        .replace(/contaste/g,"contraste")
-        .replace(/\bcolangiografia por resonancia magnetica\b/,"colangiorresonancia")
-        .replace(/\bmacizo craneo facial\b/,"macizo craneofacial")
-        .replace(/\bsacro iliacas\b/,"sacroiliacas")
-        .replace(/\bambas rodillas\b/,"rodilla ambas")
-        .replace(/\bambos hombros\b/,"hombro ambos")
-        .replace(/\bambas manos\b/,"mano ambas")
-        .replace(/\bambas caderas\b/,"cadera ambas")
-        .replace(/\borbitas oculares\b/,"orbitas")
-        .replace(/\bvasos de cuello\b/,"angiorresonancia de vasos")
-        .replace(/\bresonancia dinamica de pelvis\b/,"pelvis")
-        .replace(/\bprostatica\b/,"prostatica")
-        .replace(/\bcerebro con protocolo epilepsia\b/,"cerebro protocolo epilepsia")
-        .replace(/\bhipofisis\b/,"hipofisis")
-        .replace(/\s+/g," ").trim();
-    }
-    // Separar prácticas múltiples por " · "
-    const partes = practica.split(/\s*·\s*/);
-    let total = 0;
-    for (const parte of partes) {
-      const pNorm = norm(parte);
-      let dur = 0;
-      // 1. Exact match normalizado
-      for (const [nombre, cfg] of Object.entries(_estudiosConfigCache)) {
-        if (norm(nombre) === pNorm) { dur = cfg.duracion; break; }
-      }
-      // 2. Config contiene todas las palabras clave de la práctica RIS
-      if (!dur) {
-        const palabras = pNorm.split(" ").filter(w => w.length > 3);
-        for (const [nombre, cfg] of Object.entries(_estudiosConfigCache)) {
-          const nNorm = norm(nombre);
-          if (palabras.length > 0 && palabras.every(w => nNorm.includes(w))) {
-            dur = cfg.duracion; break;
-          }
-        }
-      }
-      // 3. Primera palabra clave principal matchea
-      if (!dur) {
-        const primera = pNorm.split(" ")[0];
-        for (const [nombre, cfg] of Object.entries(_estudiosConfigCache)) {
-          if (norm(nombre).startsWith(primera)) { dur = cfg.duracion; break; }
-        }
-      }
-      // 4. Fallback
-      total += (dur || 30) - 10;
-    }
-    return Math.max(total, 10);
+    return _duracionRISCache.get(practica) || (20 + MARGEN_ENTRE_ESTUDIOS_MIN);
   }
 
   function parsearMinsJS(hora) {
@@ -1101,6 +1078,7 @@ const AgendaView = (() => {
         ]);
         try { sessionStorage.setItem(cacheKey, JSON.stringify({ datos, risMap, cardioMap })); } catch(_) {}
       }
+      await _cargarDuracionesRIS(risMap);
       _renderSemana(datos, risMap, cardioMap);
     }
     catch (err) { App.toast("Error: "+err.message,"error"); }
