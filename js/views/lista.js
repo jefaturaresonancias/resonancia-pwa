@@ -3,6 +3,35 @@
 const ListaView = (() => {
   let _fecha  = new Date();
   _fecha.setHours(0, 0, 0, 0);
+  // Cache de duracion estimada por texto de practica de RIS (evita pedir
+  // de nuevo lo mismo en cada re-render del mismo dia). El calculo en si
+  // vive en el backend (api_tiempoPractica_estimarDuraciones, misma
+  // formula ya confirmada por el usuario el 14/8/2026 para el sugeridor
+  // de sobreturno -- no se reinventa aca) porque requiere clasificar cada
+  // tramo a su region (lib/clasificacion.js), logica que solo existe del
+  // lado de Node. Bug real 9/9/2026 que motiva esto: esta vista insertaba
+  // cada entrada de RIS como una fila puntual sin ocupar los minutos que
+  // realmente dura, dejando "+ Libre" minutos que en la turnera real de
+  // SIGEHOS estaban asignados (confirmado por el usuario, DNI 35161855 y
+  // 4604880).
+  const _duracionRISCache = new Map();
+
+  async function _cargarDuracionesRIS(risDelDia) {
+    const faltantes = risDelDia
+      .map(r => r.practica)
+      .filter(p => p && !_duracionRISCache.has(p));
+    if (faltantes.length === 0) return;
+    try {
+      const duraciones = await RailwayAPI.estimarDuracionesPractica(faltantes);
+      faltantes.forEach((p, i) => _duracionRISCache.set(p, duraciones[i] || 20));
+    } catch (_) {
+      faltantes.forEach(p => _duracionRISCache.set(p, 20)); // fallback conservador, no bloquea el render
+    }
+  }
+
+  function _duracionRIS(practica) {
+    return _duracionRISCache.get(practica) || 20;
+  }
 
   // ── colores de origen ─────────────────────────────────────
   const ORIGEN_STYLE = {
@@ -248,6 +277,15 @@ const ListaView = (() => {
     // en rpc/ris.js#api_leerRISRango: esa era la idea original).
     const turnoPorDni      = new Map(turnos.map(t => [String(t.dni).trim().replace(/^0+/, ""), t]));
     const turnoPorApellido = new Map(turnos.map(t => [(t.apellido||"").trim().toUpperCase(), t]));
+    // Ventanas [mins, mins+duracion) realmente ocupadas por un estudio de
+    // RIS sin turno propio — bug real 9/9/2026 (DNI 35161855, ACOSTA
+    // EDUARDO, "Rm de abdomen con contraste · Colangiografia con
+    // contraste" ~1h en SIGEHOS): esta vista insertaba la fila de RIS en
+    // un solo instante, dejando los slots siguientes marcados "+ Libre"
+    // aunque el resonador siguiera ocupado de verdad. Se registran acá
+    // las ventanas y se filtran los slots "libre" que caen adentro,
+    // recién después de terminar de armar `filas` más abajo.
+    const ventanasOcupadasRIS = [];
     for (const r of risDelDia) {
       const mins = _parseMins(r.hora);
       if (mins < MIN_I || mins >= MIN_F) continue;
@@ -259,6 +297,7 @@ const ListaView = (() => {
         continue;
       }
       filas.push({ slot: { tipo: "ris" }, turno: null, mins, esRIS: true, ris: r });
+      ventanasOcupadasRIS.push([mins, mins + _duracionRIS(r.practica)]);
     }
     // Agregar turnos que no coinciden con ningún slot del grid
     const minsEnFilas = new Set(filas.filter(f=>f.turno).map(f=>f.turno.fila));
@@ -266,6 +305,14 @@ const ListaView = (() => {
       if (!minsEnFilas.has(t.fila)) {
         filas.push({ slot: { tipo: "turno" }, turno: t, mins: t.mins, esRIS: false });
       }
+    }
+    if (ventanasOcupadasRIS.length) {
+      const filasSinHuecosRIS = filas.filter(f => {
+        if (!f.slot || f.slot.tipo !== "libre") return true;
+        return !ventanasOcupadasRIS.some(([desde, hasta]) => f.mins >= desde && f.mins < hasta);
+      });
+      filas.length = 0;
+      filas.push(...filasSinHuecosRIS);
     }
     filas.sort((a, b) => a.mins - b.mins);
 
@@ -639,6 +686,7 @@ Esta acción no se puede deshacer.`)) return;
         RailwayAPI.leerRISRango(fechaStr, 1).catch(() => ({}))
       ]);
       const risDelDia = risPorFecha[fechaStr] || [];
+      await _cargarDuracionesRIS(risDelDia);
       const agendaDia = agendaArr && agendaArr[0] ? agendaArr[0] : null;
       _render(agendaDia, turnos, filtro, risDelDia);
       _cargarBannerExcepcion();

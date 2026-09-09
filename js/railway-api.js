@@ -362,6 +362,12 @@ const RailwayAPI = (() => {
     return rpc('api_agendaConfig_obtener');
   }
 
+  /** Minutos estimados que ocupa cada práctica de RIS (mismo tramos " · ", misma fórmula del sugeridor de sobreturno) — para saber cuánto dura de verdad un estudio de RIS sin turno propio. practicas: string[]. Devuelve number[] en el mismo orden. */
+  async function estimarDuracionesPractica(practicas) {
+    const r = await rpc('api_tiempoPractica_estimarDuraciones', [practicas]);
+    return r.duraciones || [];
+  }
+
   async function obtenerAgendaPreviewSemanal() {
     const data = await rpc('api_agenda_previewSemanal');
     return data.dias;
@@ -626,7 +632,7 @@ const RailwayAPI = (() => {
     sugerirSobreturno,
     leerConfigSugerirSobreturno, guardarConfigSugerirSobreturno,
     leerReglasSugerirSobreturno, guardarReglaSugerirSobreturno, eliminarReglaSugerirSobreturno,
-    obtenerAgendaConfig, leerAsignadoresTurno, guardarAsignadoresTurno,
+    obtenerAgendaConfig, estimarDuracionesPractica, leerAsignadoresTurno, guardarAsignadoresTurno,
     leerFranjasPreferidasSugerir, guardarFranjaPreferidaSugerir, eliminarFranjaPreferidaSugerir,
     leerCategoriasEstudio, guardarCategoriaEstudio, eliminarCategoriaEstudio,
     leerAgendaFeriados, guardarAgendaFeriado, eliminarAgendaFeriado,
