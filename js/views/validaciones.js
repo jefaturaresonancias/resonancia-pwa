@@ -14,6 +14,20 @@ const ValidacionesView = (() => {
   let _filas = [];
   let _reglasCache = []; // reglas configuradas (leerReglasAgenda) — se usa para
                           // nombres de reglas custom en los badges, y en el modal
+
+  // Descarte local (9/9/2026) — bug real: al marcar reportado/cargado en
+  // RIS un aviso justo cuando el refresco periódico de validaciones tenía
+  // esa fila momentáneamente reemplazada (borrada+reinsertada con el
+  // mismo hash), el backend devolvía "No se encontró la validación" y el
+  // aviso quedaba trabado sin forma de sacarlo de encima. "Descartar" es
+  // a propósito 100% local (localStorage, por navegador) — nunca llama al
+  // backend, así que nunca puede fallar por esto ni por ningún otro
+  // problema de hash. No resuelve nada del lado del servidor, solo oculta
+  // la tarjeta de ESTA vista.
+  const KEY_DESCARTADAS = 'resonancia_validaciones_descartadas';
+  let _descartados;
+  try { _descartados = new Set(JSON.parse(localStorage.getItem(KEY_DESCARTADAS) || '[]')); }
+  catch (_) { _descartados = new Set(); }
   let _colapsado = null;     // Set<fecha> de "próximos" — null = sin inicializar (primer render)
   let _colapsadoHist = null; // Set<fecha> de "históricos" — arranca todo colapsado
   let _mostrarReportados = false; // por defecto oculta lo ya reportado
@@ -69,11 +83,20 @@ const ValidacionesView = (() => {
   // pasado/futuro — eso lo hacen _proximos()/_historicos() sobre esta base.
   function _base() {
     const busqueda = document.getElementById('validaciones-buscar').value.trim().toLowerCase();
-    let arr = _filas.filter(f => _mostrarReportados || !f.reportado);
+    let arr = _filas.filter(f => (_mostrarReportados || !f.reportado) && !_descartados.has(f.hash));
     if (busqueda) {
       arr = arr.filter(f => `${f.paciente} ${f.documento} ${f.practica} ${f.motivo}`.toLowerCase().includes(busqueda));
     }
     return arr;
+  }
+
+  // Descarte 100% local — ver comentario de _descartados más arriba. No
+  // llama al backend, nunca puede fallar por un hash que no coincide.
+  function _descartar(hash) {
+    _descartados.add(hash);
+    try { localStorage.setItem(KEY_DESCARTADAS, JSON.stringify(Array.from(_descartados))); } catch (_) {}
+    App.toast('Descartado (solo en este navegador)', 'ok');
+    _render();
   }
 
   // Lo resuelto se queda en "Próximos" (en verde) hasta DIAS_ARCHIVO_RESUELTO
@@ -246,9 +269,14 @@ const ValidacionesView = (() => {
             <div style="margin-top:.2rem;font-size:.73rem;color:var(--text-2)">${f.practica}</div>
             <div style="margin-top:.2rem;font-size:.7rem;color:var(--text-3)">${f.paciente} — ${f.documento} · ${f.origen || '—'}</div>
             ${f.resuelto ? `<div style="margin-top:.3rem;font-size:.68rem;color:${RESUELTO}">Se archiva a históricos en ${diasFaltan} ${diasFaltan === 1 ? 'día' : 'días'}</div>` : ''}
-            <button type="button" class="btn-sm validaciones-btn-reportar" data-hash="${f.hash}" data-reportado="${f.reportado ? '1' : '0'}" style="margin-top:.5rem;width:100%;font-size:11px">
-              ${f.reportado ? '↺ Desmarcar' : (f.regla === 'NO_CARGADO_RIS' ? '✓ Marcar cargado en RIS' : '✓ Marcar reportado')}
-            </button>
+            <div style="display:flex;gap:.4rem;margin-top:.5rem">
+              <button type="button" class="btn-sm validaciones-btn-reportar" data-hash="${f.hash}" data-reportado="${f.reportado ? '1' : '0'}" style="flex:1;font-size:11px">
+                ${f.reportado ? '↺ Desmarcar' : (f.regla === 'NO_CARGADO_RIS' ? '✓ Marcar cargado en RIS' : '✓ Marcar reportado')}
+              </button>
+              <button type="button" class="btn-sm validaciones-btn-descartar" data-hash="${f.hash}" title="Ocultar solo en este navegador, sin tocar el servidor" style="font-size:11px;color:var(--text-3)">
+                ✕ Descartar
+              </button>
+            </div>
           </div>`;
       }).join('');
 
@@ -289,6 +317,9 @@ const ValidacionesView = (() => {
     });
     cont.querySelectorAll('.validaciones-btn-reportar').forEach(btn => {
       btn.addEventListener('click', () => _marcarReportado(btn.dataset.hash, btn.dataset.reportado !== '1'));
+    });
+    cont.querySelectorAll('.validaciones-btn-descartar').forEach(btn => {
+      btn.addEventListener('click', () => _descartar(btn.dataset.hash));
     });
   }
 
