@@ -277,14 +277,21 @@ const ListaView = (() => {
     // en rpc/ris.js#api_leerRISRango: esa era la idea original).
     const turnoPorDni      = new Map(turnos.map(t => [String(t.dni).trim().replace(/^0+/, ""), t]));
     const turnoPorApellido = new Map(turnos.map(t => [(t.apellido||"").trim().toUpperCase(), t]));
-    // Ventanas [mins, mins+duracion) realmente ocupadas por un estudio de
-    // RIS sin turno propio — bug real 9/9/2026 (DNI 35161855, ACOSTA
-    // EDUARDO, "Rm de abdomen con contraste · Colangiografia con
-    // contraste" ~1h en SIGEHOS): esta vista insertaba la fila de RIS en
-    // un solo instante, dejando los slots siguientes marcados "+ Libre"
-    // aunque el resonador siguiera ocupado de verdad. Se registran acá
-    // las ventanas y se filtran los slots "libre" que caen adentro,
-    // recién después de terminar de armar `filas` más abajo.
+    // Ventanas [mins, mins+duracion+margen) realmente ocupadas por un
+    // estudio de RIS sin turno propio — bug real 9/9/2026 (DNI 35161855
+    // ACOSTA EDUARDO y DNI 96365423 BALDERA JORGE): esta vista insertaba
+    // la fila de RIS en un solo instante, dejando los slots siguientes
+    // marcados "+ Libre" aunque el resonador siguiera ocupado de verdad.
+    // MARGEN_ENTRE_ESTUDIOS_MIN cubre el cambio de paciente/sala entre un
+    // estudio y el siguiente (confirmado por el usuario: ningún estudio
+    // real arranca a los 5-10' de que termina el anterior, aunque la
+    // duración estimada por región dé ese resto "libre" en el papel — el
+    // contraste compartido entre tramos de un mismo estudio combinado,
+    // ej. "cerebro con contraste · órbitas" sin repetir "con contraste"
+    // en el segundo tramo, es una fuente conocida de subestimar la
+    // duración real). Se registran acá las ventanas y se filtran los
+    // slots "libre" que caen adentro, recién después de armar `filas`.
+    const MARGEN_ENTRE_ESTUDIOS_MIN = 10;
     const ventanasOcupadasRIS = [];
     for (const r of risDelDia) {
       const mins = _parseMins(r.hora);
@@ -297,7 +304,7 @@ const ListaView = (() => {
         continue;
       }
       filas.push({ slot: { tipo: "ris" }, turno: null, mins, esRIS: true, ris: r });
-      ventanasOcupadasRIS.push([mins, mins + _duracionRIS(r.practica)]);
+      ventanasOcupadasRIS.push([mins, mins + _duracionRIS(r.practica) + MARGEN_ENTRE_ESTUDIOS_MIN]);
     }
     // Agregar turnos que no coinciden con ningún slot del grid
     const minsEnFilas = new Set(filas.filter(f=>f.turno).map(f=>f.turno.fila));
