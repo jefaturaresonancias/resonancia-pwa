@@ -514,9 +514,11 @@
           <div class="view-header">
             <h2>Validaciones de Agenda</h2>
             <div style="display:flex;gap:.5rem;align-items:center">
-              <select id="validaciones-regla" style="padding:5px 8px;border-radius:6px;border:1px solid var(--border);font-size:12px">
-                <option value="">Todas las reglas</option>
-              </select>
+              <span id="validaciones-filtro-regla-wrap">
+                <select id="validaciones-regla" style="padding:5px 8px;border-radius:6px;border:1px solid var(--border);font-size:12px">
+                  <option value="">Todas las reglas</option>
+                </select>
+              </span>
               <input id="validaciones-buscar" type="text" placeholder="Buscar paciente, DNI, práctica…"
                 style="padding:5px 8px;border-radius:6px;border:1px solid var(--border);font-size:12px;width:220px">
               <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text-2);cursor:pointer;white-space:nowrap">
@@ -528,6 +530,10 @@
               <button id="btn-reporte-mensual" class="btn-sm">📄 Reporte mensual</button>
               <button id="btn-reglas-gestionar" class="btn-sm">⚙️ Gestionar reglas</button>
             </div>
+          </div>
+          <div class="validaciones-tabs">
+            <button type="button" class="validaciones-tab active" data-tab="ris">📡 No cargado en RIS <span id="validaciones-tab-ris-count" class="validaciones-tab-count"></span></button>
+            <button type="button" class="validaciones-tab" data-tab="reglas">📋 Reglas de agenda <span id="validaciones-tab-reglas-count" class="validaciones-tab-count"></span></button>
           </div>
           <div id="validaciones-loading" class="loading-bar hidden">⏳ Cargando validaciones…</div>
           <div style="padding:1rem;overflow-y:auto;flex:1">

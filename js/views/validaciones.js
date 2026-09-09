@@ -17,6 +17,15 @@ const ValidacionesView = (() => {
   let _colapsado = null;     // Set<fecha> de "próximos" — null = sin inicializar (primer render)
   let _colapsadoHist = null; // Set<fecha> de "históricos" — arranca todo colapsado
   let _mostrarReportados = false; // por defecto oculta lo ya reportado
+  let _tabActiva = 'ris'; // 'ris' | 'reglas' — qué pestaña está viendo el usuario
+
+  // Separa lo que se usa a diario para cargar turnos en RIS (una sola
+  // regla, NO_CARGADO_RIS) del resto de las reglas de conflicto de horario
+  // (contraste madrugada, franja cardio, etc.) — antes convivían en una
+  // sola lista plana filtrable por <select>.
+  function _porTab(arr) {
+    return arr.filter(f => _tabActiva === 'ris' ? f.regla === 'NO_CARGADO_RIS' : f.regla !== 'NO_CARGADO_RIS');
+  }
 
   function _reglaInfo(id) {
     if (REGLAS[id]) return REGLAS[id];
@@ -72,13 +81,13 @@ const ValidacionesView = (() => {
   // después pasa a "Históricos". Lo no resuelto sigue el criterio de
   // siempre: pasado -> históricos, resto -> próximos.
   function _proximos() {
-    return _base().filter(f => {
+    return _porTab(_base()).filter(f => {
       if (f.resuelto) return _diasDesdeResuelto(f) < DIAS_ARCHIVO_RESUELTO;
       return !_esPasada(f.fecha);
     });
   }
   function _historicos() {
-    return _base().filter(f => {
+    return _porTab(_base()).filter(f => {
       if (f.resuelto) return _diasDesdeResuelto(f) >= DIAS_ARCHIVO_RESUELTO;
       return _esPasada(f.fecha);
     });
@@ -115,6 +124,10 @@ const ValidacionesView = (() => {
   // resuelto: son para lo que todavía necesita atención, no para lo
   // archivado ni lo verde.
   function _renderResumen() {
+    const cont = document.getElementById('validaciones-resumen');
+    // Solo tiene sentido en "Reglas de agenda" — la pestaña RIS es un solo
+    // tipo, no hay nada que desglosar por tarjetas.
+    if (_tabActiva === 'ris') { cont.innerHTML = ''; return; }
     const filas       = _proximos().filter(f => !f.resuelto);
     const reglaActiva = document.getElementById('validaciones-regla').value;
     const porRegla     = {};
@@ -219,7 +232,7 @@ const ValidacionesView = (() => {
             <div style="margin-top:.2rem;font-size:.7rem;color:var(--text-3)">${f.paciente} — ${f.documento} · ${f.origen || '—'}</div>
             ${f.resuelto ? `<div style="margin-top:.3rem;font-size:.68rem;color:${RESUELTO}">Se archiva a históricos en ${diasFaltan} ${diasFaltan === 1 ? 'día' : 'días'}</div>` : ''}
             <button type="button" class="btn-sm validaciones-btn-reportar" data-hash="${f.hash}" data-reportado="${f.reportado ? '1' : '0'}" style="margin-top:.5rem;width:100%;font-size:11px">
-              ${f.reportado ? '↺ Desmarcar' : '✓ Marcar reportado'}
+              ${f.reportado ? '↺ Desmarcar' : (f.regla === 'NO_CARGADO_RIS' ? '✓ Marcar cargado en RIS' : '✓ Marcar reportado')}
             </button>
           </div>`;
       }).join('');
@@ -344,10 +357,21 @@ const ValidacionesView = (() => {
     });
   }
 
+  // Cuenta pendientes (no reportados, no pasados) de cada pestaña — igual
+  // criterio que _renderResumen usa para "próximos sin resolver".
+  function _actualizarContadoresTab() {
+    const pendientes = _base().filter(f => !f.resuelto && !_esPasada(f.fecha));
+    const ris    = pendientes.filter(f => f.regla === 'NO_CARGADO_RIS').length;
+    const reglas = pendientes.filter(f => f.regla !== 'NO_CARGADO_RIS').length;
+    document.getElementById('validaciones-tab-ris-count').textContent = ris ? `(${ris})` : '';
+    document.getElementById('validaciones-tab-reglas-count').textContent = reglas ? `(${reglas})` : '';
+  }
+
   function _render() {
     _renderResumen();
     _renderContainer(_filtradas());
     _renderHistoricos();
+    _actualizarContadoresTab();
   }
 
   // ── Modal: gestionar reglas (lista ↔ formulario, mismo overlay) ────────
@@ -701,6 +725,23 @@ const ValidacionesView = (() => {
     document.getElementById('reglas-modal-overlay').addEventListener('click', (e) => {
       if (e.target.id === 'reglas-modal-overlay') _cerrarModalReglas();
     });
+
+    document.querySelectorAll('.validaciones-tab').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        if (btn.dataset.tab === _tabActiva) return;
+        _tabActiva = btn.dataset.tab;
+        document.querySelectorAll('.validaciones-tab').forEach((b) => b.classList.toggle('active', b === btn));
+        document.getElementById('validaciones-regla').value = '';
+        document.getElementById('validaciones-filtro-regla-wrap').classList.toggle('hidden', _tabActiva === 'ris');
+        // Recalcular colapsado inicial para la pestaña nueva — mismo
+        // criterio que al cargar por primera vez (todo colapsado salvo el
+        // día más próximo).
+        _colapsado = null;
+        _colapsadoHist = null;
+        _render();
+      });
+    });
+    document.getElementById('validaciones-filtro-regla-wrap').classList.toggle('hidden', _tabActiva === 'ris');
   }
 
   return { init, cargar };

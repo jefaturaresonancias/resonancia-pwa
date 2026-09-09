@@ -246,6 +246,23 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
   padding: .4rem 1.25rem; font-size: .8rem; font-weight: 700; flex-shrink: 0;
 }
 
+/* ── PESTAÑAS (Validaciones) ─────────────────────────────────*/
+.validaciones-tabs {
+  display: flex; gap: .5rem; padding: 0 1rem; border-bottom: 1px solid var(--border);
+  flex-shrink: 0; background: var(--surface);
+}
+.validaciones-tab {
+  padding: .7rem 1rem; border: none; border-bottom: 3px solid transparent;
+  background: transparent; color: var(--text-2); font-size: .85rem; font-weight: 700;
+  transition: color .15s, border-color .15s;
+}
+.validaciones-tab:hover { color: var(--navy); }
+.validaciones-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.validaciones-tab-count {
+  display: inline-block; margin-left: 4px; font-weight: 700; color: var(--text-3);
+}
+.validaciones-tab.active .validaciones-tab-count { color: var(--accent); }
+
 /* ── AGENDA GRID ─────────────────────────────────────────────*/
 .agenda-leyenda {
   display: flex; flex-wrap: wrap; align-items: center; gap: .6rem;
