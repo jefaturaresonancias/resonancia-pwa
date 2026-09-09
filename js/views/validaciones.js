@@ -80,9 +80,17 @@ const ValidacionesView = (() => {
   // días después de resuelto, sin importar la fecha del turno en sí —
   // después pasa a "Históricos". Lo no resuelto sigue el criterio de
   // siempre: pasado -> históricos, resto -> próximos.
+  //
+  // "No cargado en RIS" es distinto: por diseño, un turno recién se marca
+  // a partir de 48hs de pasado (CARGADO_RIS_MARGEN_HORAS) — así que SIEMPRE
+  // tiene fecha pasada. Con el criterio de arriba, cualquier aviso de RIS
+  // sin resolver quedaría clasificado como "histórico" (invisible en esta
+  // pestaña) en vez de aparecer como pendiente. Acá "pendiente" es
+  // simplemente "no resuelto", sin importar la fecha del turno.
   function _proximos() {
     return _porTab(_base()).filter(f => {
       if (f.resuelto) return _diasDesdeResuelto(f) < DIAS_ARCHIVO_RESUELTO;
+      if (_tabActiva === 'ris') return true;
       return !_esPasada(f.fecha);
     });
   }
@@ -294,7 +302,16 @@ const ValidacionesView = (() => {
   // derecha). Al hacer clic una chip se expande a las dos columnas para
   // mostrar el detalle, sin desarmar el resto de la grilla.
   function _renderHistoricos() {
-    const cont  = document.getElementById('validaciones-historicos');
+    const cont = document.getElementById('validaciones-historicos');
+    const grid = document.getElementById('validaciones-grid');
+    // No hace falta en la pestaña RIS — ahí lo que importa es lo pendiente
+    // de cargar hoy, no un archivo histórico.
+    if (_tabActiva === 'ris') {
+      cont.innerHTML = '';
+      grid.style.gridTemplateColumns = '1fr';
+      return;
+    }
+    grid.style.gridTemplateColumns = '280px 1fr';
     const filas = _filtradasHist();
 
     const porFecha = {};
@@ -357,12 +374,13 @@ const ValidacionesView = (() => {
     });
   }
 
-  // Cuenta pendientes (no reportados, no pasados) de cada pestaña — igual
-  // criterio que _renderResumen usa para "próximos sin resolver".
+  // Cuenta pendientes de cada pestaña, mismo criterio que _proximos(): en
+  // RIS "pendiente" es solo "no resuelto" (siempre tiene fecha pasada por
+  // diseño); en reglas de agenda se suma el filtro de "no pasado".
   function _actualizarContadoresTab() {
-    const pendientes = _base().filter(f => !f.resuelto && !_esPasada(f.fecha));
-    const ris    = pendientes.filter(f => f.regla === 'NO_CARGADO_RIS').length;
-    const reglas = pendientes.filter(f => f.regla !== 'NO_CARGADO_RIS').length;
+    const base = _base();
+    const ris    = base.filter(f => !f.resuelto && f.regla === 'NO_CARGADO_RIS').length;
+    const reglas = base.filter(f => !f.resuelto && !_esPasada(f.fecha) && f.regla !== 'NO_CARGADO_RIS').length;
     document.getElementById('validaciones-tab-ris-count').textContent = ris ? `(${ris})` : '';
     document.getElementById('validaciones-tab-reglas-count').textContent = reglas ? `(${reglas})` : '';
   }
