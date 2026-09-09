@@ -215,7 +215,14 @@ const ValidacionesView = (() => {
 
     cont.innerHTML = fechas.map(fecha => {
       const items = porFecha[fecha].map(f => {
-        const info = _reglaInfo(f.regla);
+        // NO_CARGADO_RIS ahora aparece en la lista desde que se detecta
+        // (no solo pasadas 48hs) — mientras no llegó a la alarma se muestra
+        // en un tono neutro ("todavía hay tiempo"), y recién se pone en
+        // rojo cuando pasaron 48hs desde que se cargó el turno (f.alarma,
+        // calculado en el backend con turno_creado_en).
+        const info = (f.regla === 'NO_CARGADO_RIS' && f.alarma === false)
+          ? { label: 'Pendiente de cargar en RIS', color: '#f57f17' }
+          : _reglaInfo(f.regla);
         const RESUELTO = '#2e7d32';
         const borde = f.resuelto ? RESUELTO : info.color;
         const diasFaltan = f.resuelto ? Math.max(0, Math.ceil(DIAS_ARCHIVO_RESUELTO - _diasDesdeResuelto(f))) : null;
