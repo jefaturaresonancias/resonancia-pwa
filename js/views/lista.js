@@ -401,7 +401,7 @@ const ListaView = (() => {
               const esInt  = origenUp.includes("INTERN");
               const presBadge = pres
                 ? `<span class="btn-card-done">✓ Presente</span>`
-                : `<button class="btn-card-pres" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}">Presente</button>`;
+                : `<button class="btn-card-pres" data-turno-id="${turno.turnoId}" data-nombre="${turno.nombre} ${turno.apellido}">Presente</button>`;
               const hashesAttrRis = (ris.hashes || []).join(",");
               cards.push(`<div class="card-turno card-split ${pres?"presente":""} ${esInt?"card-int":""}">
                 <div>
@@ -427,7 +427,7 @@ const ListaView = (() => {
                 <div class="card-right">
                   ${esInt?`<span class="origen-tag-card int">Internación</span>`:""}
                   ${presBadge}
-                  <button class="btn-card-anular" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}">Anular</button>
+                  <button class="btn-card-anular" data-turno-id="${turno.turnoId}" data-nombre="${turno.nombre} ${turno.apellido}">Anular</button>
                 </div>
               </div>`);
             }
@@ -438,7 +438,7 @@ const ListaView = (() => {
               const esInt  = origenUp.includes("INTERN");
               const presBadge = pres
                 ? `<span class="btn-card-done">✓ Presente</span>`
-                : `<button class="btn-card-pres" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}">Presente</button>`;
+                : `<button class="btn-card-pres" data-turno-id="${turno.turnoId}" data-nombre="${turno.nombre} ${turno.apellido}">Presente</button>`;
               const risHashes = turno._risHashes || [];
               const hashesAttr = risHashes.join(",");
               const suitestensaHtml = risHashes.length
@@ -460,7 +460,7 @@ const ListaView = (() => {
                 <div class="card-right">
                   ${esInt?`<span class="origen-tag-card int">Internación</span>`:""}
                   ${presBadge}
-                  <button class="btn-card-anular" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}">Anular</button>
+                  <button class="btn-card-anular" data-turno-id="${turno.turnoId}" data-nombre="${turno.nombre} ${turno.apellido}">Anular</button>
                   ${suitestensaHtml}
                 </div>
               </div>`);
@@ -488,12 +488,12 @@ const ListaView = (() => {
         // Bind botones
         contenedor.querySelectorAll(".btn-card-pres").forEach(btn => {
           btn.addEventListener("click", async () => {
-            const fila   = parseInt(btn.dataset.fila);
+            const turnoId = btn.dataset.turnoId;
             const nombre = btn.dataset.nombre;
             if (!confirm(`¿Dar presente a ${nombre}?`)) return;
             btn.disabled = true; btn.textContent = "Guardando…";
             try {
-              await RailwayAPI.presente(fila);
+              await RailwayAPI.presente(turnoId);
               App.toast(`Presente: ${nombre}`, "ok");
               await cargar();
             } catch(err) {
@@ -505,14 +505,14 @@ const ListaView = (() => {
 
         contenedor.querySelectorAll(".btn-card-anular").forEach(btn => {
           btn.addEventListener("click", async () => {
-            const fila   = parseInt(btn.dataset.fila);
+            const turnoId = btn.dataset.turnoId;
             const nombre = btn.dataset.nombre;
             if (!confirm(`¿Anular el turno de ${nombre}?
 
 Esta acción no se puede deshacer.`)) return;
             btn.disabled = true;
             try {
-              await RailwayAPI.anular(fila);
+              await RailwayAPI.anular(turnoId);
               App.toast(`Turno anulado: ${nombre}`, "ok");
               await cargar();
             } catch(err) {
@@ -599,7 +599,7 @@ Esta acción no se puede deshacer.`)) return;
       const rowCls = pres ? "presente-row" : "";
       const presBadge = pres
         ? `<span class="presente-badge">✅ Presente<br><span style="font-weight:400;font-size:10px;color:#666">${turno.tsPresente||""}</span></span>`
-        : `<button class="btn-presente" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}">Presente</button>`;
+        : `<button class="btn-presente" data-turno-id="${turno.turnoId}" data-nombre="${turno.nombre} ${turno.apellido}">Presente</button>`;
 
       // Turno con estudio ya reflejado en RIS (mismo DNI/apellido — ver
       // más arriba) → puede mandarse a Suitestensa igual que una fila de
@@ -612,7 +612,7 @@ Esta acción no se puede deshacer.`)) return;
            <button class="btn-suitestensa" data-hashes="${hashesAttr}" data-fecha="${fechaStr}" data-nombre="${turno.nombre} ${turno.apellido}" style="margin-top:2px">Cargar en Suitestensa</button>`
         : "";
 
-      return `<tr class="${rowCls}" data-fila="${turno.fila}">
+      return `<tr class="${rowCls}" data-fila="${turno.fila}" data-turno-id="${turno.turnoId}">
         <td class="td-hora">${hora}</td>
         <td class="td-nombre">${turno.nombre}</td>
         <td>${turno.apellido}</td>
@@ -623,7 +623,7 @@ Esta acción no se puede deshacer.`)) return;
         <td class="td-asigno" style="font-size:12px;color:var(--text-2)">${turno.tecnicoAsigno||""}</td>
         <td>${presBadge}</td>
         <td>
-          <button class="btn-sm btn-anular" data-fila="${turno.fila}" data-nombre="${turno.nombre} ${turno.apellido}" style="color:#c62828;border-color:#c62828">Anular</button>
+          <button class="btn-sm btn-anular" data-turno-id="${turno.turnoId}" data-nombre="${turno.nombre} ${turno.apellido}" style="color:#c62828;border-color:#c62828">Anular</button>
           ${suitestensaHtml}
         </td>
       </tr>`;
@@ -643,12 +643,12 @@ Esta acción no se puede deshacer.`)) return;
     // ── botón presente ──
     tbody.querySelectorAll(".btn-presente").forEach(btn => {
       btn.addEventListener("click", async () => {
-        const fila   = parseInt(btn.dataset.fila);
+        const turnoId = btn.dataset.turnoId;
         const nombre = btn.dataset.nombre;
         if (!confirm(`¿Dar presente a ${nombre}?`)) return;
         btn.disabled = true; btn.textContent = "Guardando…";
         try {
-          await RailwayAPI.presente(fila);
+          await RailwayAPI.presente(turnoId);
           App.toast(`Presente: ${nombre}`, "ok");
           await cargar();
         } catch(err) {
@@ -661,12 +661,12 @@ Esta acción no se puede deshacer.`)) return;
     // ── botón anular ──
     tbody.querySelectorAll(".btn-anular").forEach(btn => {
       btn.addEventListener("click", async () => {
-        const fila   = parseInt(btn.dataset.fila);
+        const turnoId = btn.dataset.turnoId;
         const nombre = btn.dataset.nombre;
         if (!confirm(`¿Anular el turno de ${nombre}?\n\nEsta acción no se puede deshacer.`)) return;
         btn.disabled = true;
         try {
-          await RailwayAPI.anular(fila);
+          await RailwayAPI.anular(turnoId);
           App.toast(`Turno anulado: ${nombre}`, "ok");
           await cargar();
         } catch(err) {

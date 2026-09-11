@@ -459,7 +459,7 @@ const AgendaView = (() => {
       return `<td${rowspanAttr} style="padding:0;border:1px solid #e4e8ee;height:36px${slot.solicitudDigital === false ? ";box-shadow:inset 0 0 0 2px #c62828" : ""}">
         <div style="display:flex;height:100%;gap:1px">
           <div class="slot-turno slot-content" style="flex:1;background:${slot.color||"#a8d5a2"};border-left:3px solid ${col.border};cursor:pointer;overflow:hidden"
-            data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}"
+            data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-turno-id="${slot.turnoId||""}" data-tooltip="${encodeURIComponent(tip)}"
             data-fturno="1" data-origen="${slot.origen||""}" data-presente="${slot.presente==="Presente"?"1":"0"}" data-estudio="${(slot.estudio||"").toLowerCase()}">
             <span class="slot-nombre" style="color:${col.text}">${slot.apellido}, ${slot.nombre} ${pres}${horaFinBadge}${sinSolicitudBadge}</span>
             <span class="slot-estudio" style="color:${col.text}">${slot.estudio}</span>
@@ -652,7 +652,7 @@ const AgendaView = (() => {
           </div>`
         : `<div class="slot-content"><span class="slot-nombre" style="color:${col.text}">${iconRIS}${slot.apellido}, ${slot.nombre} ${pres}${sinSolicitudBadge}</span><span class="slot-estudio" style="color:${col.text}">${slot.estudio}${badgeRIS}</span></div>`;
 
-      return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border}${sinSolicitud ? ";box-shadow:inset 0 0 0 2px #c62828" : ""}" data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-tooltip="${encodeURIComponent(tip)}"${rowspanAttr}
+      return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border}${sinSolicitud ? ";box-shadow:inset 0 0 0 2px #c62828" : ""}" data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-turno-id="${slot.turnoId||""}" data-tooltip="${encodeURIComponent(tip)}"${rowspanAttr}
         data-fturno="1" data-origen="${slot.origen||""}" data-presente="${slot.presente==="Presente"?"1":"0"}" data-estudio="${(slot.estudio||"").toLowerCase()}"
         >${contenido}</td>`;
     }
@@ -784,7 +784,7 @@ const AgendaView = (() => {
       });
       td.addEventListener("mousemove", e => { if(tip) _posTip(e,tip); });
       td.addEventListener("mouseleave", () => { if(tip){tip.remove();tip=null;} });
-      td.addEventListener("click", () => { if(td.dataset.fila) App.mostrarOpcionesTurno(td.dataset.fila, td.dataset.tooltip, td.dataset.fecha, td.dataset.mins); });
+      td.addEventListener("click", () => { if(td.dataset.fila) App.mostrarOpcionesTurno(td.dataset.fila, td.dataset.tooltip, td.dataset.fecha, td.dataset.mins, td.dataset.turnoId); });
     });
   }
 

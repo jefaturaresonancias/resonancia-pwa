@@ -406,15 +406,15 @@ const TurnoView = (() => {
     document.getElementById("turno-result").classList.add("hidden");
 
     try {
-      const filaOriginal = parseInt(document.getElementById("form-turno").dataset.filaOriginal || "0");
-      if (filaOriginal) {
+      const turnoIdOriginal = document.getElementById("form-turno").dataset.turnoIdOriginal || "";
+      if (turnoIdOriginal) {
         const tooltipOrig = document.getElementById("form-turno").dataset.tooltipOriginal || "";
         const confirmar = confirm(`¿Modificar turno?\n\nDE: ${tooltipOrig}\n\nA: ${apellido}, ${nombre} — ${fecha} ${_slotSeleccionado.hora} hs\n¿Confirmás?`);
         if (!confirmar) { btn.disabled = false; btn.textContent = "✓ Confirmar turno"; return; }
         const estudioOriginal = document.getElementById("form-turno").dataset.estudioOriginal || "";
         const tipo = estudio !== estudioOriginal ? "Estudio" : "Fecha";
-        await RailwayAPI.modificar(filaOriginal, { tipo, nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs, tecnicoAsigno, solicitudDigital, ...datosExcepcion });
-        document.getElementById("form-turno").dataset.filaOriginal = "";
+        await RailwayAPI.modificar(turnoIdOriginal, { tipo, nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs, tecnicoAsigno, solicitudDigital, ...datosExcepcion });
+        document.getElementById("form-turno").dataset.turnoIdOriginal = "";
         document.getElementById("form-turno").dataset.estudioOriginal = "";
       } else {
         await RailwayAPI.asignar({ nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs, tecnicoAsigno, solicitudDigital, ...datosExcepcion });
@@ -528,8 +528,8 @@ const TurnoView = (() => {
     _resetForm();
   }
 
-  async function abrirPanelModificar(fila, tooltipTexto, fechaOriginal, minsOriginal) {
-    // Buscar datos del turno por fila
+  async function abrirPanelModificar(turnoId, tooltipTexto, fechaOriginal, minsOriginal) {
+    // Datos del turno original: se parsean del tooltip (no hay lookup acá)
     let turno = null;
     try {
       const lineas = tooltipTexto.split("\n");
@@ -544,7 +544,7 @@ const TurnoView = (() => {
       const origen   = lineas[3] || "";
       const obsLine  = lineas.find(l => l.startsWith("📝")) || "";
       const obs      = obsLine.replace("📝","").trim();
-      turno = { fila, apellido, nombre, dni, estudio, origen, observaciones: obs };
+      turno = { turnoId, apellido, nombre, dni, estudio, origen, observaciones: obs };
     } catch(e) { App.toast("Error leyendo datos del turno", "error"); return; }
 
     await cargarEstudios();
@@ -631,8 +631,8 @@ const TurnoView = (() => {
     aviso.innerHTML = `✏️ Modificando turno de <strong>${turno.apellido}, ${turno.nombre}</strong><br><span style="font-weight:400;color:#888">${horaOriginal ? "Se mantiene la fecha y el horario originales — cambialos si hace falta." : "Seleccioná nueva fecha y horario."} Al confirmar se anula el turno original.</span>`;
     document.getElementById("form-turno").insertBefore(aviso, document.getElementById("form-turno").firstChild);
 
-    // Guardar fila original y estudio original para reprogramar al confirmar
-    document.getElementById("form-turno").dataset.filaOriginal = fila;
+    // Guardar turnoId original y estudio original para reprogramar al confirmar
+    document.getElementById("form-turno").dataset.turnoIdOriginal = turnoId;
     document.getElementById("form-turno").dataset.tooltipOriginal = tooltipTexto;
     document.getElementById("form-turno").dataset.estudioOriginal = turno.estudio;
   }
@@ -688,18 +688,18 @@ const BuscarView = (() => {
             ${t.tecnicoAsigno ? `<span>🧑‍⚕️ Asignó: ${t.tecnicoAsigno}</span>` : ""}
             ${t.presente === "Presente" ? '<span>✅ Presente</span>' : ""}
           </div>
-          ${t.tipoMod === "" ? `<div style="margin-top:.5rem"><button class="btn-sm btn-anular-busq" data-fila="${t.fila}" data-nombre="${t.apellido}, ${t.nombre}" style="color:#c62828;border-color:#c62828">Anular turno</button></div>` : ""}
+          ${t.tipoMod === "" ? `<div style="margin-top:.5rem"><button class="btn-sm btn-anular-busq" data-turno-id="${t.turnoId}" data-nombre="${t.apellido}, ${t.nombre}" style="color:#c62828;border-color:#c62828">Anular turno</button></div>` : ""}
         </div>`;
       }).join("");
 
       div.querySelectorAll(".btn-anular-busq").forEach(btn => {
         btn.addEventListener("click", async () => {
-          const fila = parseInt(btn.dataset.fila);
+          const turnoId = btn.dataset.turnoId;
           const nombre = btn.dataset.nombre;
           if (!confirm(`¿Anular el turno de ${nombre}?`)) return;
           btn.disabled = true;
           try {
-            await RailwayAPI.anular(fila);
+            await RailwayAPI.anular(turnoId);
             App.toast(`Turno anulado: ${nombre}`, "ok");
             buscar();
           } catch (err) {

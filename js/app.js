@@ -98,10 +98,10 @@ const App = (() => {
   // ── Mostrar opciones de un turno (click en celda) ─────────
   let _turnoSeleccionado = null;
 
-  function mostrarOpcionesTurno(fila, tooltipEncoded, fecha, mins) {
+  function mostrarOpcionesTurno(fila, tooltipEncoded, fecha, mins, turnoId) {
     if (!fila) return;
     const tip = tooltipEncoded ? decodeURIComponent(tooltipEncoded) : "";
-    _turnoSeleccionado = { fila: parseInt(fila), tooltip: tip, fecha, mins };
+    _turnoSeleccionado = { fila: parseInt(fila), turnoId, tooltip: tip, fecha, mins };
 
     // "NO ASIGNADO EN RIS" viaja como texto plano dentro de tip (también se
     // usa tal cual en el confirm() nativo de "Anular", que no interpreta
@@ -121,13 +121,13 @@ const App = (() => {
       // await — y botones deshabilitados mientras está en curso, para que
       // un click doble (o un PIN de sesión vencido pidiéndose de nuevo por
       // detrás del confirm()) no deje todo en un estado raro sin avisar.
-      const filaAAnular = _turnoSeleccionado.fila;
+      const turnoIdAAnular = _turnoSeleccionado.turnoId;
       const btnAnular = ev.currentTarget;
       const btnModificar = document.getElementById("btn-op-modificar");
       btnAnular.disabled = true; btnModificar.disabled = true;
       btnAnular.textContent = "Anulando…";
       try {
-        await RailwayAPI.anular(filaAAnular);
+        await RailwayAPI.anular(turnoIdAAnular);
         toast("Turno anulado", "ok");
         cerrarOpcionesTurno();
         refrescarAgenda();
@@ -140,11 +140,11 @@ const App = (() => {
     });
 
     document.getElementById("btn-op-modificar").addEventListener("click", () => {
-      const filaGuardada = _turnoSeleccionado.fila;
+      const turnoIdGuardado = _turnoSeleccionado.turnoId;
       const tipGuardado  = tip;
       const { fecha, mins } = _turnoSeleccionado;
       cerrarOpcionesTurno();
-      TurnoView.abrirPanelModificar(filaGuardada, tipGuardado, fecha, mins);
+      TurnoView.abrirPanelModificar(turnoIdGuardado, tipGuardado, fecha, mins);
     });
 
     document.getElementById("panel-opciones-turno").style.display = "flex";

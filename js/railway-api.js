@@ -136,21 +136,21 @@ const RailwayAPI = (() => {
     return rpc('api_turnos_asignar', [datos]);
   }
 
-  // ── Fase 2b: anular/presente/modificar migradas a Railway ──────
-  // `fila` acá sigue siendo el número de fila del Sheet — las lecturas
-  // (agenda/lista/buscar) todavía vienen de Apps Script, así que es lo
-  // único que la PWA tiene en la mano. Railway lo usa como fila_sheet
-  // para ubicar el turno correspondiente (ver rpc/turnos.js).
+  // ── anular/presente/modificar: Railway/Postgres es la fuente de verdad
+  // (9/9/2026) — se identifica el turno por `turnoId` (turno_id de
+  // Postgres, generado al toque al crearlo), no por la fila del Sheet.
+  // La Sheet queda como espejo: Railway refleja para allá best-effort,
+  // pero el resultado que ve la PWA nunca depende de que responda.
 
-  /** Anula un turno existente. @param {number} fila Fila en "Base de datos" */
-  async function anular(fila) {
+  /** Anula un turno existente. @param {string} turnoId */
+  async function anular(turnoId) {
     _invalidarCacheAgenda();
-    return rpc('api_turnos_anular', [{ filaSheet: fila }]);
+    return rpc('api_turnos_anular', [{ turnoId }]);
   }
 
-  /** Registra presente de un paciente. @param {number} fila Fila en "Base de datos" */
-  async function presente(fila) {
-    return rpc('api_turnos_presente', [{ filaSheet: fila }]);
+  /** Registra presente de un paciente. @param {string} turnoId */
+  async function presente(turnoId) {
+    return rpc('api_turnos_presente', [{ turnoId }]);
   }
 
   // ── Carga manual en Suitestensa (25/8/2026, ver plan "Disparo manual
@@ -192,12 +192,12 @@ const RailwayAPI = (() => {
 
   /**
    * Reprograma un turno existente (fecha y/o estudio) en una sola operación.
-   * @param {number} fila   Fila original en "Base de datos"
-   * @param {object} datos  { tipo, nombre, apellido, dni, estudio, origen, fecha, hora, observaciones }
+   * @param {string} turnoId  turnoId del turno original
+   * @param {object} datos    { tipo, nombre, apellido, dni, estudio, origen, fecha, hora, observaciones }
    */
-  async function modificar(fila, datos) {
+  async function modificar(turnoId, datos) {
     _invalidarCacheAgenda();
-    return rpc('api_turnos_modificar', [{ filaSheet: fila, ...datos }]);
+    return rpc('api_turnos_modificar', [{ turnoId, ...datos }]);
   }
 
   // ── Etapa 2b (migración de lecturas): grilla semanal ────────────
