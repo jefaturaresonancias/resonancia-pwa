@@ -692,6 +692,23 @@ const AgendaView = (() => {
         }
       }
     }
+    // Franja recurrente informativa (bloquea:false, ej. "Internados
+    // CEDETAC"): se ve con su color como las demás, pero NO tiene que
+    // bloquear la carga — bug encontrado 11/9/2026, esta rama nunca
+    // chequeaba `slot.bloquea` y caía siempre en el bloqueo mudo de abajo,
+    // aunque el backend (enBloqueoRecurrente/evaluarRestriccionesCodigo)
+    // ya la dejaba pasar sin problema si se cargaba por otro camino
+    // ("Nuevo turno" a mano). Mismo criterio que franja por origen/código:
+    // clickeable, sin precargar nada especial.
+    if (tipo === "bloqueo_rec" && slot.bloquea === false) {
+      const p = fecha.split("/");
+      const f = new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0]));
+      f.setHours(0,0,0,0);
+      const hoy = new Date(); hoy.setHours(0,0,0,0);
+      if (f >= hoy) {
+        return `<td class="slot-franja-informativa" style="background:${bg};cursor:pointer" data-fecha="${fecha}" data-mins="${mins}" title="${slot.label||""} — informativa, clic para asignar turno"${rowspanAttr}><div class="slot-content"></div></td>`;
+      }
+    }
     // Compresión visual (27/8/2026, a pedido): franjas/bloqueos/feriados ya
     // no repiten el texto completo en cada celda — solo el color, con el
     // detalle en el title (tooltip nativo al pasar el mouse). La leyenda
@@ -700,6 +717,14 @@ const AgendaView = (() => {
   }
 
   function _bindSlotClicks(container) {
+    // Barre tooltips huérfanos de un render anterior (bug real encontrado
+    // 11/9/2026): si el mouse seguía sobre una celda cuando la grilla se
+    // reconstruye (ej. clic en "Actualizar" o cambio de semana), ese
+    // mouseleave nunca llega — el div .tooltip-turno queda pegado en
+    // pantalla para siempre, ya que `tip` de abajo arranca de nuevo en
+    // null en cada render y pierde la referencia al viejo.
+    document.querySelectorAll(".tooltip-turno").forEach(el => el.remove());
+
     function _esPasado(fecha) {
       const p = fecha.split("/");
       const f = new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0]));
@@ -725,6 +750,14 @@ const AgendaView = (() => {
         const hora  = String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0");
         const label = td.dataset.label ? decodeURIComponent(td.dataset.label) : "";
         App.abrirTurnoConCondicion(td.dataset.fecha, hora, { codigo: td.dataset.codigo, label });
+      });
+    });
+
+    container.querySelectorAll(".slot-franja-informativa").forEach(td => {
+      td.addEventListener("click", () => {
+        if (_esPasado(td.dataset.fecha)) { App.toast("No se puede asignar en fechas pasadas", "error"); return; }
+        const mins = parseInt(td.dataset.mins);
+        App.abrirTurnoConFechaHora(td.dataset.fecha, String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0"));
       });
     });
 

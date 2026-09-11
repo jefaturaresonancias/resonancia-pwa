@@ -68,6 +68,15 @@ const App = (() => {
 
   // ── Mostrar / ocultar views ───────────────────────────────
   function showView(id) {
+    // Tooltips de la grilla de agenda (agenda.js, .tooltip-turno) se
+    // agregan sueltos a document.body al pasar el mouse y se sacan recién
+    // en mouseleave — si la celda que los abrió se destruye antes (un
+    // re-render de la grilla, o cambiar de vista mientras el mouse seguía
+    // encima), ese mouseleave nunca llega y el cuadrito queda pegado en
+    // pantalla para siempre, incluso arriba de otras vistas (bug real
+    // encontrado 11/9/2026). Barrida acá, en el único lugar por el que pasa
+    // cualquier cambio de vista, así no importa cuál fue la causa puntual.
+    document.querySelectorAll(".tooltip-turno").forEach(el => el.remove());
     document.querySelectorAll(".view").forEach(v => v.classList.add("hidden"));
     document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
     const view = document.getElementById("view-" + id);
