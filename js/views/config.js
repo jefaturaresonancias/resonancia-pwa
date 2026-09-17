@@ -400,6 +400,14 @@ const ConfigView = (() => {
     "admin-jefatura-only": ["admin", "jefatura"]
   };
   function _navEsElegibleParaRol(el, rol) {
+    // "Lista del día" (ver mismo caso especial documentado en app.js): su
+    // única clase HTML es tecnico-only, pero desde 17/9/2026 también debe
+    // poder habilitarse para administrativo — no se le puede sumar una
+    // segunda clase genérica sin romper el loop de app.js que aplica
+    // display por clase (mismo motivo ahí). Se resuelve acá como excepción
+    // puntual, en vez de tocar ROLES_POR_CLASE (que afectaría a todos los
+    // demás botones tecnico-only).
+    if (el.id === "nav-lista") return ["tecnico", "administrativo", "admin", "jefatura"].includes(rol);
     for (const [clase, roles] of Object.entries(ROLES_POR_CLASE)) {
       if (el.classList.contains(clase) && !roles.includes(rol)) return false;
     }

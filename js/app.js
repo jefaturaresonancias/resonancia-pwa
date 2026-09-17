@@ -206,13 +206,17 @@ const App = (() => {
     const navLista  = document.getElementById("nav-lista");
 
     // "Lista del día" (26/8/2026, ver plan "Disparo manual de carga en
-    // Suitestensa"): visible para técnico, admin y jefatura (no
-    // administrativo) — el botón solo tiene la clase .tecnico-only en el
+    // Suitestensa"): el botón solo tiene la clase .tecnico-only en el
     // HTML, así que hace falta este chequeo dedicado DESPUÉS del loop
     // genérico de arriba para que gane la decisión final (agregarle una
     // segunda clase genérica al mismo botón no sirve: los loops de las
     // distintas clases se pisarían entre sí según el orden en que corren).
-    navLista.style.display = (rol === "tecnico" || rol === "admin" || rol === "jefatura") ? "" : "none";
+    // Habilitado también para administrativo (pedido del usuario,
+    // 17/9/2026) — esto solo lo hace ELEGIBLE; si se ve de verdad para
+    // administrativo lo termina de decidir el panel "Botones del menú por
+    // rol" de Config (_menuRolesConfig más abajo), igual que cualquier
+    // otro botón de ese rol.
+    navLista.style.display = (rol === "tecnico" || rol === "administrativo" || rol === "admin" || rol === "jefatura") ? "" : "none";
 
     if (rol === "tecnico") {
       navLista.style.order  = "1";
