@@ -862,6 +862,9 @@ const AgendaView = (() => {
           }
         }
       }
+      // cupoLibres viene del backend: casilleros libres recortados por los
+      // topes de turnos por franja (lo que realmente se puede cargar).
+      if (typeof dia.cupoLibres === "number") libres = dia.cupoLibres;
       resumenMap[dia.fecha] = {
         libres, ocupados, bloqueados,
         esFeriado: dia.esFeriado, feriado: dia.feriado,
@@ -883,13 +886,12 @@ const AgendaView = (() => {
       if (!v.esFeriado) { totalOcup += v.ocupados; totalLibres += v.libres; }
     }
     const totalRIS = Object.values(risMes).reduce((a,v) => a + v.length, 0);
-    const PROMEDIO = 32;
 
     // ── Helper: color de barra según ocupación ──
     function _colorBarra(ocupados, libres) {
       const total = ocupados + libres;
       if (total === 0) return "#ccc";
-      const pct = ocupados / PROMEDIO;
+      const pct = ocupados / total;
       if (pct >= 1)    return "#e05555";
       if (pct >= 0.8)  return "#f0c040";
       return "#4a9e5c";
@@ -1011,7 +1013,7 @@ const AgendaView = (() => {
           </div>`;
       } else {
         const total     = res.libres + res.ocupados;
-        const barW      = Math.min(100, Math.round((res.ocupados / PROMEDIO) * 100));
+        const barW      = total > 0 ? Math.min(100, Math.round((res.ocupados / total) * 100)) : 100;
         const barColor  = _colorBarra(res.ocupados, res.libres);
         const risDelDia = (risMes[fechaStr] || []).length;
 
@@ -1129,7 +1131,7 @@ const AgendaView = (() => {
       const lunes = new Date(p);
       lunes.setDate(p.getDate()-(dow===0?6:dow-1));
       const desde    = _strFecha(lunes);
-      const cacheKey = `agenda_mes_${desde}_${_paso}`;
+      const cacheKey = `agenda_mes_v2_${desde}_${_paso}`;
       const cached   = forzar ? null : sessionStorage.getItem(cacheKey);
 
       let datosMes, risMes;
