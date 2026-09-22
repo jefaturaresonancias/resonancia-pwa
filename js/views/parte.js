@@ -42,10 +42,30 @@ const ParteView = (() => {
   const RE_HORA   = /(?<!\d)(\d{1,2}:\d{2})(?!\d)/g;
   const RE_DOC    = /(DNI|CIBO|RP)\s*:?\s*(\d+)/i;
   const RE_NOMBRE = /\b([A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,})*,\s*[A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,})*)\b/;
-  const RE_PRAC   = /((?:RESONANCIA|ANGIORRESON|COLANGIO|TOMOGRAF|ECOGRAF|DENSITOM|RX\b|TAC\b).+?)(?=\bDNI\b|\bCIBO\b|\bRP\b|\bTURNO\b|\bSOBRETURNO\b|$)/is;
+  // Bug real 22/9/2026: el parte que baja el hospital ahora abrevia toda
+  // práctica como "RM DE ..." (antes venía como "RESONANCIA MAGNETICA
+  // DE ...") — sin "RM\b" acá, este regex no encontraba NINGÚN keyword
+  // en filas simples ("RM DE MUÑECA DERECHA") y dejaba `practica` vacía,
+  // y en compuestos con "RM DE X - ANGIORRESONANCIA DE Y" agarraba solo
+  // la mitad de ANGIORRESON en adelante, perdiendo el primer tramo.
+  // "RM" antepuesto no cambia el comportamiento de los casos que ya
+  // andaban bien (ej. "COLANGIOGRAFIA POR RM..."): al buscar la PRIMERA
+  // posición que matchea cualquier alternativa, COLANGIO sigue ganando
+  // por aparecer antes en el texto.
+  const RE_PRAC   = /((?:RESONANCIA|ANGIORRESON|COLANGIO|TOMOGRAF|ECOGRAF|DENSITOM|RX\b|TAC\b|RM\b).+?)(?=\bDNI\b|\bCIBO\b|\bRP\b|\bTURNO\b|\bSOBRETURNO\b|$)/is;
   const RE_EMAIL  = /\S+@\S+/g;
   const RE_FIN    = /\b(TURNO|SOBRETURNO|ESTADO|AS\b|AU\b|CN\b)/i;
-  const RE_ESTADO = /\d{3,}\s+([A-Z]{2,3})\s*$/;
+  // Código de ESTADO DEL TURNO — siempre la última columna de la fila,
+  // así que siempre es el último token del bloque. Antes exigía dígitos
+  // (teléfono) justo antes del código (`\d{3,}\s+(...)$`) — bug real
+  // 22/9/2026 (DNI 14555794, OLIVETTO FERNANDO): sin teléfono cargado,
+  // nada frenaba al regex de nombre y el código quedaba pegado al
+  // apellido_nombre ("OLIVETTO, FERNANDO PR"). Ahora no depende de que
+  // haya dígitos antes — valida el código contra ESTADOS_CONOCIDOS en vez
+  // de contra un dígito adyacente, y se saca del bloque ANTES de buscar
+  // el nombre, tenga teléfono o no.
+  const RE_ESTADO_FINAL = /\s+([A-Z]{2,3})\s*$/;
+  const ESTADOS_CONOCIDOS = new Set(["AS","PR","CA","AT","AU","SU","CN","CAN","NP","AUS"]);
   const CANCELADOS = new Set(["CA","CN","CAN","NP","AUS"]);
   const IGNORAR    = ["TIPO DE","APELLIDO Y","PARTE DIARIO","HOSP SANTOJANNI"];
 
@@ -54,9 +74,12 @@ const ParteView = (() => {
   function _procesarBloque(hora, bloque) {
     bloque = _limpiar(bloque);
 
-    // Filtrar cancelados
-    const mEstado = RE_ESTADO.exec(bloque);
-    if (mEstado && CANCELADOS.has(mEstado[1].toUpperCase())) return null;
+    // Sacar el código de estado del final (si lo hay) — filtra cancelados
+    // y evita que se pegue al nombre más abajo.
+    const mEstado = RE_ESTADO_FINAL.exec(bloque);
+    const esEstadoConocido = mEstado && ESTADOS_CONOCIDOS.has(mEstado[1].toUpperCase());
+    if (esEstadoConocido && CANCELADOS.has(mEstado[1].toUpperCase())) return null;
+    if (esEstadoConocido) bloque = bloque.slice(0, mEstado.index).trim();
 
     // Documento
     const mDoc = RE_DOC.exec(bloque);
