@@ -158,24 +158,10 @@ const RailwayAPI = (() => {
   // cargarEnSuitestensa/estadoSuitestensa se sacaron de acá junto con los
   // botones que los llamaban (ver js/views/lista.js).
 
-  // ── Excepción horaria (28/8/2026) — válvula de escape auditable para
-  // cuando falta el administrativo dentro de su propio horario (07-17hs
-  // aprox., ver _sinAdministrativo en bot-cargar-suitestensa.js): el botón
-  // de carga manual queda bloqueado en ese horario salvo que haya una
-  // excepción vigente. ─────────────────────────────────────────────────
-  /** @returns {Promise<object|null>} la excepción vigente, o null si no hay ninguna activa */
-  async function estadoExcepcionSuitestensa() {
-    const data = await rpc('api_suitestensa_estadoExcepcion', []);
-    return data.excepcion;
-  }
-  /** @param {string} motivo @param {string} activadoPor */
-  async function activarExcepcionSuitestensa(motivo, activadoPor) {
-    return rpc('api_suitestensa_activarExcepcion', [motivo, activadoPor]);
-  }
-  /** @param {string} desactivadoPor */
-  async function desactivarExcepcionSuitestensa(desactivadoPor) {
-    return rpc('api_suitestensa_desactivarExcepcion', [desactivadoPor]);
-  }
+  // Excepción horaria (28/8/2026) — dada de baja 22/9/2026 junto con el
+  // resto de la carga manual en Suitestensa (bot pausado, "ya no se
+  // usa"). Wrappers sacados de acá; el banner que los llamaba se sacó de
+  // js/views/lista.js.
 
   /**
    * Reprograma un turno existente (fecha y/o estudio) en una sola operación.
@@ -611,7 +597,6 @@ const RailwayAPI = (() => {
 
   return {
     rpc, leerRISRango, leerCardiologia, asignar, anular, presente,
-    estadoExcepcionSuitestensa, activarExcepcionSuitestensa, desactivarExcepcionSuitestensa,
     modificar, turnos, buscar, agenda, slots,
     leerValidacionesAgenda, marcarValidacionReportada, leerReglasAgenda, guardarReglaAgenda, eliminarReglaAgenda,
     leerLimitesSobreturno, guardarLimiteSobreturno, eliminarLimiteSobreturno,
