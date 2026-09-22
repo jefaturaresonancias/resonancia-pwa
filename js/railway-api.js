@@ -153,23 +153,10 @@ const RailwayAPI = (() => {
     return rpc('api_turnos_presente', [{ turnoId }]);
   }
 
-  // ── Carga manual en Suitestensa (25/8/2026, ver plan "Disparo manual
-  // de carga en Suitestensa") — dispara bot-cargar-suitestensa.js en modo
-  // manual para uno o más turnos puntuales (identificados por hash real
-  // de `estudios`, no por documento+fecha, para no ambigüar cuando un
-  // mismo paciente tiene más de un turno el mismo día). ────────────────
-  /** @param {string[]} hashes @param {string} fecha YYYY-MM-DD */
-  async function cargarEnSuitestensa(hashes, fecha) {
-    return rpc('api_bot_solicitarComando', [
-      'bot-ris', 'ejecutar_ahora', 'bot-cargar-suitestensa.js',
-      ['--hashes=' + hashes.join(','), '--fecha=' + fecha]
-    ]);
-  }
-  /** @param {string[]} hashes */
-  async function estadoSuitestensa(hashes) {
-    const data = await rpc('api_suitestensa_estadoPorHashes', [hashes]);
-    return data.filas;
-  }
+  // Carga manual en Suitestensa (25/8/2026) — dada de baja 22/9/2026,
+  // bot-cargar-suitestensa.js pausado ("ya no se usa"). Los wrappers
+  // cargarEnSuitestensa/estadoSuitestensa se sacaron de acá junto con los
+  // botones que los llamaban (ver js/views/lista.js).
 
   // ── Excepción horaria (28/8/2026) — válvula de escape auditable para
   // cuando falta el administrativo dentro de su propio horario (07-17hs
@@ -623,7 +610,7 @@ const RailwayAPI = (() => {
   }
 
   return {
-    rpc, leerRISRango, leerCardiologia, asignar, anular, presente, cargarEnSuitestensa, estadoSuitestensa,
+    rpc, leerRISRango, leerCardiologia, asignar, anular, presente,
     estadoExcepcionSuitestensa, activarExcepcionSuitestensa, desactivarExcepcionSuitestensa,
     modificar, turnos, buscar, agenda, slots,
     leerValidacionesAgenda, marcarValidacionReportada, leerReglasAgenda, guardarReglaAgenda, eliminarReglaAgenda,

@@ -48,106 +48,10 @@ const ListaView = (() => {
     return ORIGEN_STYLE[(o||"").toUpperCase()] || { bg: "#fce4ec", border: "#c9506a", text: "#7a1f35" };
   }
 
-  // ── carga manual en Suitestensa (26/8/2026, ver plan "Disparo manual
-  // de carga en Suitestensa") ────────────────────────────────
-  function _dmyAIso(dmy) {
-    const [d, m, y] = String(dmy || "").split("/");
-    return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-  }
-
-  // No hace un `await cargar()` al terminar (a diferencia de Presente/
-  // Anular): recargar toda la lista mientras hay otras filas en polling
-  // perdería su estado. El botón mismo refleja el resultado final.
-  async function _dispararCargaSuitestensa(btn) {
-    const hashes = (btn.dataset.hashes || "").split(",").filter(Boolean);
-    const fecha  = _dmyAIso(btn.dataset.fecha);
-    const nombre = btn.dataset.nombre;
-    if (hashes.length === 0) { App.toast("No se pudo identificar el turno (sin hash)", "error"); return; }
-    if (!confirm(`¿Cargar a ${nombre} en Suitestensa?`)) return;
-
-    const fila = btn.closest(".row-ris, tr, .card-turno");
-    const estadoEl = fila ? fila.querySelector(".suitestensa-estado") : null;
-    const desde = new Date();
-
-    btn.disabled = true;
-    btn.textContent = "Encolando…";
-    if (estadoEl) estadoEl.innerHTML = "";
-
-    try {
-      await RailwayAPI.cargarEnSuitestensa(hashes, fecha);
-    } catch (err) {
-      App.toast("Error al encolar: " + err.message, "error");
-      btn.disabled = false;
-      btn.textContent = "Cargar en Suitestensa";
-      return;
-    }
-    btn.textContent = "Cargando…";
-
-    // 120s se quedaba corto (bug real 2026-08-29/30, DNI 25434659: cargó
-    // bien pero tardó 134s de punta a punta) — más margen tras subir el
-    // timeout de navegación de Suitestensa de 40s a 60s (ver
-    // resonancia-bot, config.js#TIMEOUT_NAV_SUITESTENSA) para tolerar la
-    // red lenta del hospital, pero sin llegar a los 3 minutos (pedido
-    // 30/8/2026, se sentía muy largo desde la PWA).
-    const TIMEOUT_MS = 150000, INTERVALO_MS = 5000;
-
-    // Barra de progreso (pedido 30/8/2026): se llena a un ritmo constante
-    // durante los TIMEOUT_MS de espera — no refleja el progreso real del
-    // bot (no hay forma de saberlo desde acá), es una referencia visual de
-    // cuánto falta para el timeout. Un solo <div> con transición CSS,
-    // arrancada en el siguiente frame para que el navegador registre el
-    // ancho inicial (0%) antes de animar a 100%.
-    if (estadoEl) {
-      estadoEl.innerHTML = '<div class="suitestensa-progress"><div class="suitestensa-progress-fill"></div></div>';
-      const fill = estadoEl.querySelector(".suitestensa-progress-fill");
-      requestAnimationFrame(() => {
-        fill.style.transitionDuration = TIMEOUT_MS + "ms";
-        fill.style.width = "100%";
-      });
-    }
-
-    const poll = async () => {
-      let filas = [];
-      try { filas = await RailwayAPI.estadoSuitestensa(hashes); } catch (e) { /* reintenta en el próximo tick */ }
-
-      // Solo cuentan filas actualizadas DESPUÉS del click — evita confundir
-      // el estado de un intento anterior (ej. un 'error' viejo) con el
-      // resultado de este click.
-      const vigentes = filas.filter(f => new Date(f.actualizado_en) >= desde);
-      const resueltos = hashes.map(h => vigentes.find(f => f.hash === h)).filter(Boolean);
-
-      if (resueltos.length === hashes.length) {
-        const filaError = resueltos.find(f => f.estado === "error" || f.estado === "error_permanente");
-        const filaSinMapeo = resueltos.find(f => f.estado === "sin_mapeo");
-        btn.disabled = false;
-        // Se muestra el detalle_error real (ej. bloqueo por horario
-        // administrativo, o el motivo puntual del fallo) en vez de un
-        // genérico "❌ error" — el técnico necesita saber POR QUÉ, no solo
-        // que falló (pedido 28/8/2026, tras sumar el bloqueo horario).
-        if (filaError)      { btn.textContent = "Reintentar"; if (estadoEl) estadoEl.textContent = "❌ " + (filaError.detalle_error || "error"); }
-        else if (filaSinMapeo) { btn.textContent = "Reintentar"; if (estadoEl) estadoEl.textContent = "⚠️ " + (filaSinMapeo.detalle_error || "sin mapeo"); }
-        else               { btn.textContent = "✅ Cargado"; btn.disabled = true; if (estadoEl) estadoEl.textContent = "✅ OK"; }
-        return;
-      }
-
-      if (Date.now() - desde.getTime() >= TIMEOUT_MS) {
-        btn.disabled = false;
-        btn.textContent = "Reintentar";
-        if (estadoEl) estadoEl.textContent = "⏱ sin respuesta, revisar panel de bots";
-        return;
-      }
-
-      setTimeout(poll, INTERVALO_MS);
-    };
-    setTimeout(poll, INTERVALO_MS);
-  }
-
-  function _bindBotonSuitestensa(root) {
-    if (!root) return;
-    root.querySelectorAll(".btn-suitestensa").forEach(btn => {
-      btn.addEventListener("click", () => _dispararCargaSuitestensa(btn));
-    });
-  }
+  // Carga manual en Suitestensa (26/8/2026) — dada de baja del todo
+  // 22/9/2026 (bot-cargar-suitestensa.js pausado, "ya no se usa"): se
+  // sacaron los botones "Cargar en Suitestensa" de todas las tarjetas/
+  // filas de esta vista (ver _render más abajo).
 
   // ── excepción horaria (28/8/2026) — válvula de escape auditable para
   // cuando falta el administrativo dentro de su propio horario. No hay
@@ -269,12 +173,8 @@ const ListaView = (() => {
     }
 
     // Agregar filas RIS intercaladas — si coincide con un turno propio
-    // (mismo DNI o apellido), no se agrega como fila aparte: se le pegan
-    // los hashes de RIS al turno para que esa fila pueda mostrar "Cargar
-    // en Suitestensa" (antes se descartaban sin más, dejando un turno que
-    // ya tiene su estudio en RIS sin ninguna forma de mandarlo a
-    // Suitestensa — bug encontrado 27/8/2026, ver comentario de `hashes`
-    // en rpc/ris.js#api_leerRISRango: esa era la idea original).
+    // (mismo DNI o apellido), no se agrega como fila aparte (evita
+    // mostrar dos veces al mismo paciente).
     const turnoPorDni      = new Map(turnos.map(t => [String(t.dni).trim().replace(/^0+/, ""), t]));
     const turnoPorApellido = new Map(turnos.map(t => [(t.apellido||"").trim().toUpperCase(), t]));
     // Ventanas [mins, mins+duracion+margen) realmente ocupadas por un
@@ -300,7 +200,6 @@ const ListaView = (() => {
       const apellRIS = String(r.apellido_nombre || "").split(",")[0].trim().toUpperCase();
       const turnoCoincidente = turnoPorDni.get(dniRIS) || turnoPorApellido.get(apellRIS);
       if (turnoCoincidente) {
-        turnoCoincidente._risHashes = [...(turnoCoincidente._risHashes || []), ...(r.hashes || [])];
         continue;
       }
       filas.push({ slot: { tipo: "ris" }, turno: null, mins, esRIS: true, ris: r });
@@ -387,14 +286,9 @@ const ListaView = (() => {
 
             // Si hay turno + RIS → tarjeta dividida. OJO: este `ris` NO está
             // correlacionado con `turno` (el matcheo real por DNI/apellido ya
-            // pasó más arriba y le pegó sus hashes a `turno._risHashes`) — acá
+            // pasó más arriba, ver el `continue` de la sección de RIS) — acá
             // solo cayeron en el mismo índice de columna porque comparten
             // horario. Son dos pacientes distintos mostrados lado a lado.
-            // Bug real 28/8/2026: esta tarjeta nunca tuvo botón de Suitestensa
-            // para el lado RIS, así que un paciente sin turno propio que
-            // compartía horario con otro que sí lo tenía quedaba sin forma de
-            // cargarse — y si había 2 turnos + 2 RIS en el mismo horario,
-            // AMBOS RIS cabían en tarjetas divididas y ninguno tenía botón.
             if (turno && ris) {
               const pres   = turno.presente === "Presente";
               const origenUp = (turno.origen||"").toUpperCase();
@@ -402,7 +296,6 @@ const ListaView = (() => {
               const presBadge = pres
                 ? `<span class="btn-card-done">✓ Presente</span>`
                 : `<button class="btn-card-pres" data-turno-id="${turno.turnoId}" data-nombre="${turno.nombre} ${turno.apellido}">Presente</button>`;
-              const hashesAttrRis = (ris.hashes || []).join(",");
               cards.push(`<div class="card-turno card-split ${pres?"presente":""} ${esInt?"card-int":""}">
                 <div>
                   <div class="hora-big ${pres?"ok":""}">${hora}</div>
@@ -420,8 +313,6 @@ const ListaView = (() => {
                     <div style="font-size:9px;font-weight:700;color:#aaa;margin-bottom:2px">RIS</div>
                     <div class="card-nombre" style="font-size:12px;font-style:italic;color:#888">${ris.apellido_nombre}</div>
                     <div class="card-estudio" style="color:#aaa">${ris.practica}</div>
-                    <span class="suitestensa-estado" data-hashes="${hashesAttrRis}" style="display:block;font-size:10px"></span>
-                    <button class="btn-suitestensa" data-hashes="${hashesAttrRis}" data-fecha="${fechaStr}" data-nombre="${ris.apellido_nombre}" style="margin-top:2px">Cargar en Suitestensa</button>
                   </div>
                 </div>
                 <div class="card-right">
@@ -439,12 +330,6 @@ const ListaView = (() => {
               const presBadge = pres
                 ? `<span class="btn-card-done">✓ Presente</span>`
                 : `<button class="btn-card-pres" data-turno-id="${turno.turnoId}" data-nombre="${turno.nombre} ${turno.apellido}">Presente</button>`;
-              const risHashes = turno._risHashes || [];
-              const hashesAttr = risHashes.join(",");
-              const suitestensaHtml = risHashes.length
-                ? `<span class="suitestensa-estado" data-hashes="${hashesAttr}" style="display:block;font-size:10px"></span>
-                   <button class="btn-suitestensa" data-hashes="${hashesAttr}" data-fecha="${fechaStr}" data-nombre="${turno.nombre} ${turno.apellido}">Cargar en Suitestensa</button>`
-                : "";
               cards.push(`<div class="card-turno ${pres?"presente":""} ${esInt?"card-int":""}">
                 <div>
                   <div class="hora-big ${pres?"ok":""}">${hora}</div>
@@ -461,13 +346,11 @@ const ListaView = (() => {
                   ${esInt?`<span class="origen-tag-card int">Internación</span>`:""}
                   ${presBadge}
                   <button class="btn-card-anular" data-turno-id="${turno.turnoId}" data-nombre="${turno.nombre} ${turno.apellido}">Anular</button>
-                  ${suitestensaHtml}
                 </div>
               </div>`);
             }
             // Solo RIS
             else if (ris) {
-              const hashesAttr = (ris.hashes || []).join(",");
               cards.push(`<div class="row-ris">
                 <div class="hora-ris">${hora}</div>
                 <div class="ris-body">
@@ -476,8 +359,6 @@ const ListaView = (() => {
                 </div>
                 <div class="ris-acciones">
                   <span class="ris-badge">RIS</span>
-                  <span class="suitestensa-estado" data-hashes="${hashesAttr}"></span>
-                  <button class="btn-suitestensa" data-hashes="${hashesAttr}" data-fecha="${ris.fecha}" data-nombre="${ris.apellido_nombre}">Cargar en Suitestensa</button>
                 </div>
               </div>`);
             }
@@ -521,8 +402,6 @@ Esta acción no se puede deshacer.`)) return;
             }
           });
         });
-
-        _bindBotonSuitestensa(contenedor);
       }
       document.getElementById("lista-empty").classList.toggle("hidden", filasFiltradas.some(f=>f.turno||f.esRIS));
       return;
@@ -546,7 +425,6 @@ Esta acción no se puede deshacer.`)) return;
         const nombre   = (partes[1] || "").trim();
         // Extraer solo el número del documento
         const dniNum   = String(r.documento || "").replace(/^(DNI|CIBO|RP)\s*/i,"").trim();
-        const hashesAttr = (r.hashes || []).join(",");
         return `<tr class="fila-ris-row">
           <td class="td-hora" style="color:#999;font-size:13px">${hora}</td>
           <td class="ris-nombre">${nombre}</td>
@@ -554,9 +432,9 @@ Esta acción no se puede deshacer.`)) return;
           <td class="ris-dni">${dniNum}</td>
           <td class="ris-estudio">${r.practica}</td>
           <td><span class="ris-badge">RIS</span></td>
-          <td><span class="suitestensa-estado" data-hashes="${hashesAttr}"></span></td>
           <td></td>
-          <td><button class="btn-suitestensa" data-hashes="${hashesAttr}" data-fecha="${r.fecha}" data-nombre="${nombre} ${apellido}">Cargar en Suitestensa</button></td>
+          <td></td>
+          <td></td>
           <td></td>
         </tr>`;
       }
@@ -601,17 +479,6 @@ Esta acción no se puede deshacer.`)) return;
         ? `<span class="presente-badge">✅ Presente<br><span style="font-weight:400;font-size:10px;color:#666">${turno.tsPresente||""}</span></span>`
         : `<button class="btn-presente" data-turno-id="${turno.turnoId}" data-nombre="${turno.nombre} ${turno.apellido}">Presente</button>`;
 
-      // Turno con estudio ya reflejado en RIS (mismo DNI/apellido — ver
-      // más arriba) → puede mandarse a Suitestensa igual que una fila de
-      // RIS. Todavía no está en RIS → nada que hacer acá hasta que llegue
-      // (no hay ningún hash para inventarle, ver rpc/ris.js).
-      const risHashes = turno._risHashes || [];
-      const hashesAttr = risHashes.join(",");
-      const suitestensaHtml = risHashes.length
-        ? `<span class="suitestensa-estado" data-hashes="${hashesAttr}" style="display:block;font-size:10px;margin-top:4px"></span>
-           <button class="btn-suitestensa" data-hashes="${hashesAttr}" data-fecha="${fechaStr}" data-nombre="${turno.nombre} ${turno.apellido}" style="margin-top:2px">Cargar en Suitestensa</button>`
-        : "";
-
       return `<tr class="${rowCls}" data-fila="${turno.fila}" data-turno-id="${turno.turnoId}">
         <td class="td-hora">${hora}</td>
         <td class="td-nombre">${turno.nombre}</td>
@@ -624,7 +491,6 @@ Esta acción no se puede deshacer.`)) return;
         <td>${presBadge}</td>
         <td>
           <button class="btn-sm btn-anular" data-turno-id="${turno.turnoId}" data-nombre="${turno.nombre} ${turno.apellido}" style="color:#c62828;border-color:#c62828">Anular</button>
-          ${suitestensaHtml}
         </td>
       </tr>`;
     }).join("");
@@ -675,8 +541,6 @@ Esta acción no se puede deshacer.`)) return;
         }
       });
     });
-
-    _bindBotonSuitestensa(tbody);
   }
 
   // ── carga ─────────────────────────────────────────────────

@@ -407,17 +407,6 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
   margin: .5rem 0; background: #fff8e1; border-color: #c9a000; color: #7a4f00;
 }
 
-/* Barra de progreso del botón "Cargar en Suitestensa" (30/8/2026) —
-   referencia visual de cuánto falta para el timeout del polling, no el
-   progreso real del bot (no hay forma de saberlo desde acá). */
-.suitestensa-progress {
-  width: 100%; max-width: 110px; height: 4px; margin-top: 3px;
-  background: var(--border); border-radius: 2px; overflow: hidden;
-}
-.suitestensa-progress-fill {
-  height: 100%; width: 0%; background: var(--accent);
-  transition: width linear;
-}
 .excepcion-banner-activa {
   display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
   padding: .6rem 1rem; margin: .5rem 0;
@@ -744,18 +733,6 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
   padding: 2px 7px; border-radius: 8px;
   text-transform: uppercase;
 }
-
-/* Botón "Cargar en Suitestensa" (26/8/2026, disparo manual por fila —
-   ver plan "Disparo manual de carga en Suitestensa") */
-.btn-suitestensa {
-  padding: 4px 10px; border-radius: 8px;
-  border: 1px solid var(--navy); background: transparent;
-  color: var(--navy); font-size: 10px; font-weight: 700; cursor: pointer;
-  transition: all .15s; white-space: nowrap;
-}
-.btn-suitestensa:hover:not(:disabled) { background: var(--navy); color: #fff; }
-.btn-suitestensa:disabled { opacity: .6; cursor: default; }
-.suitestensa-estado { font-size: 10px; color: #888; }
 
 #tabla-turnos tbody tr.presente-row {
   background: #f0faf0 !important;
