@@ -422,6 +422,10 @@ const RailwayAPI = (() => {
     return rpc('api_listaPrioridad_leerEstadoPel', [dni, fecha]);
   }
 
+  async function marcarVerificadoManualListaPrioridad(id, verificado) {
+    return rpc('api_listaPrioridad_marcarVerificadoManual', [id, verificado]);
+  }
+
   // ── Config de agenda (corte de Sheets, 25/8/2026) ───────────────
   // Feriados, franjas recurrentes, bloqueos, restricciones por
   // código/origen/propia y catálogo de estudios — antes vivían en la hoja
@@ -638,6 +642,7 @@ const RailwayAPI = (() => {
     leerReglasSugerirSobreturno, guardarReglaSugerirSobreturno, eliminarReglaSugerirSobreturno,
     obtenerAgendaConfig, estimarDuracionesPractica, leerAsignadoresTurno, guardarAsignadoresTurno,
     buscarEstudioPorDni, leerListaPrioridad, agregarAListaPrioridad, quitarDeListaPrioridad, verificarPelPorDni, leerEstadoPelItem,
+    marcarVerificadoManualListaPrioridad,
     leerFranjasPreferidasSugerir, guardarFranjaPreferidaSugerir, eliminarFranjaPreferidaSugerir,
     leerCategoriasEstudio, guardarCategoriaEstudio, eliminarCategoriaEstudio,
     leerAgendaFeriados, guardarAgendaFeriado, eliminarAgendaFeriado,

@@ -35,6 +35,34 @@ const PriorizacionView = (() => {
     return '';
   }
 
+  // Estado de envío del informe (23/9/2026, a pedido) — solo llega con
+  // valor cuando el bot ya vio FINALIZADO en PEL y el paciente tiene
+  // reclamo (ver rpc/listaPrioridad.js): ¿ya se cargó el informe para
+  // enviar, ya se mandó, o todavía no se bajó?
+  function _chipEstadoEnvioHTML(estadoEnvio) {
+    if (estadoEnvio === 'enviado') {
+      return `<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--success-bg);color:var(--success)">📤 Ya enviado</span>`;
+    }
+    if (estadoEnvio === 'cargado_para_envio') {
+      return `<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--warn-bg);color:var(--warn)">📋 Cargado, falta enviar</span>`;
+    }
+    if (estadoEnvio === 'sin_cargar') {
+      return `<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--bg);color:var(--text-2);border:1px solid var(--border)">⏳ Informe sin cargar</span>`;
+    }
+    return '';
+  }
+
+  async function _toggleVerificadoManual(id, checked) {
+    try {
+      await RailwayAPI.marcarVerificadoManualListaPrioridad(id, checked);
+      const item = _items.find((it) => it.id === id);
+      if (item) item.verificadoManual = checked;
+    } catch (err) {
+      App.toast('Error: ' + err.message, 'error');
+      cargar(); // por si quedó desincronizado con el servidor
+    }
+  }
+
   function _splitApellidoNombre(str) {
     const [ap, ...resto] = String(str || '').split(',');
     return { apellido: (ap || '').trim(), nombre: resto.join(',').trim() };
@@ -263,6 +291,7 @@ const PriorizacionView = (() => {
         // por bot-verificar-pel-dni.js al terminar. null = nunca se
         // verificó todavía (sin chip, no es un "no está" real).
         const chipPelHTML = _chipPelHTML(it.pelEstado);
+        const chipEnvioHTML = _chipEstadoEnvioHTML(it.estadoEnvio);
         return `
           <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;
             padding:.6rem .85rem;border:1px solid var(--border);border-left:4px solid ${urgencia};
@@ -270,14 +299,21 @@ const PriorizacionView = (() => {
             <div style="font-size:.82rem;line-height:1.5;min-width:0">
               <strong>${it.apellido}, ${it.nombre}</strong> — DNI ${it.dni}
               ${badgeReclamo ? ' · ' + badgeReclamo : ''}
-              <span data-pel-chip="${it.id}">${chipPelHTML ? ' · ' + chipPelHTML : ''}</span><br>
+              <span data-pel-chip="${it.id}">${chipPelHTML ? ' · ' + chipPelHTML : ''}</span>
+              ${chipEnvioHTML ? ' · ' + chipEnvioHTML : ''}<br>
               <span style="color:var(--text-2)">${it.estudio}</span><br>
               <span style="color:${urgencia};font-weight:700">${it.diasDesdeEstudio} día${it.diasDesdeEstudio === 1 ? '' : 's'} desde el estudio</span>
               <span style="color:var(--text-3)"> · ${it.fechaEstudio}</span>
             </div>
-            <div style="display:flex;gap:.4rem;flex-shrink:0">
-              <button type="button" class="btn-sm" data-verificar-pel="${it.dni}" data-fecha="${it.fechaEstudio}" data-id="${it.id}" style="white-space:nowrap">🔍 Verificar PEL</button>
-              <button type="button" class="btn-sm" data-quitar="${it.id}" data-nombre="${it.apellido}, ${it.nombre}">✕ Quitar</button>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.4rem;flex-shrink:0">
+              <div style="display:flex;gap:.4rem">
+                <button type="button" class="btn-sm" data-verificar-pel="${it.dni}" data-fecha="${it.fechaEstudio}" data-id="${it.id}" style="white-space:nowrap">🔍 Verificar PEL</button>
+                <button type="button" class="btn-sm" data-quitar="${it.id}" data-nombre="${it.apellido}, ${it.nombre}">✕ Quitar</button>
+              </div>
+              <label style="display:flex;align-items:center;gap:4px;font-size:.7rem;color:var(--text-2);cursor:pointer;white-space:nowrap">
+                <input type="checkbox" data-verif-manual="${it.id}" ${it.verificadoManual ? 'checked' : ''}>
+                Verificado a mano
+              </label>
             </div>
           </div>`;
       }).join('');
@@ -310,6 +346,9 @@ const PriorizacionView = (() => {
     cont.querySelectorAll('[data-verificar-pel]').forEach((btn) => {
       btn.addEventListener('click', () => _verificarPel(btn.dataset.verificarPel, btn.dataset.fecha, Number(btn.dataset.id), btn));
     });
+    cont.querySelectorAll('[data-verif-manual]').forEach((cb) => {
+      cb.addEventListener('change', () => _toggleVerificadoManual(Number(cb.dataset.verifManual), cb.checked));
+    });
   }
 
   // Entregable en papel de la lista completa (23/9/2026, a pedido) — mismo
@@ -321,6 +360,7 @@ const PriorizacionView = (() => {
     const { porRegion, regiones } = _agrupar();
     const hoy = new Date().toLocaleDateString('es-AR');
 
+    const ENVIO_LABEL = { enviado: '📤 Enviado', cargado_para_envio: '📋 Falta enviar', sin_cargar: '⏳ Sin cargar' };
     const filasHtml = (filas) => filas.map((it) => `
       <tr>
         <td>${it.apellido}, ${it.nombre}</td>
@@ -329,12 +369,15 @@ const PriorizacionView = (() => {
         <td>${it.fechaEstudio}</td>
         <td style="text-align:center;font-weight:700">${it.diasDesdeEstudio}</td>
         <td>${it.reclamado === true ? '🔴 Reclamado' + (it.nroReclamo ? ' #' + it.nroReclamo : '') : ''}</td>
+        <td>${it.pelEstado || ''}</td>
+        <td>${ENVIO_LABEL[it.estadoEnvio] || ''}</td>
+        <td style="text-align:center">${it.verificadoManual ? '✔️' : ''}</td>
       </tr>`).join('');
 
     const seccionesHtml = regiones.map((region) => `
       <h3>${region} <span style="font-weight:400;color:#666">(${porRegion[region].length})</span></h3>
       <table>
-        <thead><tr><th>Paciente</th><th>DNI</th><th>Estudio</th><th>Fecha estudio</th><th>Días</th><th>Reclamo</th></tr></thead>
+        <thead><tr><th>Paciente</th><th>DNI</th><th>Estudio</th><th>Fecha estudio</th><th>Días</th><th>Reclamo</th><th>PEL</th><th>Envío</th><th>A mano</th></tr></thead>
         <tbody>${filasHtml(porRegion[region])}</tbody>
       </table>`).join('');
 
