@@ -412,6 +412,10 @@ const RailwayAPI = (() => {
     return rpc('api_listaPrioridad_quitar', [id]);
   }
 
+  async function verificarPelPorDni(dni) {
+    return rpc('api_listaPrioridad_verificarPel', [dni]);
+  }
+
   // ── Config de agenda (corte de Sheets, 25/8/2026) ───────────────
   // Feriados, franjas recurrentes, bloqueos, restricciones por
   // código/origen/propia y catálogo de estudios — antes vivían en la hoja
@@ -627,7 +631,7 @@ const RailwayAPI = (() => {
     leerConfigSugerirSobreturno, guardarConfigSugerirSobreturno,
     leerReglasSugerirSobreturno, guardarReglaSugerirSobreturno, eliminarReglaSugerirSobreturno,
     obtenerAgendaConfig, estimarDuracionesPractica, leerAsignadoresTurno, guardarAsignadoresTurno,
-    buscarEstudioPorDni, leerListaPrioridad, agregarAListaPrioridad, quitarDeListaPrioridad,
+    buscarEstudioPorDni, leerListaPrioridad, agregarAListaPrioridad, quitarDeListaPrioridad, verificarPelPorDni,
     leerFranjasPreferidasSugerir, guardarFranjaPreferidaSugerir, eliminarFranjaPreferidaSugerir,
     leerCategoriasEstudio, guardarCategoriaEstudio, eliminarCategoriaEstudio,
     leerAgendaFeriados, guardarAgendaFeriado, eliminarAgendaFeriado,

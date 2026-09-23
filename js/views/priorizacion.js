@@ -16,22 +16,6 @@ const PriorizacionView = (() => {
     });
     document.getElementById('pri-manual-btn').addEventListener('click', () => _mostrarFormManual());
     document.getElementById('pri-exportar-btn').addEventListener('click', exportarPDF);
-    _cargarAsignadores();
-  }
-
-  async function _cargarAsignadores() {
-    try {
-      const nombres = await RailwayAPI.leerAsignadoresTurno();
-      const sel = document.getElementById('pri-agrega');
-      sel.innerHTML = '<option value="">— Quién agrega —</option>' +
-        nombres.map((n) => `<option value="${n}">${n}</option>`).join('');
-    } catch (err) {
-      App.toast('Error cargando la lista de asignadores: ' + err.message, 'error');
-    }
-  }
-
-  function _quienAgrega() {
-    return document.getElementById('pri-agrega').value;
   }
 
   function _splitApellidoNombre(str) {
@@ -48,7 +32,6 @@ const PriorizacionView = (() => {
   async function _buscar() {
     const dni = document.getElementById('pri-dni').value.trim();
     if (!dni) { App.toast('Ingresá un DNI', 'warn'); return; }
-    if (!_quienAgrega()) { App.toast('Indicá quién está agregando antes de buscar', 'warn'); return; }
 
     const cont = document.getElementById('pri-resultado');
     cont.innerHTML = '<div class="loading-bar">⏳ Buscando…</div>';
@@ -128,7 +111,7 @@ const PriorizacionView = (() => {
 
   async function _agregar(datos) {
     try {
-      await RailwayAPI.agregarAListaPrioridad({ ...datos, agregadoPor: _quienAgrega() });
+      await RailwayAPI.agregarAListaPrioridad(datos);
       App.toast(`✅ ${datos.apellido}, ${datos.nombre} agregado a la lista`, 'ok');
       _limpiarBusqueda();
       cargar();
@@ -145,6 +128,26 @@ const PriorizacionView = (() => {
       cargar();
     } catch (err) {
       App.toast('Error: ' + err.message, 'error');
+    }
+  }
+
+  // Dispara bot-verificar-pel.js --dni=<dni> en reclamos-rmn-backend
+  // (23/9/2026, a pedido) — mismo mecanismo que ya tiene cada reclamo, pero
+  // por DNI, así sirve también para pacientes de esta lista sin reclamo
+  // asociado. No espera el resultado: el bot corre aparte y, si encuentra
+  // el informe en PEL, es él mismo quien lo escribe en `reclamos` — acá
+  // solo se avisa que quedó disparado.
+  async function _verificarPel(dni, btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Disparando…';
+    try {
+      await RailwayAPI.verificarPelPorDni(dni);
+      App.toast('🤖 Verificación de PEL disparada — puede tardar unos minutos', 'ok');
+    } catch (err) {
+      App.toast('Error: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🔍 Verificar PEL';
     }
   }
 
@@ -209,9 +212,12 @@ const PriorizacionView = (() => {
               ${badgeReclamo ? ' · ' + badgeReclamo : ''}<br>
               <span style="color:var(--text-2)">${it.estudio}</span><br>
               <span style="color:${urgencia};font-weight:700">${it.diasDesdeEstudio} día${it.diasDesdeEstudio === 1 ? '' : 's'} desde el estudio</span>
-              <span style="color:var(--text-3)"> · ${it.fechaEstudio} · agregado por ${it.agregadoPor || '—'}</span>
+              <span style="color:var(--text-3)"> · ${it.fechaEstudio}</span>
             </div>
-            <button type="button" class="btn-sm" data-quitar="${it.id}" data-nombre="${it.apellido}, ${it.nombre}" style="flex-shrink:0">✕ Quitar</button>
+            <div style="display:flex;gap:.4rem;flex-shrink:0">
+              <button type="button" class="btn-sm" data-verificar-pel="${it.dni}" style="white-space:nowrap">🔍 Verificar PEL</button>
+              <button type="button" class="btn-sm" data-quitar="${it.id}" data-nombre="${it.apellido}, ${it.nombre}">✕ Quitar</button>
+            </div>
           </div>`;
       }).join('');
 
@@ -239,6 +245,9 @@ const PriorizacionView = (() => {
     });
     cont.querySelectorAll('[data-quitar]').forEach((btn) => {
       btn.addEventListener('click', () => _quitar(Number(btn.dataset.quitar), btn.dataset.nombre));
+    });
+    cont.querySelectorAll('[data-verificar-pel]').forEach((btn) => {
+      btn.addEventListener('click', () => _verificarPel(btn.dataset.verificarPel, btn));
     });
   }
 
