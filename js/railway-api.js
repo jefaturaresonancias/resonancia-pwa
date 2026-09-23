@@ -412,8 +412,14 @@ const RailwayAPI = (() => {
     return rpc('api_listaPrioridad_quitar', [id]);
   }
 
-  async function verificarPelPorDni(dni) {
-    return rpc('api_listaPrioridad_verificarPel', [dni]);
+  async function verificarPelPorDni(dni, fecha) {
+    return rpc('api_listaPrioridad_verificarPel', [dni, fecha]);
+  }
+
+  // Lectura liviana para el polling después de disparar verificarPelPorDni
+  // — no cruza reclamos-rmn-backend por HTTP como leerListaPrioridad.
+  async function leerEstadoPelItem(dni, fecha) {
+    return rpc('api_listaPrioridad_leerEstadoPel', [dni, fecha]);
   }
 
   // ── Config de agenda (corte de Sheets, 25/8/2026) ───────────────
@@ -631,7 +637,7 @@ const RailwayAPI = (() => {
     leerConfigSugerirSobreturno, guardarConfigSugerirSobreturno,
     leerReglasSugerirSobreturno, guardarReglaSugerirSobreturno, eliminarReglaSugerirSobreturno,
     obtenerAgendaConfig, estimarDuracionesPractica, leerAsignadoresTurno, guardarAsignadoresTurno,
-    buscarEstudioPorDni, leerListaPrioridad, agregarAListaPrioridad, quitarDeListaPrioridad, verificarPelPorDni,
+    buscarEstudioPorDni, leerListaPrioridad, agregarAListaPrioridad, quitarDeListaPrioridad, verificarPelPorDni, leerEstadoPelItem,
     leerFranjasPreferidasSugerir, guardarFranjaPreferidaSugerir, eliminarFranjaPreferidaSugerir,
     leerCategoriasEstudio, guardarCategoriaEstudio, eliminarCategoriaEstudio,
     leerAgendaFeriados, guardarAgendaFeriado, eliminarAgendaFeriado,

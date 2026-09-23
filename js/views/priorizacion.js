@@ -18,6 +18,23 @@ const PriorizacionView = (() => {
     document.getElementById('pri-exportar-btn').addEventListener('click', exportarPDF);
   }
 
+  // Contenido del chip de PEL según pel_verificacion_manual (23/9/2026) —
+  // null = nunca se verificó todavía, no es un "no está" real, así que no
+  // se muestra nada (string vacío, no una etiqueta neutra) hasta que se
+  // aprieta "Verificar PEL" al menos una vez.
+  function _chipPelHTML(pelEstado) {
+    if (pelEstado === 'FINALIZADO') {
+      return `<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--success-bg);color:var(--success)">✅ Finalizado en PEL</span>`;
+    }
+    if (pelEstado === 'A INFORMAR' || pelEstado === 'PRELIMINAR') {
+      return `<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--warn-bg);color:var(--warn)">🟡 A informar en PEL</span>`;
+    }
+    if (pelEstado === 'NO_ENCONTRADO') {
+      return `<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--danger-bg);color:var(--danger)">❌ No está en PEL</span>`;
+    }
+    return '';
+  }
+
   function _splitApellidoNombre(str) {
     const [ap, ...resto] = String(str || '').split(',');
     return { apellido: (ap || '').trim(), nombre: resto.join(',').trim() };
@@ -139,18 +156,55 @@ const PriorizacionView = (() => {
   // PEL. Corregido 23/9/2026 (mismo día): apuntaba a bot-verificar-pel.js,
   // que solo cruza reclamos YA activos y no hacía nada para el resto.
   // No espera el resultado acá: se ve en logs-bots del panel de Bots.
-  async function _verificarPel(dni, btn) {
+  // fecha = fechaEstudio del item (clave junto con el DNI en
+  // pel_verificacion_manual) — sin esto el bot no sabría bajo qué fila
+  // guardar el resultado. id = id del item en esta lista, para actualizar
+  // su chip en cuanto el bot termina, sin esperar a la próxima carga de
+  // toda la lista (mismo patrón de polling que ya se usaba para el viejo
+  // botón "Cargar en Suitestensa" de Lista del día, sacado el 22/9/2026).
+  async function _verificarPel(dni, fecha, id, btn) {
     btn.disabled = true;
     btn.textContent = '⏳ Disparando…';
+    const desde = new Date();
     try {
-      await RailwayAPI.verificarPelPorDni(dni);
-      App.toast('🤖 Consulta a PEL disparada — el resultado queda en el panel de Bots', 'ok');
+      await RailwayAPI.verificarPelPorDni(dni, fecha);
+      App.toast('🤖 Consultando PEL…', 'ok');
     } catch (err) {
       App.toast('Error: ' + err.message, 'error');
-    } finally {
       btn.disabled = false;
       btn.textContent = '🔍 Verificar PEL';
+      return;
     }
+    btn.textContent = '⏳ Consultando…';
+
+    // El bot tarda ~50s (login SIGEHOS + VPN + navegar PEL) — mismo
+    // margen que ya se usaba para Suitestensa.
+    const TIMEOUT_MS = 150000, INTERVALO_MS = 5000;
+    const poll = async () => {
+      let r = null;
+      try { r = await RailwayAPI.leerEstadoPelItem(dni, fecha); } catch (e) { /* reintenta en el próximo tick */ }
+
+      const vigente = r && r.pelVerificadoEn && new Date(r.pelVerificadoEn) >= desde;
+      if (vigente) {
+        const item = _items.find((it) => it.id === id);
+        if (item) { item.pelEstado = r.pelEstado; item.pelVerificadoEn = r.pelVerificadoEn; }
+        const chip = document.querySelector(`[data-pel-chip="${id}"]`);
+        const html = _chipPelHTML(r.pelEstado);
+        if (chip) chip.innerHTML = html ? ' · ' + html : '';
+        btn.disabled = false;
+        btn.textContent = '🔍 Verificar PEL';
+        return;
+      }
+
+      if (Date.now() - desde.getTime() >= TIMEOUT_MS) {
+        btn.disabled = false;
+        btn.textContent = '🔍 Reintentar';
+        App.toast('Sin respuesta de PEL todavía — revisar panel de Bots', 'warn');
+        return;
+      }
+      setTimeout(poll, INTERVALO_MS);
+    };
+    setTimeout(poll, INTERVALO_MS);
   }
 
   async function cargar() {
@@ -205,19 +259,24 @@ const PriorizacionView = (() => {
           : it.reclamado === null
             ? `<span style="font-size:9px;color:var(--text-3)">reclamo no verificado</span>`
             : '';
+        // Chip de PEL (23/9/2026) — refleja pel_verificacion_manual, subida
+        // por bot-verificar-pel-dni.js al terminar. null = nunca se
+        // verificó todavía (sin chip, no es un "no está" real).
+        const chipPelHTML = _chipPelHTML(it.pelEstado);
         return `
           <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;
             padding:.6rem .85rem;border:1px solid var(--border);border-left:4px solid ${urgencia};
             border-radius:var(--radius);background:var(--surface);margin-bottom:.4rem">
             <div style="font-size:.82rem;line-height:1.5;min-width:0">
               <strong>${it.apellido}, ${it.nombre}</strong> — DNI ${it.dni}
-              ${badgeReclamo ? ' · ' + badgeReclamo : ''}<br>
+              ${badgeReclamo ? ' · ' + badgeReclamo : ''}
+              <span data-pel-chip="${it.id}">${chipPelHTML ? ' · ' + chipPelHTML : ''}</span><br>
               <span style="color:var(--text-2)">${it.estudio}</span><br>
               <span style="color:${urgencia};font-weight:700">${it.diasDesdeEstudio} día${it.diasDesdeEstudio === 1 ? '' : 's'} desde el estudio</span>
               <span style="color:var(--text-3)"> · ${it.fechaEstudio}</span>
             </div>
             <div style="display:flex;gap:.4rem;flex-shrink:0">
-              <button type="button" class="btn-sm" data-verificar-pel="${it.dni}" style="white-space:nowrap">🔍 Verificar PEL</button>
+              <button type="button" class="btn-sm" data-verificar-pel="${it.dni}" data-fecha="${it.fechaEstudio}" data-id="${it.id}" style="white-space:nowrap">🔍 Verificar PEL</button>
               <button type="button" class="btn-sm" data-quitar="${it.id}" data-nombre="${it.apellido}, ${it.nombre}">✕ Quitar</button>
             </div>
           </div>`;
@@ -249,7 +308,7 @@ const PriorizacionView = (() => {
       btn.addEventListener('click', () => _quitar(Number(btn.dataset.quitar), btn.dataset.nombre));
     });
     cont.querySelectorAll('[data-verificar-pel]').forEach((btn) => {
-      btn.addEventListener('click', () => _verificarPel(btn.dataset.verificarPel, btn));
+      btn.addEventListener('click', () => _verificarPel(btn.dataset.verificarPel, btn.dataset.fecha, Number(btn.dataset.id), btn));
     });
   }
 
