@@ -96,6 +96,7 @@ const App = (() => {
     if (id === "pami")   PamiView.cargar();
     if (id === "config") ConfigView.cargar();
     if (id === "validaciones") ValidacionesView.cargar();
+    if (id === "priorizacion") PriorizacionView.cargar();
     if (id === "agenda-especial") AgendaEspecialView.cargar();
   }
 
@@ -529,6 +530,7 @@ const App = (() => {
     PamiView.init();
     ConfigView.init();
     ValidacionesView.init();
+    PriorizacionView.init();
     AgendaEspecialView.init();
     _initPin();
     // Antes de mostrar/restaurar cualquier rol hay que tener la config real

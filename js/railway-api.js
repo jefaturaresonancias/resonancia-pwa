@@ -390,6 +390,28 @@ const RailwayAPI = (() => {
     return rpc('api_asignadoresTurno_guardar', [{ nombres }]);
   }
 
+  // ── Priorización de informes (23/9/2026, a pedido) ──────────────
+  // Cola manual compartida: buscar un DNI contra `estudios` (RIS) y
+  // sumarlo a la lista, o cargarlo a mano si no aparece ahí.
+
+  async function buscarEstudioPorDni(dni) {
+    const data = await rpc('api_buscarEstudioPorDNI', [dni]);
+    return data.estudios;
+  }
+
+  async function leerListaPrioridad() {
+    const data = await rpc('api_listaPrioridad_leer');
+    return data.items;
+  }
+
+  async function agregarAListaPrioridad(datos) {
+    return rpc('api_listaPrioridad_agregar', [datos]);
+  }
+
+  async function quitarDeListaPrioridad(id) {
+    return rpc('api_listaPrioridad_quitar', [id]);
+  }
+
   // ── Config de agenda (corte de Sheets, 25/8/2026) ───────────────
   // Feriados, franjas recurrentes, bloqueos, restricciones por
   // código/origen/propia y catálogo de estudios — antes vivían en la hoja
@@ -605,6 +627,7 @@ const RailwayAPI = (() => {
     leerConfigSugerirSobreturno, guardarConfigSugerirSobreturno,
     leerReglasSugerirSobreturno, guardarReglaSugerirSobreturno, eliminarReglaSugerirSobreturno,
     obtenerAgendaConfig, estimarDuracionesPractica, leerAsignadoresTurno, guardarAsignadoresTurno,
+    buscarEstudioPorDni, leerListaPrioridad, agregarAListaPrioridad, quitarDeListaPrioridad,
     leerFranjasPreferidasSugerir, guardarFranjaPreferidaSugerir, eliminarFranjaPreferidaSugerir,
     leerCategoriasEstudio, guardarCategoriaEstudio, eliminarCategoriaEstudio,
     leerAgendaFeriados, guardarAgendaFeriado, eliminarAgendaFeriado,
