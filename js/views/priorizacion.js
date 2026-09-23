@@ -131,18 +131,20 @@ const PriorizacionView = (() => {
     }
   }
 
-  // Dispara bot-verificar-pel.js --dni=<dni> en reclamos-rmn-backend
-  // (23/9/2026, a pedido) — mismo mecanismo que ya tiene cada reclamo, pero
-  // por DNI, así sirve también para pacientes de esta lista sin reclamo
-  // asociado. No espera el resultado: el bot corre aparte y, si encuentra
-  // el informe en PEL, es él mismo quien lo escribe en `reclamos` — acá
-  // solo se avisa que quedó disparado.
+  // Dispara bot-verificar-pel-dni.js --dni=<dni> (rpc/listaPrioridad.js,
+  // jefatura-rmn-sistema2) — consulta de solo lectura, busca el DNI
+  // directo en PEL sin depender de que tenga un reclamo activo (por eso
+  // sirve para cualquier paciente de esta lista). No escribe nada en
+  // `reclamos` ni descarga informes — solo confirma si está cargado en
+  // PEL. Corregido 23/9/2026 (mismo día): apuntaba a bot-verificar-pel.js,
+  // que solo cruza reclamos YA activos y no hacía nada para el resto.
+  // No espera el resultado acá: se ve en logs-bots del panel de Bots.
   async function _verificarPel(dni, btn) {
     btn.disabled = true;
     btn.textContent = '⏳ Disparando…';
     try {
       await RailwayAPI.verificarPelPorDni(dni);
-      App.toast('🤖 Verificación de PEL disparada — puede tardar unos minutos', 'ok');
+      App.toast('🤖 Consulta a PEL disparada — el resultado queda en el panel de Bots', 'ok');
     } catch (err) {
       App.toast('Error: ' + err.message, 'error');
     } finally {
