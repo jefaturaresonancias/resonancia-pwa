@@ -52,6 +52,13 @@ const PriorizacionView = (() => {
     return '';
   }
 
+  // fechaEstudio viaja en ISO (AAAA-MM-DD, lo que ya devuelve el backend) —
+  // se muestra en DD/MM/AAAA (23/9/2026, a pedido).
+  function _isoADmy(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : (iso || '');
+  }
+
   async function _toggleVerificadoManual(id, checked) {
     try {
       await RailwayAPI.marcarVerificadoManualListaPrioridad(id, checked);
@@ -170,6 +177,22 @@ const PriorizacionView = (() => {
     try {
       await RailwayAPI.quitarDeListaPrioridad(id);
       App.toast('Sacado de la lista', 'ok');
+      cargar();
+    } catch (err) {
+      App.toast('Error: ' + err.message, 'error');
+    }
+  }
+
+  // "Resuelto (retirado)" (23/9/2026, a pedido) — para cuando ya se sabe
+  // que el paciente retiró el estudio por otra vía: cierra el reclamo de
+  // una en reclamos-rmn-backend (resuelto + archivado) y saca el item de
+  // esta lista, sin pasar por el circuito digital normal de envío.
+  async function _resolverYArchivar(id, reclamoId, nombreCompleto) {
+    if (!confirm(`¿Marcar el reclamo de ${nombreCompleto} como resuelto y archivarlo? Usalo solo si ya sabés que retiró el estudio por otra vía.`)) return;
+    try {
+      await RailwayAPI.resolverYArchivarReclamoDesdeLista(reclamoId);
+      await RailwayAPI.quitarDeListaPrioridad(id);
+      App.toast('✅ Reclamo resuelto y archivado', 'ok');
       cargar();
     } catch (err) {
       App.toast('Error: ' + err.message, 'error');
@@ -303,11 +326,12 @@ const PriorizacionView = (() => {
               ${chipEnvioHTML ? ' · ' + chipEnvioHTML : ''}<br>
               <span style="color:var(--text-2)">${it.estudio}</span><br>
               <span style="color:${urgencia};font-weight:700">${it.diasDesdeEstudio} día${it.diasDesdeEstudio === 1 ? '' : 's'} desde el estudio</span>
-              <span style="color:var(--text-3)"> · ${it.fechaEstudio}</span>
+              <span style="color:var(--text-3)"> · ${_isoADmy(it.fechaEstudio)}</span>
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.4rem;flex-shrink:0">
               <div style="display:flex;gap:.4rem">
                 <button type="button" class="btn-sm" data-verificar-pel="${it.dni}" data-fecha="${it.fechaEstudio}" data-id="${it.id}" style="white-space:nowrap">🔍 Verificar PEL</button>
+                ${it.reclamado && it.reclamoId ? `<button type="button" class="btn-sm" data-resolver="${it.id}" data-reclamo-id="${it.reclamoId}" data-nombre="${it.apellido}, ${it.nombre}" style="white-space:nowrap">✅ Resuelto (retirado)</button>` : ''}
                 <button type="button" class="btn-sm" data-quitar="${it.id}" data-nombre="${it.apellido}, ${it.nombre}">✕ Quitar</button>
               </div>
               <label style="display:flex;align-items:center;gap:4px;font-size:.7rem;color:var(--text-2);cursor:pointer;white-space:nowrap">
@@ -349,6 +373,9 @@ const PriorizacionView = (() => {
     cont.querySelectorAll('[data-verif-manual]').forEach((cb) => {
       cb.addEventListener('change', () => _toggleVerificadoManual(Number(cb.dataset.verifManual), cb.checked));
     });
+    cont.querySelectorAll('[data-resolver]').forEach((btn) => {
+      btn.addEventListener('click', () => _resolverYArchivar(Number(btn.dataset.resolver), btn.dataset.reclamoId, btn.dataset.nombre));
+    });
   }
 
   // Entregable en papel de la lista completa (23/9/2026, a pedido) — mismo
@@ -366,7 +393,7 @@ const PriorizacionView = (() => {
         <td>${it.apellido}, ${it.nombre}</td>
         <td>${it.dni}</td>
         <td>${it.estudio}</td>
-        <td>${it.fechaEstudio}</td>
+        <td>${_isoADmy(it.fechaEstudio)}</td>
         <td style="text-align:center;font-weight:700">${it.diasDesdeEstudio}</td>
         <td>${it.reclamado === true ? '🔴 Reclamado' + (it.nroReclamo ? ' #' + it.nroReclamo : '') : ''}</td>
         <td>${it.pelEstado || ''}</td>
