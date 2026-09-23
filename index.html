@@ -555,7 +555,10 @@
         <div id="view-priorizacion" class="view hidden">
           <div class="view-header">
             <h2>Priorización de informes</h2>
-            <span id="pri-contador" style="font-size:.78rem;color:var(--text-2)"></span>
+            <div style="display:flex;align-items:center;gap:.75rem">
+              <span id="pri-contador" style="font-size:.78rem;color:var(--text-2)"></span>
+              <button type="button" class="btn-sm" id="pri-exportar-btn">📄 Exportar PDF</button>
+            </div>
           </div>
           <div style="padding:1rem;overflow-y:auto;flex:1">
             <div style="border:1px solid var(--border);border-radius:var(--radius);padding:.85rem;background:var(--surface);margin-bottom:1rem">

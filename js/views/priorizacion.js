@@ -15,6 +15,7 @@ const PriorizacionView = (() => {
       if (e.key === 'Enter') _buscar();
     });
     document.getElementById('pri-manual-btn').addEventListener('click', () => _mostrarFormManual());
+    document.getElementById('pri-exportar-btn').addEventListener('click', exportarPDF);
     _cargarAsignadores();
   }
 
@@ -158,6 +159,23 @@ const PriorizacionView = (() => {
     }
   }
 
+  // Agrupa por región (más atrasada primero) y ordena cada grupo por días
+  // desde el estudio (más atrasado primero) — usado tanto por _render()
+  // como por exportarPDF(), así la hoja impresa sale en el mismo orden
+  // que se ve en pantalla.
+  function _agrupar() {
+    const porRegion = {};
+    for (const it of _items) {
+      if (!porRegion[it.region]) porRegion[it.region] = [];
+      porRegion[it.region].push(it);
+    }
+    for (const region in porRegion) porRegion[region].sort((a, b) => b.diasDesdeEstudio - a.diasDesdeEstudio);
+    const regiones = Object.keys(porRegion).sort(
+      (a, b) => porRegion[b][0].diasDesdeEstudio - porRegion[a][0].diasDesdeEstudio
+    );
+    return { porRegion, regiones };
+  }
+
   function _render() {
     const cont = document.getElementById('pri-lista');
     document.getElementById('pri-contador').textContent = _items.length
@@ -170,17 +188,7 @@ const PriorizacionView = (() => {
       return;
     }
 
-    const porRegion = {};
-    for (const it of _items) {
-      if (!porRegion[it.region]) porRegion[it.region] = [];
-      porRegion[it.region].push(it);
-    }
-    for (const region in porRegion) porRegion[region].sort((a, b) => b.diasDesdeEstudio - a.diasDesdeEstudio);
-
-    // Las regiones con el caso más atrasado arriba de todo — no alfabético.
-    const regiones = Object.keys(porRegion).sort(
-      (a, b) => porRegion[b][0].diasDesdeEstudio - porRegion[a][0].diasDesdeEstudio
-    );
+    const { porRegion, regiones } = _agrupar();
 
     cont.innerHTML = regiones.map((region) => {
       const filas = porRegion[region];
@@ -234,5 +242,55 @@ const PriorizacionView = (() => {
     });
   }
 
-  return { init, cargar };
+  // Entregable en papel de la lista completa (23/9/2026, a pedido) — mismo
+  // patrón que panoramaSemanal.js: ventana nueva + print nativo del
+  // navegador, sin librerías. Siempre todo expandido (ignora _colapsado —
+  // eso es solo un estado de pantalla) y en el mismo orden que _render().
+  function exportarPDF() {
+    if (!_items.length) { App.toast('No hay nada para exportar', 'warn'); return; }
+    const { porRegion, regiones } = _agrupar();
+    const hoy = new Date().toLocaleDateString('es-AR');
+
+    const filasHtml = (filas) => filas.map((it) => `
+      <tr>
+        <td>${it.apellido}, ${it.nombre}</td>
+        <td>${it.dni}</td>
+        <td>${it.estudio}</td>
+        <td>${it.fechaEstudio}</td>
+        <td style="text-align:center;font-weight:700">${it.diasDesdeEstudio}</td>
+        <td>${it.reclamado === true ? '🔴 Reclamado' + (it.nroReclamo ? ' #' + it.nroReclamo : '') : ''}</td>
+      </tr>`).join('');
+
+    const seccionesHtml = regiones.map((region) => `
+      <h3>${region} <span style="font-weight:400;color:#666">(${porRegion[region].length})</span></h3>
+      <table>
+        <thead><tr><th>Paciente</th><th>DNI</th><th>Estudio</th><th>Fecha estudio</th><th>Días</th><th>Reclamo</th></tr></thead>
+        <tbody>${filasHtml(porRegion[region])}</tbody>
+      </table>`).join('');
+
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Priorización de informes</title>
+      <style>
+        body{font-family:Arial,sans-serif;margin:0;padding:16px;color:#1a2332}
+        h1{font-size:16px;margin:0 0 2px}
+        .sub{font-size:11px;color:#666;margin-bottom:16px}
+        h3{font-size:13px;color:#1a3a5c;border-bottom:1px solid #1a3a5c;padding-bottom:3px;margin:18px 0 6px}
+        table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:4px}
+        th{text-align:left;background:#f4f6f9;padding:4px 6px;border-bottom:1px solid #d0d7e2}
+        td{padding:4px 6px;border-bottom:1px solid #eee}
+        @page{size:portrait;margin:12mm}
+      </style></head>
+      <body>
+        <h1>Priorización de informes</h1>
+        <div class="sub">Generado el ${hoy} · ${_items.length} paciente${_items.length === 1 ? '' : 's'}</div>
+        ${seccionesHtml}
+      </body></html>`;
+
+    const ventana = window.open('', '_blank');
+    if (!ventana) { App.toast('El navegador bloqueó la ventana del PDF — habilitá pop-ups para este sitio.', 'error'); return; }
+    ventana.document.write(html);
+    ventana.document.close();
+    ventana.onload = () => ventana.print();
+  }
+
+  return { init, cargar, exportarPDF };
 })();
