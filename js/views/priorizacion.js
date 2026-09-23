@@ -8,6 +8,7 @@ const PriorizacionView = (() => {
   let _items = [];
   let _colapsado = new Set();
   let _resultadoBusqueda = null; // último resultado de _buscar(), para poder "Agregar" sin volver a pedirlo
+  let _tabActiva = 'todos'; // 'todos' | 'sin_categoria' | codigo de categoría (NEURO/CUERPO/MSK/...)
 
   function init() {
     document.getElementById('pri-buscar-btn').addEventListener('click', _buscar);
@@ -16,6 +17,64 @@ const PriorizacionView = (() => {
     });
     document.getElementById('pri-manual-btn').addEventListener('click', () => _mostrarFormManual());
     document.getElementById('pri-exportar-btn').addEventListener('click', exportarPDF);
+  }
+
+  // Pestañas Neuro/Cuerpo/MSK/... (23/9/2026, a pedido: "vamos a necesitar
+  // pestañas para poder hacer PDFs y visualizaciones distintas") — las
+  // categorías salen del item (ya clasificado server-side contra
+  // CATEGORIAS_ESTUDIO, ver rpc/listaPrioridad.js), no de una config
+  // aparte acá: solo se muestran pestañas de categorías que realmente
+  // tienen algún paciente en este momento, más "Todos" y, si corresponde,
+  // "Sin categoría" (nada matcheó ninguna palabra clave configurada).
+  function _categoriasPresentes() {
+    const porCodigo = new Map();
+    let hayFueraDeCategoria = false;
+    _items.forEach((it) => {
+      if (!it.categorias || !it.categorias.length) { hayFueraDeCategoria = true; return; }
+      it.categorias.forEach((c) => { if (!porCodigo.has(c.codigo)) porCodigo.set(c.codigo, c.nombre); });
+    });
+    return { categorias: Array.from(porCodigo, ([codigo, nombre]) => ({ codigo, nombre })), hayFueraDeCategoria };
+  }
+
+  function _itemsFiltrados() {
+    if (_tabActiva === 'todos') return _items;
+    if (_tabActiva === 'sin_categoria') return _items.filter((it) => !it.categorias || !it.categorias.length);
+    return _items.filter((it) => (it.categorias || []).some((c) => c.codigo === _tabActiva));
+  }
+
+  function _renderTabs() {
+    const cont = document.getElementById('pri-tabs');
+    const { categorias, hayFueraDeCategoria } = _categoriasPresentes();
+    if (!categorias.length) { cont.innerHTML = ''; return; } // todo en una sola bolsa — no vale la pena mostrar pestañas
+
+    // Si la pestaña activa dejó de tener sentido (se vació esa categoría,
+    // o se quitó el único item sin categorizar) volvemos a "Todos" en vez
+    // de mostrar una pestaña activa vacía sin aviso.
+    const activaSigueExistiendo = _tabActiva === 'todos'
+      || (_tabActiva === 'sin_categoria' && hayFueraDeCategoria)
+      || categorias.some((c) => c.codigo === _tabActiva);
+    if (!activaSigueExistiendo) _tabActiva = 'todos';
+
+    const tabs = [{ codigo: 'todos', nombre: 'Todos' }, ...categorias];
+    if (hayFueraDeCategoria) tabs.push({ codigo: 'sin_categoria', nombre: 'Sin categoría' });
+
+    cont.innerHTML = tabs.map((t) => {
+      const activa = _tabActiva === t.codigo;
+      return `<button type="button" data-tab="${t.codigo}" style="
+        padding:.4rem .9rem;border-radius:20px;font-size:.78rem;font-weight:700;cursor:pointer;
+        border:1px solid ${activa ? 'var(--navy)' : 'var(--border)'};
+        background:${activa ? 'var(--navy)' : 'var(--surface)'};color:${activa ? '#fff' : 'var(--text-2)'}">
+        ${t.nombre}
+      </button>`;
+    }).join('');
+
+    cont.querySelectorAll('[data-tab]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        _tabActiva = btn.dataset.tab;
+        _colapsado = new Set(); // pestaña nueva, que arranque expandida
+        _render();
+      });
+    });
   }
 
   // Contenido del chip de PEL según pel_verificacion_manual (23/9/2026) —
@@ -272,10 +331,11 @@ const PriorizacionView = (() => {
   // Agrupa por región (más atrasada primero) y ordena cada grupo por días
   // desde el estudio (más atrasado primero) — usado tanto por _render()
   // como por exportarPDF(), así la hoja impresa sale en el mismo orden
-  // que se ve en pantalla.
-  function _agrupar() {
+  // que se ve en pantalla. Recibe la lista explícita (ya filtrada por
+  // pestaña) en vez de mirar _items directo.
+  function _agrupar(items) {
     const porRegion = {};
-    for (const it of _items) {
+    for (const it of items) {
       if (!porRegion[it.region]) porRegion[it.region] = [];
       porRegion[it.region].push(it);
     }
@@ -288,17 +348,19 @@ const PriorizacionView = (() => {
 
   function _render() {
     const cont = document.getElementById('pri-lista');
+    _renderTabs();
+    const filtrados = _itemsFiltrados();
     document.getElementById('pri-contador').textContent = _items.length
-      ? `${_items.length} paciente${_items.length === 1 ? '' : 's'} en la lista`
+      ? `${filtrados.length} de ${_items.length} paciente${_items.length === 1 ? '' : 's'}`
       : '';
 
-    if (!_items.length) {
+    if (!filtrados.length) {
       cont.innerHTML = `<div style="text-align:center;padding:3rem;color:var(--text-3)">
-        <div style="font-size:3rem">✅</div><div style="margin-top:1rem">Sin pacientes en la lista de priorización</div></div>`;
+        <div style="font-size:3rem">✅</div><div style="margin-top:1rem">${_items.length ? 'Sin pacientes en esta pestaña' : 'Sin pacientes en la lista de priorización'}</div></div>`;
       return;
     }
 
-    const { porRegion, regiones } = _agrupar();
+    const { porRegion, regiones } = _agrupar(filtrados);
 
     cont.innerHTML = regiones.map((region) => {
       const filas = porRegion[region];
@@ -383,9 +445,13 @@ const PriorizacionView = (() => {
   // navegador, sin librerías. Siempre todo expandido (ignora _colapsado —
   // eso es solo un estado de pantalla) y en el mismo orden que _render().
   function exportarPDF() {
-    if (!_items.length) { App.toast('No hay nada para exportar', 'warn'); return; }
-    const { porRegion, regiones } = _agrupar();
+    const filtrados = _itemsFiltrados();
+    if (!filtrados.length) { App.toast('No hay nada para exportar en esta pestaña', 'warn'); return; }
+    const { porRegion, regiones } = _agrupar(filtrados);
     const hoy = new Date().toLocaleDateString('es-AR');
+    const tituloTab = _tabActiva === 'todos' ? 'Priorización de informes'
+      : _tabActiva === 'sin_categoria' ? 'Priorización de informes — Sin categoría'
+      : 'Priorización de informes — ' + (_categoriasPresentes().categorias.find((c) => c.codigo === _tabActiva) || {}).nombre;
 
     const ENVIO_LABEL = { enviado: '📤 Enviado', cargado_para_envio: '📋 Falta enviar', sin_cargar: '⏳ Sin cargar' };
     const filasHtml = (filas) => filas.map((it) => `
@@ -408,7 +474,7 @@ const PriorizacionView = (() => {
         <tbody>${filasHtml(porRegion[region])}</tbody>
       </table>`).join('');
 
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Priorización de informes</title>
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${tituloTab}</title>
       <style>
         body{font-family:Arial,sans-serif;margin:0;padding:16px;color:#1a2332}
         h1{font-size:16px;margin:0 0 2px}
@@ -420,8 +486,8 @@ const PriorizacionView = (() => {
         @page{size:portrait;margin:12mm}
       </style></head>
       <body>
-        <h1>Priorización de informes</h1>
-        <div class="sub">Generado el ${hoy} · ${_items.length} paciente${_items.length === 1 ? '' : 's'}</div>
+        <h1>${tituloTab}</h1>
+        <div class="sub">Generado el ${hoy} · ${filtrados.length} paciente${filtrados.length === 1 ? '' : 's'}</div>
         ${seccionesHtml}
       </body></html>`;
 
