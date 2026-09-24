@@ -292,6 +292,22 @@ const TurnoView = (() => {
     App.toast(`Sugerencia aplicada: ${s.fecha} ${s.hora} hs — podés confirmarla o buscar otra`, "ok");
   }
 
+  // Excepción de límites (jefatura/admin) — la valida de verdad el
+  // servidor (rpc/turnos.js / rpc/agenda.js, _validarExcepcionLimites); acá
+  // solo se exige que no viaje vacía. Devuelve null si el toggle no está
+  // tildado, o si falta el PIN (y ya avisó con un toast).
+  function _leerDatosExcepcion() {
+    const excepcionTildada = document.getElementById("t-excepcion-toggle").checked;
+    if (!excepcionTildada) return {};
+    const excepcionPin = document.getElementById("t-excepcion-pin").value.trim();
+    if (!excepcionPin) { App.toast("Ingresá el PIN de excepción.", "error"); return null; }
+    return {
+      excepcionLimites: true,
+      excepcionRol: document.getElementById("t-excepcion-rol").value,
+      excepcionPin,
+    };
+  }
+
   // ── Buscar slots ──────────────────────────────────────────
   async function _buscarSlots() {
     if (!_tecnicoAsignaOk()) return;
@@ -308,6 +324,9 @@ const TurnoView = (() => {
     const fecha = `${d}/${m}/${y}`;
     const estudioStr = _estudiosElegidos.join(", ");
 
+    const datosExcepcion = _leerDatosExcepcion();
+    if (datosExcepcion === null) return;
+
     const slotsContainer = document.getElementById("slots-container");
     const slotsGrid      = document.getElementById("slots-grid");
     const slotsLoading   = document.getElementById("slots-loading");
@@ -320,7 +339,7 @@ const TurnoView = (() => {
     _slotSeleccionado = null;
 
     try {
-      const result = await RailwayAPI.slots(fecha, estudioStr, origen);
+      const result = await RailwayAPI.slots(fecha, estudioStr, origen, datosExcepcion);
       if (result.esFeriado) {
         slotsGrid.innerHTML = `<p style="color:#c62828;font-weight:600">🚫 ${fecha} es feriado: ${result.feriado}</p>`;
         return;

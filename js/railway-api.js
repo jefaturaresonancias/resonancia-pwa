@@ -196,8 +196,8 @@ const RailwayAPI = (() => {
    * @param {string} estudio nombre exacto del estudio (puede ser comma-separated)
    * @param {string} origen  AMBULATORIO | INTERNACIÓN | etc.
    */
-  async function slots(fecha, estudio, origen = "AMBULATORIO") {
-    return rpc('api_agenda_slots', [{ fecha, estudio, origen }]);
+  async function slots(fecha, estudio, origen = "AMBULATORIO", datosExcepcion = {}) {
+    return rpc('api_agenda_slots', [{ fecha, estudio, origen, ...datosExcepcion }]);
   }
 
   // ── Etapa 2a (migración de lecturas): lista del día y búsqueda ──
