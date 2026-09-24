@@ -166,7 +166,7 @@ const PriorizacionView = (() => {
             <div style="font-size:.82rem;line-height:1.5">
               <strong>${apellido}, ${nombre}</strong> — DNI ${e.documento}<br>
               <span style="color:var(--text-2)">${e.practica}</span><br>
-              <span style="color:var(--text-3)">${e.fecha} ${e.hora || ''} · ${e.estado || '—'}</span>
+              <span style="color:var(--text-3)">${_isoADmy(e.fecha)} ${e.hora || ''} · ${e.estado || '—'}</span>
             </div>
             <button type="button" class="btn-sm" data-agregar-ris="${i}" style="flex-shrink:0">➕ Agregar</button>
           </div>`;
