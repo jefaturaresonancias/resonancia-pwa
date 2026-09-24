@@ -34,13 +34,27 @@ const TurnoView = (() => {
     }
   }
 
+  // El PIN todavía no se validó acá (eso lo hace el servidor recién al
+  // buscar horarios/confirmar) — alcanza con el toggle tildado para
+  // liberar este filtro, que es solo una ayuda visual para no "buscar a
+  // ciegas"; si el PIN termina siendo inválido, el servidor lo rechaza
+  // igual más adelante.
+  function _excepcionTildada() {
+    const el = document.getElementById("t-excepcion-toggle");
+    return !!(el && el.checked);
+  }
+
   function _poblarSelect(filtro) {
     const sel = document.getElementById("t-estudio-sel");
     sel.innerHTML = '<option value="">— Seleccionar estudio —</option>';
     const nombres = Object.keys(_estudiosConfig).sort();
     for (const n of nombres) {
       if (filtro && !n.toLowerCase().includes(filtro.toLowerCase())) continue;
-      if (_filtroCodigo && (_estudiosConfig[n] || {}).restriccion !== _filtroCodigo) continue;
+      // Franja reservada por código (ej. "Solo Mamarias"): normalmente se
+      // filtra a solo esos estudios para no "buscar a ciegas", pero con la
+      // excepción tildada (PIN jefatura/admin) se libera — el mismo caso
+      // que ahora deja pasar el servidor en rpc/agenda.js y rpc/turnos.js.
+      if (_filtroCodigo && !_excepcionTildada() && (_estudiosConfig[n] || {}).restriccion !== _filtroCodigo) continue;
       if (_estudiosElegidos.includes(n)) continue; // ya agregado
       const opt = document.createElement("option");
       opt.value = n; opt.textContent = n;
@@ -499,6 +513,10 @@ const TurnoView = (() => {
       const wrap = document.getElementById("t-excepcion-wrap");
       wrap.classList.toggle("hidden", !e.target.checked);
       if (e.target.checked) document.getElementById("t-excepcion-pin").focus();
+      // Si entramos filtrados por código (franja tipo "Solo Mamarias") y
+      // se tilda/destilda la excepción, el desplegable de estudios tiene
+      // que reflejarlo al toque, no recién al volver a tipear el buscador.
+      _poblarSelect(document.getElementById("t-estudio-buscar").value);
     });
     // Agregar estudio al hacer clic en el botón o cambiar select
     document.getElementById("btn-agregar-estudio").addEventListener("click", () => {
