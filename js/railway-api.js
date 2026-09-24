@@ -431,6 +431,20 @@ const RailwayAPI = (() => {
     return rpc('api_listaPrioridad_leerEstadoPel', [dni, fecha]);
   }
 
+  // Botón "Verificar todos en PEL" (24/9/2026) — un solo bot recorre TODOS
+  // los pacientes activos de la lista en una sola sesión de PEL.
+  async function verificarPelTodos() {
+    return rpc('api_listaPrioridad_verificarPelTodos', []);
+  }
+
+  // Polling del lote — trae pel_verificacion_manual entera de una, sin
+  // cruzar reclamos-rmn-backend (ver rpc/listaPrioridad.js, pensada para
+  // no pegarle a esa API cada 30s durante los ~30 minutos que tarda el lote).
+  async function leerEstadoPelTodos() {
+    const data = await rpc('api_listaPrioridad_leerEstadoPelTodos', []);
+    return data.verificaciones;
+  }
+
   async function marcarVerificadoManualListaPrioridad(id, verificado) {
     return rpc('api_listaPrioridad_marcarVerificadoManual', [id, verificado]);
   }
@@ -656,6 +670,7 @@ const RailwayAPI = (() => {
     obtenerAgendaConfig, estimarDuracionesPractica, leerAsignadoresTurno, guardarAsignadoresTurno,
     buscarEstudioPorDni, leerListaPrioridad, leerResueltosListaPrioridad, agregarAListaPrioridad,
     quitarDeListaPrioridad, reactivarListaPrioridad, verificarPelPorDni, leerEstadoPelItem,
+    verificarPelTodos, leerEstadoPelTodos,
     marcarVerificadoManualListaPrioridad, resolverYArchivarReclamoDesdeLista,
     leerFranjasPreferidasSugerir, guardarFranjaPreferidaSugerir, eliminarFranjaPreferidaSugerir,
     leerCategoriasEstudio, guardarCategoriaEstudio, eliminarCategoriaEstudio,

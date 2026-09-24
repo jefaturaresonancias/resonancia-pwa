@@ -10,6 +10,7 @@ const PriorizacionView = (() => {
   let _resultadoBusqueda = null; // último resultado de _buscar(), para poder "Agregar" sin volver a pedirlo
   let _tabActiva = 'todos'; // 'todos' | 'sin_categoria' | codigo de categoría (NEURO/CUERPO/MSK/...)
   let _vista = 'activos'; // 'activos' | 'resueltos'
+  let _orden = 'fecha_asc'; // 'fecha_asc' (más atrasado primero, default de siempre) | 'fecha_desc'
 
   function init() {
     document.getElementById('pri-buscar-btn').addEventListener('click', _buscar);
@@ -18,6 +19,11 @@ const PriorizacionView = (() => {
     });
     document.getElementById('pri-manual-btn').addEventListener('click', () => _mostrarFormManual());
     document.getElementById('pri-exportar-btn').addEventListener('click', exportarPDF);
+    document.getElementById('pri-verificar-todos-btn').addEventListener('click', _verificarTodos);
+    document.getElementById('pri-orden').addEventListener('change', (e) => {
+      _orden = e.target.value;
+      _render();
+    });
   }
 
   // Activos / Resueltos (24/9/2026, a pedido: "que se pase a otra pestaña
@@ -360,6 +366,77 @@ const PriorizacionView = (() => {
     setTimeout(poll, INTERVALO_MS);
   }
 
+  let _polleoTodosActivo = false; // evita armar dos polling en paralelo si se aprieta el botón dos veces
+
+  // Botón "Verificar todos en PEL" (24/9/2026, a pedido: "correrlos todos
+  // juntos") — un solo bot recorre TODOS los pacientes activos en una
+  // sesión de PEL (ver api_listaPrioridad_verificarPelTodos). Con listas
+  // de 100+ pacientes esto puede tardar bastante — el polling acá es
+  // liviano (leerEstadoPelTodos, sin cruzar reclamos-rmn-backend) y se
+  // frena solo apenas ve que ya se verificaron todos, sin esperar el
+  // timeout entero.
+  async function _verificarTodos() {
+    const btn = document.getElementById('pri-verificar-todos-btn');
+    const activos = _items.length;
+    if (!activos) { App.toast('No hay pacientes en la lista', 'warn'); return; }
+    if (!confirm(`Esto va a consultar PEL para los ${activos} pacientes activos de la lista, uno por uno en una sola corrida — puede tardar bastante (varios minutos cada 10 pacientes aprox.). ¿Confirmar?`)) return;
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Disparando…';
+    let cantidad = activos;
+    try {
+      const res = await RailwayAPI.verificarPelTodos();
+      cantidad = res.cantidad || activos;
+      App.toast(`🤖 Verificando ${cantidad} paciente(s) en PEL — se va actualizando solo, podés seguir usando la app`, 'ok');
+    } catch (err) {
+      App.toast('Error: ' + err.message, 'error');
+      btn.disabled = false;
+      btn.textContent = '🔍 Verificar todos en PEL';
+      return;
+    }
+    btn.textContent = `⏳ Verificando (0/${cantidad})…`;
+
+    if (_polleoTodosActivo) return;
+    _polleoTodosActivo = true;
+    const desde = new Date();
+    const TIMEOUT_MS = 50 * 60 * 1000, INTERVALO_MS = 30000;
+
+    const _docKey = (dni) => String(dni || '').replace(/^(DNI|CIBO|RP)\s*/i, '').trim().replace(/^0+/, '');
+
+    const poll = async () => {
+      let verificaciones = [];
+      try { verificaciones = await RailwayAPI.leerEstadoPelTodos(); } catch (e) { /* reintenta en el próximo tick */ }
+
+      const porClave = {};
+      verificaciones.forEach((v) => { porClave[v.fecha + '_' + v.documento] = v; });
+      let cambiaron = false, verificadosDesde = 0;
+      _items.forEach((it) => {
+        const v = porClave[it.fechaEstudio + '_' + _docKey(it.dni)];
+        const vigente = v && v.pelVerificadoEn && new Date(v.pelVerificadoEn) >= desde;
+        if (vigente) {
+          verificadosDesde++;
+          if (it.pelEstado !== v.pelEstado) cambiaron = true;
+          it.pelEstado = v.pelEstado;
+          it.pelVerificadoEn = v.pelVerificadoEn;
+        }
+      });
+      if (cambiaron) _render();
+      btn.textContent = `⏳ Verificando (${verificadosDesde}/${cantidad})…`;
+
+      if (verificadosDesde >= cantidad || Date.now() - desde.getTime() >= TIMEOUT_MS) {
+        _polleoTodosActivo = false;
+        btn.disabled = false;
+        btn.textContent = '🔍 Verificar todos en PEL';
+        App.toast(verificadosDesde >= cantidad
+          ? `✅ Verificación en lote terminada (${verificadosDesde}/${cantidad})`
+          : `Se dejó de sondear tras 50 min (${verificadosDesde}/${cantidad}) — puede seguir corriendo del lado del bot, revisar panel de Bots`, 'ok');
+        return;
+      }
+      setTimeout(poll, INTERVALO_MS);
+    };
+    setTimeout(poll, INTERVALO_MS);
+  }
+
   async function cargar() {
     const cont = document.getElementById('pri-lista');
     cont.innerHTML = '<div class="loading-bar">⏳ Cargando…</div>';
@@ -373,20 +450,32 @@ const PriorizacionView = (() => {
     }
   }
 
-  // Agrupa por región (más atrasada primero) y ordena cada grupo por días
-  // desde el estudio (más atrasado primero) — usado tanto por _render()
-  // como por exportarPDF(), así la hoja impresa sale en el mismo orden
-  // que se ve en pantalla. Recibe la lista explícita (ya filtrada por
-  // pestaña) en vez de mirar _items directo.
+  // fechaEstudio es ISO (AAAA-MM-DD) — comparación de string alcanza.
+  // fecha_asc = más antigua primero (mismo orden de siempre, equivalente a
+  // ordenar por diasDesdeEstudio descendente); fecha_desc lo invierte
+  // (24/9/2026, a pedido: "opciones para ordenar el listado por fecha
+  // ascendente y descendente").
+  function _compararFecha(a, b) {
+    const cmp = (a.fechaEstudio || '').localeCompare(b.fechaEstudio || '');
+    return _orden === 'fecha_desc' ? -cmp : cmp;
+  }
+
+  // Agrupa por región y ordena cada grupo por fecha del estudio según
+  // _orden — usado tanto por _render() como por exportarPDF(), así la
+  // hoja impresa sale en el mismo orden que se ve en pantalla. Recibe la
+  // lista explícita (ya filtrada por pestaña) en vez de mirar _items
+  // directo. El orden de las regiones (cuál sección aparece primero)
+  // sigue el mismo criterio que cada grupo, mirando su primer item ya
+  // ordenado.
   function _agrupar(items) {
     const porRegion = {};
     for (const it of items) {
       if (!porRegion[it.region]) porRegion[it.region] = [];
       porRegion[it.region].push(it);
     }
-    for (const region in porRegion) porRegion[region].sort((a, b) => b.diasDesdeEstudio - a.diasDesdeEstudio);
+    for (const region in porRegion) porRegion[region].sort(_compararFecha);
     const regiones = Object.keys(porRegion).sort(
-      (a, b) => porRegion[b][0].diasDesdeEstudio - porRegion[a][0].diasDesdeEstudio
+      (a, b) => _compararFecha(porRegion[a][0], porRegion[b][0])
     );
     return { porRegion, regiones };
   }
