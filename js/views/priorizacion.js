@@ -287,8 +287,16 @@ const PriorizacionView = (() => {
 
   async function _agregar(datos) {
     try {
-      await RailwayAPI.agregarAListaPrioridad(datos);
-      App.toast(`✅ ${datos.apellido}, ${datos.nombre} agregado a la lista`, 'ok');
+      const res = await RailwayAPI.agregarAListaPrioridad(datos);
+      // yaResuelto (24/9/2026): api_listaPrioridad_agregar cruza contra
+      // reclamos-rmn-backend al agregar — si administrativo ya lo entregó
+      // en Turnos, lo manda directo a Resueltos en vez de a la lista
+      // activa. Avisar acá para que no parezca que el alta no hizo nada.
+      if (res && res.yaResuelto) {
+        App.toast(`ℹ️ ${datos.apellido}, ${datos.nombre} ya estaba entregado — se agregó directo a Resueltos`, 'ok');
+      } else {
+        App.toast(`✅ ${datos.apellido}, ${datos.nombre} agregado a la lista`, 'ok');
+      }
       _limpiarBusqueda();
       cargar();
     } catch (err) {
