@@ -405,20 +405,8 @@ const TurnoView = (() => {
     const fecha = `${d}/${m}/${y}`;
     const estudio = _estudiosElegidos.join(", ");
 
-    // Excepción de límites (jefatura/admin) — la valida de verdad el
-    // servidor (rpc/turnos.js, _validarExcepcionLimites); acá solo se
-    // exige que no viaje vacía.
-    const excepcionTildada = document.getElementById("t-excepcion-toggle").checked;
-    let datosExcepcion = {};
-    if (excepcionTildada) {
-      const excepcionPin = document.getElementById("t-excepcion-pin").value.trim();
-      if (!excepcionPin) { App.toast("Ingresá el PIN de excepción.", "error"); return; }
-      datosExcepcion = {
-        excepcionLimites: true,
-        excepcionRol: document.getElementById("t-excepcion-rol").value,
-        excepcionPin,
-      };
-    }
+    const datosExcepcion = _leerDatosExcepcion();
+    if (datosExcepcion === null) return;
 
     const btn = document.getElementById("btn-confirmar");
     btn.disabled = true; btn.textContent = "Guardando…";
