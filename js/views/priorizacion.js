@@ -114,19 +114,47 @@ const PriorizacionView = (() => {
     });
   }
 
-  // Contenido del chip de PEL según pel_verificacion_manual (23/9/2026) —
-  // null = nunca se verificó todavía, no es un "no está" real, así que no
-  // se muestra nada (string vacío, no una etiqueta neutra) hasta que se
-  // aprieta "Verificar PEL" al menos una vez.
+  // Contenido del chip de PEL según pel_verificacion_manual (23/9/2026,
+  // vocabulario actualizado 24/9/2026) — null = nunca se verificó
+  // todavía, no es un "no está" real, así que no se muestra nada (string
+  // vacío, no una etiqueta neutra) hasta que se aprieta "Verificar PEL"
+  // al menos una vez.
+  //
+  // PEL cambió su vocabulario de estados el martes 22/9/2026 9hs
+  // (confirmado por el usuario) — conviven los dos por ahora, según
+  // cuándo se haya tocado cada estudio: SIN ASIGNAR (no se hizo) → EN
+  // PROCESO (arrancó) → REALIZADA (terminó en el resonador, sin
+  // informar) → PRELIMINAR (informe sin firma médica, no cuenta como
+  // informado) → FIRMADO (informado de verdad). FINALIZADO/A INFORMAR/
+  // PARCIAL son el vocabulario viejo (bot-verificar-pel-dni.js los mapea
+  // a los mismos casilleros). Un estado real no reconocido se muestra tal
+  // cual (no se le adivina un color/significado).
   function _chipPelHTML(pelEstado) {
-    if (pelEstado === 'FINALIZADO') {
-      return `<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--success-bg);color:var(--success)">✅ Finalizado en PEL</span>`;
+    if (pelEstado === 'FIRMADO' || pelEstado === 'FINALIZADO') {
+      return `<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--success-bg);color:var(--success)">✅ Firmado en PEL</span>`;
     }
-    if (pelEstado === 'A INFORMAR' || pelEstado === 'PRELIMINAR') {
+    if (pelEstado === 'PRELIMINAR') {
+      return `<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--warn-bg);color:var(--warn)">🟡 Preliminar (sin firma)</span>`;
+    }
+    if (pelEstado === 'REALIZADA') {
+      return `<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--warn-bg);color:var(--warn)">🟠 Realizada, sin informar</span>`;
+    }
+    if (pelEstado === 'EN PROCESO') {
+      return `<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--accent-lt);color:var(--accent)">🔵 En proceso</span>`;
+    }
+    if (pelEstado === 'SIN ASIGNAR') {
+      return `<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--bg);color:var(--text-2);border:1px solid var(--border)">⚪ Sin asignar (no se hizo)</span>`;
+    }
+    if (pelEstado === 'A INFORMAR' || pelEstado === 'PARCIAL') {
       return `<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--warn-bg);color:var(--warn)">🟡 A informar en PEL</span>`;
     }
     if (pelEstado === 'NO_ENCONTRADO') {
       return `<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--danger-bg);color:var(--danger)">❌ No está en PEL</span>`;
+    }
+    if (pelEstado) {
+      // Estado real de PEL que no está en la lista de arriba — se muestra
+      // tal cual en vez de ocultarlo o adivinarle un significado.
+      return `<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--bg);color:var(--text-2);border:1px solid var(--border)">❔ PEL: ${pelEstado}</span>`;
     }
     return '';
   }
