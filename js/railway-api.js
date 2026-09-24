@@ -404,12 +404,21 @@ const RailwayAPI = (() => {
     return data.items;
   }
 
+  async function leerResueltosListaPrioridad() {
+    const data = await rpc('api_listaPrioridad_leerResueltos');
+    return data.items;
+  }
+
   async function agregarAListaPrioridad(datos) {
     return rpc('api_listaPrioridad_agregar', [datos]);
   }
 
   async function quitarDeListaPrioridad(id) {
     return rpc('api_listaPrioridad_quitar', [id]);
+  }
+
+  async function reactivarListaPrioridad(id) {
+    return rpc('api_listaPrioridad_reactivar', [id]);
   }
 
   async function verificarPelPorDni(dni, fecha) {
@@ -645,7 +654,8 @@ const RailwayAPI = (() => {
     leerConfigSugerirSobreturno, guardarConfigSugerirSobreturno,
     leerReglasSugerirSobreturno, guardarReglaSugerirSobreturno, eliminarReglaSugerirSobreturno,
     obtenerAgendaConfig, estimarDuracionesPractica, leerAsignadoresTurno, guardarAsignadoresTurno,
-    buscarEstudioPorDni, leerListaPrioridad, agregarAListaPrioridad, quitarDeListaPrioridad, verificarPelPorDni, leerEstadoPelItem,
+    buscarEstudioPorDni, leerListaPrioridad, leerResueltosListaPrioridad, agregarAListaPrioridad,
+    quitarDeListaPrioridad, reactivarListaPrioridad, verificarPelPorDni, leerEstadoPelItem,
     marcarVerificadoManualListaPrioridad, resolverYArchivarReclamoDesdeLista,
     leerFranjasPreferidasSugerir, guardarFranjaPreferidaSugerir, eliminarFranjaPreferidaSugerir,
     leerCategoriasEstudio, guardarCategoriaEstudio, eliminarCategoriaEstudio,

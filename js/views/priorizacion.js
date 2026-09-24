@@ -9,6 +9,7 @@ const PriorizacionView = (() => {
   let _colapsado = new Set();
   let _resultadoBusqueda = null; // último resultado de _buscar(), para poder "Agregar" sin volver a pedirlo
   let _tabActiva = 'todos'; // 'todos' | 'sin_categoria' | codigo de categoría (NEURO/CUERPO/MSK/...)
+  let _vista = 'activos'; // 'activos' | 'resueltos'
 
   function init() {
     document.getElementById('pri-buscar-btn').addEventListener('click', _buscar);
@@ -17,6 +18,36 @@ const PriorizacionView = (() => {
     });
     document.getElementById('pri-manual-btn').addEventListener('click', () => _mostrarFormManual());
     document.getElementById('pri-exportar-btn').addEventListener('click', exportarPDF);
+  }
+
+  // Activos / Resueltos (24/9/2026, a pedido: "que se pase a otra pestaña
+  // o apartado de resueltos para después poder hacer un listado") —
+  // "Quitar" y "Resuelto (retirado)" ya no borran, archivan (ver
+  // rpc/listaPrioridad.js) — esto es dónde se ven después. Selector
+  // aparte de las pestañas de categoría: cambia qué se pide al server
+  // (cargar()), las de categoría siguen funcionando igual adentro de
+  // cualquiera de las dos vistas.
+  function _renderVista() {
+    const cont = document.getElementById('pri-vista');
+    const vistas = [{ id: 'activos', nombre: '📋 Activos' }, { id: 'resueltos', nombre: '✅ Resueltos' }];
+    cont.innerHTML = vistas.map((v) => {
+      const activa = _vista === v.id;
+      return `<button type="button" data-vista="${v.id}" style="
+        padding:.45rem 1rem;border-radius:8px;font-size:.82rem;font-weight:700;cursor:pointer;
+        border:1.5px solid ${activa ? 'var(--navy)' : 'var(--border)'};
+        background:${activa ? 'var(--navy)' : 'var(--surface)'};color:${activa ? '#fff' : 'var(--text-2)'}">
+        ${v.nombre}
+      </button>`;
+    }).join('');
+    cont.querySelectorAll('[data-vista]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        if (btn.dataset.vista === _vista) return;
+        _vista = btn.dataset.vista;
+        _tabActiva = 'todos';
+        _colapsado = new Set();
+        cargar();
+      });
+    });
   }
 
   // Pestañas Neuro/Cuerpo/MSK/... (23/9/2026, a pedido: "vamos a necesitar
@@ -232,10 +263,22 @@ const PriorizacionView = (() => {
   }
 
   async function _quitar(id, nombreCompleto) {
-    if (!confirm(`¿Sacar a ${nombreCompleto} de la lista de priorización?`)) return;
+    if (!confirm(`¿Sacar a ${nombreCompleto} de la lista activa? Pasa a "Resueltos", no se borra.`)) return;
     try {
       await RailwayAPI.quitarDeListaPrioridad(id);
-      App.toast('Sacado de la lista', 'ok');
+      App.toast('✅ Pasado a Resueltos', 'ok');
+      cargar();
+    } catch (err) {
+      App.toast('Error: ' + err.message, 'error');
+    }
+  }
+
+  // Deshace un "Quitar" hecho por error (24/9/2026) — vuelve el item a la
+  // lista activa.
+  async function _reactivar(id, nombreCompleto) {
+    try {
+      await RailwayAPI.reactivarListaPrioridad(id);
+      App.toast(`↺ ${nombreCompleto} vuelve a Activos`, 'ok');
       cargar();
     } catch (err) {
       App.toast('Error: ' + err.message, 'error');
@@ -251,7 +294,7 @@ const PriorizacionView = (() => {
     try {
       await RailwayAPI.resolverYArchivarReclamoDesdeLista(reclamoId);
       await RailwayAPI.quitarDeListaPrioridad(id);
-      App.toast('✅ Reclamo resuelto y archivado', 'ok');
+      App.toast('✅ Reclamo resuelto y archivado — pasa a Resueltos', 'ok');
       cargar();
     } catch (err) {
       App.toast('Error: ' + err.message, 'error');
@@ -321,7 +364,9 @@ const PriorizacionView = (() => {
     const cont = document.getElementById('pri-lista');
     cont.innerHTML = '<div class="loading-bar">⏳ Cargando…</div>';
     try {
-      _items = await RailwayAPI.leerListaPrioridad();
+      _items = _vista === 'resueltos'
+        ? await RailwayAPI.leerResueltosListaPrioridad()
+        : await RailwayAPI.leerListaPrioridad();
       _render();
     } catch (err) {
       cont.innerHTML = `<div style="color:var(--danger);font-size:.85rem;padding:1rem">Error cargando la lista: ${err.message}</div>`;
@@ -348,6 +393,7 @@ const PriorizacionView = (() => {
 
   function _render() {
     const cont = document.getElementById('pri-lista');
+    _renderVista();
     _renderTabs();
     const filtrados = _itemsFiltrados();
     document.getElementById('pri-contador').textContent = _items.length
@@ -355,8 +401,10 @@ const PriorizacionView = (() => {
       : '';
 
     if (!filtrados.length) {
+      const vacioTexto = _items.length ? 'Sin pacientes en esta pestaña'
+        : _vista === 'resueltos' ? 'Todavía no se resolvió ningún paciente' : 'Sin pacientes en la lista de priorización';
       cont.innerHTML = `<div style="text-align:center;padding:3rem;color:var(--text-3)">
-        <div style="font-size:3rem">✅</div><div style="margin-top:1rem">${_items.length ? 'Sin pacientes en esta pestaña' : 'Sin pacientes en la lista de priorización'}</div></div>`;
+        <div style="font-size:3rem">✅</div><div style="margin-top:1rem">${vacioTexto}</div></div>`;
       return;
     }
 
@@ -377,6 +425,27 @@ const PriorizacionView = (() => {
         // verificó todavía (sin chip, no es un "no está" real).
         const chipPelHTML = _chipPelHTML(it.pelEstado);
         const chipEnvioHTML = _chipEstadoEnvioHTML(it.estadoEnvio);
+
+        // En "Resueltos" no tiene sentido volver a verificar PEL ni cerrar
+        // el reclamo de nuevo — solo mostrar cuándo se archivó y dejar
+        // reabrirlo por si "Quitar" se apretó de más.
+        const acciones = _vista === 'resueltos'
+          ? `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;flex-shrink:0">
+              <button type="button" class="btn-sm" data-reactivar="${it.id}" data-nombre="${it.apellido}, ${it.nombre}" style="white-space:nowrap">↺ Volver a Activos</button>
+              <span style="font-size:.68rem;color:var(--text-3)">${it.archivadoEn ? 'archivado ' + new Date(it.archivadoEn).toLocaleDateString('es-AR') : ''}</span>
+            </div>`
+          : `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:.4rem;flex-shrink:0">
+              <div style="display:flex;gap:.4rem">
+                <button type="button" class="btn-sm" data-verificar-pel="${it.dni}" data-fecha="${it.fechaEstudio}" data-id="${it.id}" style="white-space:nowrap">🔍 Verificar PEL</button>
+                ${it.reclamado && it.reclamoId ? `<button type="button" class="btn-sm" data-resolver="${it.id}" data-reclamo-id="${it.reclamoId}" data-nombre="${it.apellido}, ${it.nombre}" style="white-space:nowrap">✅ Resuelto (retirado)</button>` : ''}
+                <button type="button" class="btn-sm" data-quitar="${it.id}" data-nombre="${it.apellido}, ${it.nombre}">✕ Quitar</button>
+              </div>
+              <label style="display:flex;align-items:center;gap:4px;font-size:.7rem;color:var(--text-2);cursor:pointer;white-space:nowrap">
+                <input type="checkbox" data-verif-manual="${it.id}" ${it.verificadoManual ? 'checked' : ''}>
+                Verificado a mano
+              </label>
+            </div>`;
+
         return `
           <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;
             padding:.6rem .85rem;border:1px solid var(--border);border-left:4px solid ${urgencia};
@@ -390,17 +459,7 @@ const PriorizacionView = (() => {
               <span style="color:${urgencia};font-weight:700">${it.diasDesdeEstudio} día${it.diasDesdeEstudio === 1 ? '' : 's'} desde el estudio</span>
               <span style="color:var(--text-3)"> · ${_isoADmy(it.fechaEstudio)}</span>
             </div>
-            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.4rem;flex-shrink:0">
-              <div style="display:flex;gap:.4rem">
-                <button type="button" class="btn-sm" data-verificar-pel="${it.dni}" data-fecha="${it.fechaEstudio}" data-id="${it.id}" style="white-space:nowrap">🔍 Verificar PEL</button>
-                ${it.reclamado && it.reclamoId ? `<button type="button" class="btn-sm" data-resolver="${it.id}" data-reclamo-id="${it.reclamoId}" data-nombre="${it.apellido}, ${it.nombre}" style="white-space:nowrap">✅ Resuelto (retirado)</button>` : ''}
-                <button type="button" class="btn-sm" data-quitar="${it.id}" data-nombre="${it.apellido}, ${it.nombre}">✕ Quitar</button>
-              </div>
-              <label style="display:flex;align-items:center;gap:4px;font-size:.7rem;color:var(--text-2);cursor:pointer;white-space:nowrap">
-                <input type="checkbox" data-verif-manual="${it.id}" ${it.verificadoManual ? 'checked' : ''}>
-                Verificado a mano
-              </label>
-            </div>
+            ${acciones}
           </div>`;
       }).join('');
 
@@ -438,6 +497,9 @@ const PriorizacionView = (() => {
     cont.querySelectorAll('[data-resolver]').forEach((btn) => {
       btn.addEventListener('click', () => _resolverYArchivar(Number(btn.dataset.resolver), btn.dataset.reclamoId, btn.dataset.nombre));
     });
+    cont.querySelectorAll('[data-reactivar]').forEach((btn) => {
+      btn.addEventListener('click', () => _reactivar(Number(btn.dataset.reactivar), btn.dataset.nombre));
+    });
   }
 
   // Entregable en papel de la lista completa (23/9/2026, a pedido) — mismo
@@ -449,9 +511,10 @@ const PriorizacionView = (() => {
     if (!filtrados.length) { App.toast('No hay nada para exportar en esta pestaña', 'warn'); return; }
     const { porRegion, regiones } = _agrupar(filtrados);
     const hoy = new Date().toLocaleDateString('es-AR');
-    const tituloTab = _tabActiva === 'todos' ? 'Priorización de informes'
-      : _tabActiva === 'sin_categoria' ? 'Priorización de informes — Sin categoría'
-      : 'Priorización de informes — ' + (_categoriasPresentes().categorias.find((c) => c.codigo === _tabActiva) || {}).nombre;
+    const base = _vista === 'resueltos' ? 'Resueltos' : 'Priorización de informes';
+    const tituloTab = _tabActiva === 'todos' ? base
+      : _tabActiva === 'sin_categoria' ? base + ' — Sin categoría'
+      : base + ' — ' + (_categoriasPresentes().categorias.find((c) => c.codigo === _tabActiva) || {}).nombre;
 
     const ENVIO_LABEL = { enviado: '📤 Enviado', cargado_para_envio: '📋 Falta enviar', sin_cargar: '⏳ Sin cargar' };
     const filasHtml = (filas) => filas.map((it) => `
