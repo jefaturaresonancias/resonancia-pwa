@@ -11,6 +11,9 @@ const PriorizacionView = (() => {
   let _tabActiva = 'todos'; // 'todos' | 'sin_categoria' | codigo de categoría (NEURO/CUERPO/MSK/...)
   let _vista = 'activos'; // 'activos' | 'resueltos'
   let _orden = 'fecha_asc'; // 'fecha_asc' (más atrasado primero, default de siempre) | 'fecha_desc'
+  let _filtroResueltos = ''; // 25/9/2026, a pedido: "un buscar en priorización que solo busque en resueltos"
+                              // — Resueltos puede acumular cientos de items con el tiempo, a diferencia de
+                              // Activos que se mantiene chico; solo tiene sentido ahí.
 
   function init() {
     document.getElementById('pri-buscar-btn').addEventListener('click', _buscar);
@@ -22,6 +25,10 @@ const PriorizacionView = (() => {
     document.getElementById('pri-verificar-todos-btn').addEventListener('click', _verificarTodos);
     document.getElementById('pri-orden').addEventListener('change', (e) => {
       _orden = e.target.value;
+      _render();
+    });
+    document.getElementById('pri-buscar-resueltos').addEventListener('input', (e) => {
+      _filtroResueltos = e.target.value;
       _render();
     });
   }
@@ -51,9 +58,16 @@ const PriorizacionView = (() => {
         _vista = btn.dataset.vista;
         _tabActiva = 'todos';
         _colapsado = new Set();
+        _filtroResueltos = '';
+        document.getElementById('pri-buscar-resueltos').value = '';
         cargar();
       });
     });
+
+    // El buscador de arriba solo tiene sentido en Resueltos (ver
+    // _filtroResueltos) — se muestra/oculta acá en vez de en _render() para
+    // no reconstruir el input (y perder el foco/cursor) en cada tecla tipeada.
+    document.getElementById('pri-buscar-resueltos-wrap').style.display = _vista === 'resueltos' ? '' : 'none';
   }
 
   // Pestañas Neuro/Cuerpo/MSK/... (23/9/2026, a pedido: "vamos a necesitar
@@ -74,9 +88,22 @@ const PriorizacionView = (() => {
   }
 
   function _itemsFiltrados() {
-    if (_tabActiva === 'todos') return _items;
-    if (_tabActiva === 'sin_categoria') return _items.filter((it) => !it.categorias || !it.categorias.length);
-    return _items.filter((it) => (it.categorias || []).some((c) => c.codigo === _tabActiva));
+    let items = _items;
+    if (_tabActiva === 'sin_categoria') items = items.filter((it) => !it.categorias || !it.categorias.length);
+    else if (_tabActiva !== 'todos') items = items.filter((it) => (it.categorias || []).some((c) => c.codigo === _tabActiva));
+
+    // Buscador de Resueltos (25/9/2026) — texto libre contra DNI (match
+    // parcial, sin normalizar puntos/guiones porque el dato ya se guarda
+    // limpio) o apellido/nombre (sin acentos ni mayúsculas, para no
+    // depender de tipear "Gómez" con tilde).
+    if (_vista === 'resueltos' && _filtroResueltos.trim()) {
+      const q = _filtroResueltos.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+      items = items.filter((it) => {
+        const nombreCompleto = `${it.apellido} ${it.nombre}`.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        return String(it.dni || '').includes(q) || nombreCompleto.includes(q);
+      });
+    }
+    return items;
   }
 
   function _renderTabs() {

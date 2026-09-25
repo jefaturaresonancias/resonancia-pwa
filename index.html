@@ -573,12 +573,18 @@
             </div>
             <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.6rem;flex-wrap:wrap">
               <div id="pri-vista" style="display:flex;gap:.5rem"></div>
-              <div class="form-group" style="min-width:180px;margin:0">
-                <label style="font-size:.68rem">Ordenar por fecha del estudio</label>
-                <select id="pri-orden">
-                  <option value="fecha_asc">⬆️ Más antigua primero</option>
-                  <option value="fecha_desc">⬇️ Más reciente primero</option>
-                </select>
+              <div style="display:flex;gap:.6rem;align-items:flex-end;flex-wrap:wrap">
+                <div class="form-group" id="pri-buscar-resueltos-wrap" style="min-width:200px;margin:0;display:none">
+                  <label style="font-size:.68rem">Buscar en Resueltos (DNI o apellido)</label>
+                  <input type="text" id="pri-buscar-resueltos" placeholder="ej. 30123456 o Gómez">
+                </div>
+                <div class="form-group" style="min-width:180px;margin:0">
+                  <label style="font-size:.68rem">Ordenar por fecha del estudio</label>
+                  <select id="pri-orden">
+                    <option value="fecha_asc">⬆️ Más antigua primero</option>
+                    <option value="fecha_desc">⬇️ Más reciente primero</option>
+                  </select>
+                </div>
               </div>
             </div>
             <div id="pri-tabs" style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.75rem"></div>
