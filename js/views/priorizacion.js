@@ -159,6 +159,18 @@ const PriorizacionView = (() => {
     return '';
   }
 
+  // Chip de Turnos administrativo (24/9/2026) — refleja
+  // turnos_verificacion_manual, subida por la corrida periódica de
+  // _verificarEntregasTurnos (sistema2-node). Si yaEntregadoTurnos es true
+  // el item ya se archivó solo (ver api_listaPrioridad_leer), así que en
+  // la lista Activa este chip en la práctica no debería llegar a verse —
+  // queda sobre todo para explicar en Resueltos por qué salió de la lista
+  // cuando no fue por PEL ni por un reclamo.
+  function _chipEntregaTurnosHTML(it) {
+    if (!it.yaEntregadoTurnos) return '';
+    return `<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--success-bg);color:var(--success)">📦 Entregado en Turnos${it.entregaTurnos ? ' (' + it.entregaTurnos + ')' : ''}</span>`;
+  }
+
   // Estado de envío del informe (23/9/2026, a pedido) — solo llega con
   // valor cuando el bot ya vio FINALIZADO en PEL y el paciente tiene
   // reclamo (ver rpc/listaPrioridad.js): ¿ya se cargó el informe para
@@ -550,6 +562,7 @@ const PriorizacionView = (() => {
         // verificó todavía (sin chip, no es un "no está" real).
         const chipPelHTML = _chipPelHTML(it.pelEstado);
         const chipEnvioHTML = _chipEstadoEnvioHTML(it.estadoEnvio);
+        const chipEntregaTurnosHTML = _chipEntregaTurnosHTML(it);
 
         // En "Resueltos" no tiene sentido volver a verificar PEL ni cerrar
         // el reclamo de nuevo — solo mostrar cuándo se archivó y dejar
@@ -579,7 +592,8 @@ const PriorizacionView = (() => {
               <strong>${it.apellido}, ${it.nombre}</strong> — DNI ${it.dni}
               ${badgeReclamo ? ' · ' + badgeReclamo : ''}
               <span data-pel-chip="${it.id}">${chipPelHTML ? ' · ' + chipPelHTML : ''}</span>
-              ${chipEnvioHTML ? ' · ' + chipEnvioHTML : ''}<br>
+              ${chipEnvioHTML ? ' · ' + chipEnvioHTML : ''}
+              ${chipEntregaTurnosHTML ? ' · ' + chipEntregaTurnosHTML : ''}<br>
               <span style="color:var(--text-2)">${it.estudio}</span><br>
               <span style="color:${urgencia};font-weight:700">${it.diasDesdeEstudio} día${it.diasDesdeEstudio === 1 ? '' : 's'} desde el estudio</span>
               <span style="color:var(--text-3)"> · ${_isoADmy(it.fechaEstudio)}</span>
