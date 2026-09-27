@@ -80,16 +80,23 @@ const PriorizacionView = (() => {
   function _categoriasPresentes() {
     const porCodigo = new Map();
     let hayFueraDeCategoria = false;
+    let hayNoEncontrados = false;
     _items.forEach((it) => {
+      if (it.pelEstado === 'NO_ENCONTRADO') hayNoEncontrados = true;
       if (!it.categorias || !it.categorias.length) { hayFueraDeCategoria = true; return; }
       it.categorias.forEach((c) => { if (!porCodigo.has(c.codigo)) porCodigo.set(c.codigo, c.nombre); });
     });
-    return { categorias: Array.from(porCodigo, ([codigo, nombre]) => ({ codigo, nombre })), hayFueraDeCategoria };
+    return { categorias: Array.from(porCodigo, ([codigo, nombre]) => ({ codigo, nombre })), hayFueraDeCategoria, hayNoEncontrados };
   }
 
   function _itemsFiltrados() {
     let items = _items;
     if (_tabActiva === 'sin_categoria') items = items.filter((it) => !it.categorias || !it.categorias.length);
+    // "No encontrados" (27/9/2026, a pedido) — a diferencia de las demás
+    // pestañas, ésta filtra por pelEstado (resultado de PEL), no por
+    // categoría/región. Solo tiene sentido en Activos: los archivados a
+    // mano ya salieron del circuito de "hay que revisar esto".
+    else if (_tabActiva === 'no_encontrados') items = items.filter((it) => it.pelEstado === 'NO_ENCONTRADO');
     else if (_tabActiva !== 'todos') items = items.filter((it) => (it.categorias || []).some((c) => c.codigo === _tabActiva));
 
     // Buscador de Resueltos (25/9/2026) — texto libre contra DNI (match
@@ -108,19 +115,26 @@ const PriorizacionView = (() => {
 
   function _renderTabs() {
     const cont = document.getElementById('pri-tabs');
-    const { categorias, hayFueraDeCategoria } = _categoriasPresentes();
-    if (!categorias.length) { cont.innerHTML = ''; return; } // todo en una sola bolsa — no vale la pena mostrar pestañas
+    const { categorias, hayFueraDeCategoria, hayNoEncontrados } = _categoriasPresentes();
+    // "No encontrados" solo tiene sentido en Activos (27/9/2026) — puede
+    // ser la única pestaña con contenido si no hay categorías todavía, así
+    // que el corte de "no vale la pena mostrar pestañas" de acá abajo ya
+    // no alcanza con solo mirar categorías.
+    const mostrarNoEncontrados = _vista === 'activos' && hayNoEncontrados;
+    if (!categorias.length && !mostrarNoEncontrados) { cont.innerHTML = ''; return; }
 
     // Si la pestaña activa dejó de tener sentido (se vació esa categoría,
     // o se quitó el único item sin categorizar) volvemos a "Todos" en vez
     // de mostrar una pestaña activa vacía sin aviso.
     const activaSigueExistiendo = _tabActiva === 'todos'
       || (_tabActiva === 'sin_categoria' && hayFueraDeCategoria)
+      || (_tabActiva === 'no_encontrados' && mostrarNoEncontrados)
       || categorias.some((c) => c.codigo === _tabActiva);
     if (!activaSigueExistiendo) _tabActiva = 'todos';
 
     const tabs = [{ codigo: 'todos', nombre: 'Todos' }, ...categorias];
     if (hayFueraDeCategoria) tabs.push({ codigo: 'sin_categoria', nombre: 'Sin categoría' });
+    if (mostrarNoEncontrados) tabs.push({ codigo: 'no_encontrados', nombre: '❌ No encontrados' });
 
     cont.innerHTML = tabs.map((t) => {
       const activa = _tabActiva === t.codigo;
@@ -348,6 +362,24 @@ const PriorizacionView = (() => {
     try {
       await RailwayAPI.quitarDeListaPrioridad(id);
       App.toast('✅ Pasado a Resueltos', 'ok');
+      cargar();
+    } catch (err) {
+      App.toast('Error: ' + err.message, 'error');
+    }
+  }
+
+  // "↩️ Pasar a pendiente" de la pestaña "No encontrados" (27/9/2026, a
+  // pedido) — para cuando ya se revisó a mano (o se repitió el bot varias
+  // veces) que el NO_ENCONTRADO no era un falso negativo puntual. Borra la
+  // verificación de PEL guardada, así el item vuelve a verse como
+  // cualquier otro pendiente activo sin chip, en vez de quedar marcado
+  // "no encontrado" para siempre. No lo saca de Activos — para eso está
+  // "✕ Quitar" (pasa a Resueltos), que ya existe y sigue funcionando igual
+  // acá.
+  async function _pasarAPendiente(id, nombreCompleto) {
+    try {
+      await RailwayAPI.limpiarNoEncontradoListaPrioridad(id);
+      App.toast(`✅ ${nombreCompleto} pasado a pendiente normal`, 'ok');
       cargar();
     } catch (err) {
       App.toast('Error: ' + err.message, 'error');
@@ -603,6 +635,7 @@ const PriorizacionView = (() => {
               <div style="display:flex;gap:.4rem">
                 <button type="button" class="btn-sm" data-verificar-pel="${it.dni}" data-fecha="${it.fechaEstudio}" data-id="${it.id}" style="white-space:nowrap">🔍 Verificar PEL</button>
                 ${it.reclamado && it.reclamoId ? `<button type="button" class="btn-sm" data-resolver="${it.id}" data-reclamo-id="${it.reclamoId}" data-nombre="${it.apellido}, ${it.nombre}" style="white-space:nowrap">✅ Resuelto (retirado)</button>` : ''}
+                ${it.pelEstado === 'NO_ENCONTRADO' ? `<button type="button" class="btn-sm" data-pasar-pendiente="${it.id}" data-nombre="${it.apellido}, ${it.nombre}" style="white-space:nowrap">↩️ Pasar a pendiente</button>` : ''}
                 <button type="button" class="btn-sm" data-quitar="${it.id}" data-nombre="${it.apellido}, ${it.nombre}">✕ Quitar</button>
               </div>
               <label style="display:flex;align-items:center;gap:4px;font-size:.7rem;color:var(--text-2);cursor:pointer;white-space:nowrap">
@@ -653,6 +686,9 @@ const PriorizacionView = (() => {
     });
     cont.querySelectorAll('[data-quitar]').forEach((btn) => {
       btn.addEventListener('click', () => _quitar(Number(btn.dataset.quitar), btn.dataset.nombre));
+    });
+    cont.querySelectorAll('[data-pasar-pendiente]').forEach((btn) => {
+      btn.addEventListener('click', () => _pasarAPendiente(Number(btn.dataset.pasarPendiente), btn.dataset.nombre));
     });
     cont.querySelectorAll('[data-verificar-pel]').forEach((btn) => {
       btn.addEventListener('click', () => _verificarPel(btn.dataset.verificarPel, btn.dataset.fecha, Number(btn.dataset.id), btn));

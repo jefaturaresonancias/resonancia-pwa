@@ -449,6 +449,10 @@ const RailwayAPI = (() => {
     return rpc('api_listaPrioridad_marcarVerificadoManual', [id, verificado]);
   }
 
+  async function limpiarNoEncontradoListaPrioridad(id) {
+    return rpc('api_listaPrioridad_limpiarNoEncontrado', [id]);
+  }
+
   async function resolverYArchivarReclamoDesdeLista(reclamoId) {
     return rpc('api_listaPrioridad_resolverYArchivar', [reclamoId]);
   }
@@ -671,7 +675,7 @@ const RailwayAPI = (() => {
     buscarEstudioPorDni, leerListaPrioridad, leerResueltosListaPrioridad, agregarAListaPrioridad,
     quitarDeListaPrioridad, reactivarListaPrioridad, verificarPelPorDni, leerEstadoPelItem,
     verificarPelTodos, leerEstadoPelTodos,
-    marcarVerificadoManualListaPrioridad, resolverYArchivarReclamoDesdeLista,
+    marcarVerificadoManualListaPrioridad, limpiarNoEncontradoListaPrioridad, resolverYArchivarReclamoDesdeLista,
     leerFranjasPreferidasSugerir, guardarFranjaPreferidaSugerir, eliminarFranjaPreferidaSugerir,
     leerCategoriasEstudio, guardarCategoriaEstudio, eliminarCategoriaEstudio,
     leerAgendaFeriados, guardarAgendaFeriado, eliminarAgendaFeriado,
