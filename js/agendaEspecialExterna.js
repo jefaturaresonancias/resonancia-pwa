@@ -443,7 +443,7 @@
     document.getElementById('ae-form').addEventListener('submit', _confirmar);
     document.getElementById('ae-fecha').addEventListener('change', () => { _validarFecha(); _actualizarDisponibilidad(); });
     document.getElementById('ae-estudio').addEventListener('change', _actualizarDisponibilidad);
-    document.getElementById('ae-fecha').min = new Date().toISOString().slice(0, 10);
+    document.getElementById('ae-fecha').min = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
 
     // Modal de opciones
     document.getElementById('ae-btn-modal-cerrar').addEventListener('click', _cerrarModalTurno);

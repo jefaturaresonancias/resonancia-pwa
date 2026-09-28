@@ -425,7 +425,7 @@ const PanoramaSemanal = (() => {
 
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `panorama-semanal-${new Date().toISOString().slice(0, 10)}.png`;
+      a.download = `panorama-semanal-${new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })}.png`;
       document.body.appendChild(a);
       a.click();
       a.remove();
