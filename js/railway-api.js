@@ -63,6 +63,11 @@ const RailwayAPI = (() => {
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
       body: JSON.stringify({ args })
     });
+    // 401 = token vencido (duran 30 días) o inválido: se devuelve como error
+    // de sesión para que rpc() pida el PIN de nuevo y reintente. Antes se
+    // cortaba acá con "HTTP 401" y la PWA quedaba trabada (28/9/2026, se
+    // vencieron juntos los tokens guardados desde el 27/8).
+    if (resp.status === 401) return { ok: false, error: "Sesión inválida o expirada" };
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     return resp.json();
   }
