@@ -1,8 +1,10 @@
 // Mis licencias (30/9/2026, a pedido): cada técnico carga sus vacaciones,
 // días de estudio o permisos y ve lo que tiene cargado. Escribe en la misma
-// tabla que Vacaciones del panel de jefatura (sistema2), así queda al día
-// sin sincronizar nada: entra como "Solicitado" y jefatura la aprueba desde
-// el panel.
+// tabla que Licencias del panel de jefatura (sistema2): entra como
+// "Solicitado" y jefatura la aprueba desde el panel.
+// Privacidad: se entra con nombre + DNI (validado en el servidor contra el
+// CUIL) y el servidor devuelve solo lo de ese técnico. La sesión vive solo
+// en memoria y se cierra al ir a cualquier otra vista (cerrar()).
 const LicenciasView = (() => {
   const TIPOS = [
     { id: 'VERANO', label: 'Vacaciones', emoji: '🏖️' },
@@ -18,78 +20,90 @@ const LicenciasView = (() => {
     Completado: { fondo: 'var(--bg)', color: 'var(--text-2)', texto: '✔️ Tomada' },
     Rechazado: { fondo: 'var(--danger-bg)', color: 'var(--danger)', texto: '✖ Rechazada' },
   };
-  const KEY_TECNICO = 'licencias_tecnico';
 
   let _tecnicos = [];
-  let _registros = [];
-  let _saldos = [];
-  let _tecnico = null;
+  let _sesion = null; // { tecnico, dni, nombre } — solo en memoria
+  let _datos = null;  // { anio, registros, saldo }
 
   const _esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const _dmy = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ''); return m ? `${m[3]}/${m[2]}/${m[1]}` : (iso || ''); };
-  const _anioActual = () => Number(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).slice(0, 4));
+  const $ = (id) => document.getElementById(id);
 
   function init() {
-    const sel = document.getElementById('lic-tecnico');
-    try { _tecnico = localStorage.getItem(KEY_TECNICO); } catch (e) { _tecnico = null; }
-    sel.addEventListener('change', () => {
-      _tecnico = sel.value || null;
-      try { if (_tecnico) localStorage.setItem(KEY_TECNICO, _tecnico); } catch (e) { /* sin storage: se elige cada vez */ }
-      _render();
-    });
-    document.getElementById('lic-tipo').innerHTML = TIPOS.map((t) => `<option value="${t.id}">${t.emoji} ${t.label}</option>`).join('');
-    document.getElementById('lic-enviar').addEventListener('click', _solicitar);
+    $('lic-tipo').innerHTML = TIPOS.map((t) => `<option value="${t.id}">${t.emoji} ${t.label}</option>`).join('');
+    $('lic-entrar').addEventListener('click', _entrar);
+    $('lic-dni').addEventListener('keydown', (e) => { if (e.key === 'Enter') _entrar(); });
+    $('lic-salir').addEventListener('click', cerrar);
+    $('lic-enviar').addEventListener('click', _solicitar);
   }
 
+  // Al abrir la vista: solo la lista de nombres (sin datos de nadie).
   async function cargar() {
-    const lista = document.getElementById('lic-lista');
-    lista.innerHTML = '<div class="loading-bar">⏳ Cargando…</div>';
+    _mostrar();
+    if (_tecnicos.length) return;
     try {
-      const [tecnicos, registros, saldos] = await Promise.all([
-        _tecnicos.length ? _tecnicos : RailwayAPI.leerTecnicos(),
-        RailwayAPI.leerLicencias(),
-        RailwayAPI.leerSaldosLicencias(_anioActual()),
-      ]);
-      _tecnicos = tecnicos;
-      _registros = registros;
-      _saldos = saldos;
-      _renderSelector();
-      _render();
+      _tecnicos = await RailwayAPI.tecnicosLicencias();
+      $('lic-tecnico').innerHTML = '<option value="">— Elegí tu nombre —</option>' +
+        _tecnicos.map((t) => `<option value="${_esc(t.iniciales)}">${_esc(t.nombre)}</option>`).join('');
     } catch (err) {
-      lista.innerHTML = `<div style="color:var(--danger);font-size:.85rem;padding:1rem">Error cargando licencias: ${_esc(err.message)}</div>`;
+      App.toast('Error cargando la lista de técnicos: ' + err.message, 'error');
     }
   }
 
-  function _renderSelector() {
-    const sel = document.getElementById('lic-tecnico');
-    if (_tecnico && !_tecnicos.some((t) => t.iniciales === _tecnico)) _tecnico = null;
-    sel.innerHTML = '<option value="">— Elegí tu nombre —</option>' +
-      _tecnicos.map((t) => `<option value="${_esc(t.iniciales)}"${t.iniciales === _tecnico ? ' selected' : ''}>${_esc(t.nombreCompleto || t.iniciales)}</option>`).join('');
+  // Cierra la sesión y borra de pantalla todo lo del técnico.
+  function cerrar() {
+    _sesion = null;
+    _datos = null;
+    if (!$('lic-dni')) return;
+    $('lic-dni').value = '';
+    $('lic-tecnico').value = '';
+    ['lic-desde', 'lic-hasta', 'lic-obs'].forEach((id) => { $(id).value = ''; });
+    $('lic-saldos').innerHTML = '';
+    $('lic-lista').innerHTML = '';
+    _mostrar();
+  }
+
+  function _mostrar() {
+    $('lic-login').classList.toggle('hidden', !!_sesion);
+    $('lic-sesion').classList.toggle('hidden', !_sesion);
+  }
+
+  async function _entrar() {
+    const tecnico = $('lic-tecnico').value;
+    const dni = $('lic-dni').value.trim();
+    if (!tecnico || !dni) { App.toast('Elegí tu nombre y escribí tu DNI', 'warn'); return; }
+    const btn = $('lic-entrar');
+    btn.disabled = true;
+    try {
+      await _cargarMisDatos(tecnico, dni);
+      $('lic-dni').value = '';
+    } catch (err) {
+      App.toast(err.message, 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function _cargarMisDatos(tecnico, dni) {
+    const res = await RailwayAPI.misLicencias(tecnico, dni);
+    _sesion = { tecnico: res.tecnico.iniciales, dni, nombre: res.tecnico.nombre };
+    _datos = { anio: res.anio, registros: res.registros || [], saldo: res.saldo };
+    _mostrar();
+    _render();
   }
 
   function _render() {
-    const saldosEl = document.getElementById('lic-saldos');
-    const lista = document.getElementById('lic-lista');
-    const form = document.getElementById('lic-form');
-    form.classList.toggle('hidden', !_tecnico);
-    if (!_tecnico) {
-      saldosEl.innerHTML = '';
-      lista.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-3)">Elegí tu nombre para ver y cargar tus licencias.</div>';
-      return;
-    }
+    if (!_sesion) return;
+    $('lic-quien').textContent = _sesion.nombre;
+    const { anio, registros, saldo } = _datos;
 
-    const anio = _anioActual();
-    const mias = _registros.filter((r) => r.tecnico === _tecnico && Number(r.anio) >= anio)
-      .sort((a, b) => (a.fechaInicio < b.fechaInicio ? 1 : -1));
-
-    // Saldos del año (solo los tipos con tope anual) + días pendientes de aprobación.
-    const saldo = _saldos.find((s) => s.iniciales === _tecnico);
-    const pendientes = (tipo) => mias.filter((r) => r.tipo === tipo && r.estado === 'Solicitado' && Number(r.anio) === anio)
+    const pendientes = (tipo) => registros.filter((r) => r.tipo === tipo && r.estado === 'Solicitado' && Number(r.anio) === anio)
       .reduce((acc, r) => acc + (Number(r.diasHab) || 0), 0);
-    saldosEl.innerHTML = !saldo
-      ? '<div style="font-size:.8rem;color:var(--text-3);margin-bottom:.75rem">Todavía no tenés saldos configurados para ' + anio + ' — lo carga jefatura.</div>'
+    const tarjetas = (saldo || []).filter((p) => p.disponible > 0 || p.tomado > 0);
+    $('lic-saldos').innerHTML = !tarjetas.length
+      ? `<div style="font-size:.8rem;color:var(--text-3);margin-bottom:.75rem">Todavía no tenés saldos configurados para ${anio} — lo carga jefatura.</div>`
       : '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.6rem;margin-bottom:1rem">' +
-        saldo.porTipo.filter((p) => p.disponible > 0 || p.tomado > 0).map((p) => {
+        tarjetas.map((p) => {
           const t = TIPO[p.tipo] || { emoji: '', label: p.tipo };
           const pend = pendientes(p.tipo);
           return `<div style="border:1px solid var(--border);border-radius:var(--radius);padding:.6rem .8rem;background:var(--surface)">
@@ -99,19 +113,21 @@ const LicenciasView = (() => {
           </div>`;
         }).join('') + '</div>';
 
-    if (!mias.length) {
-      lista.innerHTML = '<div style="text-align:center;padding:1.5rem;color:var(--text-3)">No tenés licencias cargadas desde ' + anio + '.</div>';
+    const lista = $('lic-lista');
+    if (!registros.length) {
+      lista.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--text-3)">No tenés licencias cargadas desde ${anio}.</div>`;
       return;
     }
     lista.innerHTML = '<div style="font-weight:700;font-size:.82rem;color:var(--navy);margin:.25rem 0 .5rem">Lo que tenés cargado</div>' +
-      mias.map((r) => {
+      registros.map((r) => {
         const t = TIPO[r.tipo] || { emoji: '', label: r.tipo };
         const e = ESTADO[r.estado] || ESTADO.Solicitado;
+        const dias = Number(r.diasHab) || 0;
         const rango = r.fechaInicio === r.fechaFin ? _dmy(r.fechaInicio) : `${_dmy(r.fechaInicio)} al ${_dmy(r.fechaFin)}`;
         return `<div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.6rem .85rem;
             border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);margin-bottom:.4rem">
           <div style="font-size:.82rem;line-height:1.5;min-width:0">
-            <strong>${t.emoji} ${t.label}</strong> · ${rango} · ${Number(r.diasHab) || 0} día${Number(r.diasHab) === 1 ? '' : 's'} hábil${Number(r.diasHab) === 1 ? '' : 'es'}
+            <strong>${t.emoji} ${t.label}</strong> · ${rango} · ${dias} día${dias === 1 ? '' : 's'} hábil${dias === 1 ? '' : 'es'}
             <span style="font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:4px;background:${e.fondo};color:${e.color}">${e.texto}</span>
             ${r.observaciones ? `<br><span style="color:var(--text-2)">${_esc(r.observaciones)}</span>` : ''}
           </div>
@@ -122,27 +138,23 @@ const LicenciasView = (() => {
   }
 
   async function _solicitar() {
-    const tipo = document.getElementById('lic-tipo').value;
-    const desde = document.getElementById('lic-desde').value;
-    const hasta = document.getElementById('lic-hasta').value || desde;
-    const obs = document.getElementById('lic-obs').value.trim();
-    if (!_tecnico) { App.toast('Elegí tu nombre primero', 'warn'); return; }
+    if (!_sesion) return;
+    const tipo = $('lic-tipo').value;
+    const desde = $('lic-desde').value;
+    const hasta = $('lic-hasta').value || desde;
+    const obs = $('lic-obs').value.trim();
     if (!desde) { App.toast('Elegí la fecha desde', 'warn'); return; }
     if (hasta < desde) { App.toast('La fecha "hasta" no puede ser anterior a "desde"', 'warn'); return; }
-    const t = TIPO[tipo];
-    const nombre = (_tecnicos.find((x) => x.iniciales === _tecnico) || {}).nombreCompleto || _tecnico;
     const rango = desde === hasta ? _dmy(desde) : `${_dmy(desde)} al ${_dmy(hasta)}`;
-    if (!confirm(`¿Enviar solicitud de ${t.label} para ${nombre}, ${rango}?\n\nQueda pendiente hasta que jefatura la apruebe.`)) return;
+    if (!confirm(`¿Enviar solicitud de ${TIPO[tipo].label}, ${rango}?\n\nQueda pendiente hasta que jefatura la apruebe.`)) return;
 
-    const btn = document.getElementById('lic-enviar');
+    const btn = $('lic-enviar');
     btn.disabled = true;
     try {
-      await RailwayAPI.solicitarLicencia({ tecnico: _tecnico, tipo, fechaInicio: desde, fechaFin: hasta, observaciones: obs });
+      await RailwayAPI.solicitarLicencia({ tecnico: _sesion.tecnico, dni: _sesion.dni, tipo, fechaInicio: desde, fechaFin: hasta, observaciones: obs });
       App.toast('✅ Solicitud enviada — queda pendiente de aprobación', 'ok');
-      document.getElementById('lic-desde').value = '';
-      document.getElementById('lic-hasta').value = '';
-      document.getElementById('lic-obs').value = '';
-      await cargar();
+      ['lic-desde', 'lic-hasta', 'lic-obs'].forEach((id) => { $(id).value = ''; });
+      await _cargarMisDatos(_sesion.tecnico, _sesion.dni);
     } catch (err) {
       App.toast(err.message, 'error');
     } finally {
@@ -151,15 +163,15 @@ const LicenciasView = (() => {
   }
 
   async function _cancelar(id) {
-    if (!confirm('¿Cancelar esta solicitud? Se borra (todavía no estaba aprobada).')) return;
+    if (!_sesion || !confirm('¿Cancelar esta solicitud? Se borra (todavía no estaba aprobada).')) return;
     try {
-      await RailwayAPI.cancelarSolicitudLicencia(id, _tecnico);
+      await RailwayAPI.cancelarSolicitudLicencia(id, _sesion.tecnico, _sesion.dni);
       App.toast('Solicitud cancelada', 'ok');
-      await cargar();
+      await _cargarMisDatos(_sesion.tecnico, _sesion.dni);
     } catch (err) {
       App.toast(err.message, 'error');
     }
   }
 
-  return { init, cargar };
+  return { init, cargar, cerrar };
 })();

@@ -454,23 +454,21 @@ const RailwayAPI = (() => {
     return rpc('api_listaPrioridad_marcarVerificadoManual', [id, verificado]);
   }
 
-  // ── Mis licencias (30/9/2026): misma tabla que Vacaciones del panel de
-  // jefatura (sistema2) — lo que carga el técnico aparece ahí al instante.
-  async function leerTecnicos() {
-    return (await rpc('api_obtenerTecnicos', [])).tecnicos || [];
+  // ── Mis licencias (30/9/2026): misma tabla que Licencias del panel de
+  // jefatura (sistema2). Todo con nombre + DNI: el servidor solo devuelve
+  // lo del técnico validado (nadie ve lo de los demás).
+  async function tecnicosLicencias() {
+    return (await rpc('api_vac_tecnicosLista', [])).tecnicos || [];
   }
-  async function leerLicencias() {
-    return (await rpc('api_vac_obtener', [])).registros || [];
+  async function misLicencias(tecnico, dni) {
+    return rpc('api_vac_misLicencias', [{ tecnico, dni }]);
   }
-  async function leerSaldosLicencias(anio) {
-    return (await rpc('api_vac_obtenerResumenSaldos', [anio])).resumen || [];
-  }
-  /** @param {object} datos { tecnico, tipo, fechaInicio, fechaFin (AAAA-MM-DD), observaciones } */
+  /** @param {object} datos { tecnico, dni, tipo, fechaInicio, fechaFin (AAAA-MM-DD), observaciones } */
   async function solicitarLicencia(datos) {
     return rpc('api_vac_solicitar', [datos]);
   }
-  async function cancelarSolicitudLicencia(id, tecnico) {
-    return rpc('api_vac_cancelarSolicitud', [id, tecnico]);
+  async function cancelarSolicitudLicencia(id, tecnico, dni) {
+    return rpc('api_vac_cancelarSolicitud', [id, tecnico, dni]);
   }
 
   async function limpiarNoEncontradoListaPrioridad(id) {
@@ -700,7 +698,7 @@ const RailwayAPI = (() => {
     quitarDeListaPrioridad, reactivarListaPrioridad, verificarPelPorDni, leerEstadoPelItem,
     verificarPelTodos, leerEstadoPelTodos,
     marcarVerificadoManualListaPrioridad, limpiarNoEncontradoListaPrioridad, resolverYArchivarReclamoDesdeLista,
-    leerTecnicos, leerLicencias, leerSaldosLicencias, solicitarLicencia, cancelarSolicitudLicencia,
+    tecnicosLicencias, misLicencias, solicitarLicencia, cancelarSolicitudLicencia,
     leerFranjasPreferidasSugerir, guardarFranjaPreferidaSugerir, eliminarFranjaPreferidaSugerir,
     leerCategoriasEstudio, guardarCategoriaEstudio, eliminarCategoriaEstudio,
     leerAgendaFeriados, guardarAgendaFeriado, eliminarAgendaFeriado,

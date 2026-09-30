@@ -561,10 +561,23 @@
             <h2>Mis licencias</h2>
           </div>
           <div style="padding:1rem;overflow-y:auto;flex:1">
-            <div class="form-group" style="max-width:340px;margin-bottom:1rem"><label>¿Quién sos?</label>
-              <select id="lic-tecnico"></select></div>
+            <div id="lic-login" style="border:1px solid var(--border);border-radius:var(--radius);padding:.85rem;background:var(--surface);max-width:520px">
+              <div style="font-weight:700;font-size:.82rem;color:var(--navy);margin-bottom:.5rem">Entrá con tu nombre y tu DNI</div>
+              <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:flex-end">
+                <div class="form-group" style="flex:2;min-width:200px"><label>¿Quién sos?</label><select id="lic-tecnico"></select></div>
+                <div class="form-group" style="flex:1;min-width:130px"><label>DNI</label>
+                  <input type="password" id="lic-dni" inputmode="numeric" autocomplete="off" placeholder="sin puntos"></div>
+                <button type="button" class="btn-sm" id="lic-entrar">Entrar</button>
+              </div>
+              <div style="font-size:.72rem;color:var(--text-3);margin-top:.5rem">Solo ves tus licencias. Al salir de esta sección se cierra sola.</div>
+            </div>
+            <div id="lic-sesion" class="hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.75rem">
+              <div style="font-weight:700;color:var(--navy)">👤 <span id="lic-quien"></span></div>
+              <button type="button" class="btn-sm" id="lic-salir">Salir</button>
+            </div>
             <div id="lic-saldos"></div>
-            <div id="lic-form" class="hidden" style="border:1px solid var(--border);border-radius:var(--radius);padding:.85rem;background:var(--surface);margin-bottom:1rem">
+            <div id="lic-form" style="border:1px solid var(--border);border-radius:var(--radius);padding:.85rem;background:var(--surface);margin-bottom:1rem">
               <div style="font-weight:700;font-size:.82rem;color:var(--navy);margin-bottom:.5rem">Nueva solicitud</div>
               <div style="display:flex;gap:.6rem;flex-wrap:wrap">
                 <div class="form-group" style="flex:2;min-width:200px"><label>Tipo</label><select id="lic-tipo"></select></div>
@@ -579,6 +592,7 @@
               </div>
             </div>
             <div id="lic-lista"></div>
+            </div>
           </div>
         </div>
 

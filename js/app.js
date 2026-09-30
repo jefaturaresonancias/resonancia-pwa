@@ -68,6 +68,8 @@ const App = (() => {
 
   // ── Mostrar / ocultar views ───────────────────────────────
   function showView(id) {
+    // Mis licencias: la sesión (nombre + DNI) se cierra al ir a cualquier otra vista.
+    if (id !== "licencias") LicenciasView.cerrar();
     // Tooltips de la grilla de agenda (agenda.js, .tooltip-turno) se
     // agregan sueltos a document.body al pasar el mouse y se sacan recién
     // en mouseleave — si la celda que los abrió se destruye antes (un
