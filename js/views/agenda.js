@@ -1100,7 +1100,7 @@ const AgendaView = (() => {
       const cached   = forzar ? null : sessionStorage.getItem(cacheKey);
 
       let datos, risMap, cardioMap;
-      if (!_estudiosConfigCache) {
+      if (!_estudiosConfigCache || forzar) { // "Actualizar" también trae cambios de Config
         try { const cfg = await RailwayAPI.obtenerAgendaConfig(); _estudiosConfigCache = cfg.estudios || {}; } catch(_) {}
       }
       if (cached) {

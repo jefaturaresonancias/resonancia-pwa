@@ -10,14 +10,21 @@ const TurnoView = (() => {
   let _filtroCodigo     = null;      // código de restricción (ej. "SC") al entrar desde una franja por código en la agenda
 
   // ── Cargar estudios ───────────────────────────────────────
+  // Se piden de nuevo cada vez que se abre el formulario: antes quedaban
+  // guardados hasta recargar la PWA, y un cambio de duración/restricción en
+  // Config no se veía al dar el turno (30/9/2026). Los 5 s evitan repetir el
+  // pedido en el mismo clic (Modificar llama dos veces seguidas); si falla,
+  // se sigue con lo último que se tenía.
+  let _estudiosCargadosEn = 0;
   async function cargarEstudios() {
-    if (Object.keys(_estudiosConfig).length > 0) return;
+    if (Date.now() - _estudiosCargadosEn < 5000) return;
     try {
       const cfg = await RailwayAPI.obtenerAgendaConfig();
       _estudiosConfig = cfg.estudios || {};
+      _estudiosCargadosEn = Date.now();
       _poblarSelect();
     } catch (err) {
-      App.toast("Error cargando estudios: " + err.message, "error");
+      if (!Object.keys(_estudiosConfig).length) App.toast("Error cargando estudios: " + err.message, "error");
     }
   }
 
