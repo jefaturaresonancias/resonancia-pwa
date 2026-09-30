@@ -22,6 +22,7 @@ const LicenciasView = (() => {
   };
 
   let _tecnicos = [];
+  let _reglas = null; // texto de las reglas (api_vac_reglas), se carga una vez
   let _sesion = null; // { tecnico, dni, nombre } — solo en memoria
   let _datos = null;  // { anio, registros, saldo }
 
@@ -37,9 +38,24 @@ const LicenciasView = (() => {
     $('lic-enviar').addEventListener('click', _solicitar);
   }
 
-  // Al abrir la vista: solo la lista de nombres (sin datos de nadie).
+  // Reglas de licencias tal como las valida sistema2 (mismo texto que ve
+  // jefatura en el panel), visibles cada vez que se abre la pantalla.
+  async function _cargarReglas() {
+    if (!_reglas) _reglas = await RailwayAPI.reglasLicencias();
+    const grupos = {};
+    _reglas.forEach((r) => { (grupos[r.tipo] = grupos[r.tipo] || []).push(r.texto); });
+    const orden = ['GENERAL', ...TIPOS.map((t) => t.id)].filter((t) => grupos[t]);
+    $('lic-reglas').innerHTML = `<details open style="border:1px solid var(--border);border-radius:var(--radius);padding:.6rem .85rem;background:var(--surface);margin-bottom:1rem">
+      <summary style="cursor:pointer;font-weight:700;font-size:.82rem;color:var(--navy)">📘 Reglas de licencias</summary>
+      ${orden.map((t) => `<div style="margin-top:.5rem;font-size:.8rem"><b>${t === 'GENERAL' ? 'Generales' : `${TIPO[t].emoji} ${TIPO[t].label}`}</b>
+        <ul style="margin:.2rem 0 0 1.1rem;padding:0;color:var(--text-2)">${grupos[t].map((x) => `<li>${_esc(x)}</li>`).join('')}</ul></div>`).join('')}
+    </details>`;
+  }
+
+  // Al abrir la vista: reglas + solo la lista de nombres (sin datos de nadie).
   async function cargar() {
     _mostrar();
+    _cargarReglas().catch((err) => App.toast('No se pudieron cargar las reglas: ' + err.message, 'warn'));
     if (_tecnicos.length) return;
     try {
       _tecnicos = await RailwayAPI.tecnicosLicencias();

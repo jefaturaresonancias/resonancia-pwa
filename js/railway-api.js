@@ -457,6 +457,9 @@ const RailwayAPI = (() => {
   // ── Mis licencias (30/9/2026): misma tabla que Licencias del panel de
   // jefatura (sistema2). Todo con nombre + DNI: el servidor solo devuelve
   // lo del técnico validado (nadie ve lo de los demás).
+  async function reglasLicencias() {
+    return (await rpc('api_vac_reglas', [])).reglas || [];
+  }
   async function tecnicosLicencias() {
     return (await rpc('api_vac_tecnicosLista', [])).tecnicos || [];
   }
@@ -698,7 +701,7 @@ const RailwayAPI = (() => {
     quitarDeListaPrioridad, reactivarListaPrioridad, verificarPelPorDni, leerEstadoPelItem,
     verificarPelTodos, leerEstadoPelTodos,
     marcarVerificadoManualListaPrioridad, limpiarNoEncontradoListaPrioridad, resolverYArchivarReclamoDesdeLista,
-    tecnicosLicencias, misLicencias, solicitarLicencia, cancelarSolicitudLicencia,
+    reglasLicencias, tecnicosLicencias, misLicencias, solicitarLicencia, cancelarSolicitudLicencia,
     leerFranjasPreferidasSugerir, guardarFranjaPreferidaSugerir, eliminarFranjaPreferidaSugerir,
     leerCategoriasEstudio, guardarCategoriaEstudio, eliminarCategoriaEstudio,
     leerAgendaFeriados, guardarAgendaFeriado, eliminarAgendaFeriado,
