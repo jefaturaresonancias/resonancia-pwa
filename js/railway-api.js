@@ -454,6 +454,25 @@ const RailwayAPI = (() => {
     return rpc('api_listaPrioridad_marcarVerificadoManual', [id, verificado]);
   }
 
+  // ── Mis licencias (30/9/2026): misma tabla que Vacaciones del panel de
+  // jefatura (sistema2) — lo que carga el técnico aparece ahí al instante.
+  async function leerTecnicos() {
+    return (await rpc('api_obtenerTecnicos', [])).tecnicos || [];
+  }
+  async function leerLicencias() {
+    return (await rpc('api_vac_obtener', [])).registros || [];
+  }
+  async function leerSaldosLicencias(anio) {
+    return (await rpc('api_vac_obtenerResumenSaldos', [anio])).resumen || [];
+  }
+  /** @param {object} datos { tecnico, tipo, fechaInicio, fechaFin (AAAA-MM-DD), observaciones } */
+  async function solicitarLicencia(datos) {
+    return rpc('api_vac_solicitar', [datos]);
+  }
+  async function cancelarSolicitudLicencia(id, tecnico) {
+    return rpc('api_vac_cancelarSolicitud', [id, tecnico]);
+  }
+
   async function limpiarNoEncontradoListaPrioridad(id) {
     return rpc('api_listaPrioridad_limpiarNoEncontrado', [id]);
   }
@@ -681,6 +700,7 @@ const RailwayAPI = (() => {
     quitarDeListaPrioridad, reactivarListaPrioridad, verificarPelPorDni, leerEstadoPelItem,
     verificarPelTodos, leerEstadoPelTodos,
     marcarVerificadoManualListaPrioridad, limpiarNoEncontradoListaPrioridad, resolverYArchivarReclamoDesdeLista,
+    leerTecnicos, leerLicencias, leerSaldosLicencias, solicitarLicencia, cancelarSolicitudLicencia,
     leerFranjasPreferidasSugerir, guardarFranjaPreferidaSugerir, eliminarFranjaPreferidaSugerir,
     leerCategoriasEstudio, guardarCategoriaEstudio, eliminarCategoriaEstudio,
     leerAgendaFeriados, guardarAgendaFeriado, eliminarAgendaFeriado,
