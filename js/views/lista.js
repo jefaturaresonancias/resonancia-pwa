@@ -372,8 +372,11 @@ Esta acción no se puede deshacer.`)) return;
       // fila por cada slot vacío de la franja).
       if (!turno) {
         if (slot.tipo === "franja" || slot.tipo === "franja_origen") return "";
-        const bg    = slot.color || "#f5f5f5";
-        const label = slot.label || slot.tipo || "";
+        // Turno dentro de un bloqueo puntual (2/10/2026): el backend ahora
+        // devuelve el turno con `enBloqueo` en vez del bloqueo — en sus
+        // filas de continuación se sigue mostrando el bloqueo, como antes.
+        const bg    = slot.enBloqueo ? "#e06666" : (slot.color || "#f5f5f5");
+        const label = slot.enBloqueo || slot.label || slot.tipo || "";
         // Bloqueo puro — ocultar en vista técnico
         if (esTecnico) return "";
         return `<tr style="background:${bg}18">

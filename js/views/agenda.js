@@ -289,26 +289,57 @@ const AgendaView = (() => {
         if (esContinuacion || spannedTurno) continue;
 
         // RIS: buscar el que empieza exactamente en este slot (rm >= mins && rm < nextMins)
-        const dniAgenda   = new Set((dia.slots||[]).filter(sl=>sl.dni).map(sl=>String(sl.dni).trim().replace(/^0+/,"")));
-        const apellAgenda = new Set((dia.slots||[]).filter(sl=>sl.apellido).map(sl=>sl.apellido.trim().toUpperCase()));
+        const pacientesAgenda = (dia.slots||[]).flatMap(sl => [sl, ...(sl.solapados||[])]);
+        const dniAgenda   = new Set(pacientesAgenda.filter(sl=>sl.dni).map(sl=>String(sl.dni).trim().replace(/^0+/,"")));
+        const apellAgenda = new Set(pacientesAgenda.filter(sl=>sl.apellido).map(sl=>sl.apellido.trim().toUpperCase()));
         // Excluir RIS que ya están en la agenda cardiológica del día
         const dniCardio = new Set((cardioMap[dia.fecha]||[]).map(c => String(c.dni||"").trim().replace(/^0+/,"")));
-        const risNuevo = (risMap[dia.fecha]||[]).find(r => {
-          const rm = typeof r.mins==="number" ? r.mins : parsearMinsJS(r.hora);
-          if (rm < mins || rm >= nextMins) return false;
+        const _minsRIS = r => typeof r.mins==="number" ? r.mins : parsearMinsJS(r.hora);
+        const _risSinTurno = r => {
           const dniRIS   = String(r.documento||"").replace(/[A-Za-z]+\s*/,"").trim().replace(/^0+/,"");
           const apellRIS = String(r.apellido_nombre||"").split(",")[0].trim().toUpperCase();
           if (dniAgenda.has(dniRIS) || apellAgenda.has(apellRIS)) return false;
           if (dniCardio.has(dniRIS)) return false; // ya aparece en franja cardio
           return true;
+        };
+        const risNuevo = inicioTurno ? null : (risMap[dia.fecha]||[]).find(r => {
+          const rm = _minsRIS(r);
+          return rm >= mins && rm < nextMins && _risSinTurno(r);
         });
 
         // Si hay RIS nuevo → registrar activo, marcar como NO mostrado aún
         if (risNuevo) {
           const dur = _duracionRIS(risNuevo.practica);
-          risActivoCol[di] = { ris: risNuevo, hasta: risNuevo.mins + dur, mostrado: false };
+          risActivoCol[di] = { ris: risNuevo, hasta: _minsRIS(risNuevo) + dur, mostrado: false };
         } else if (risActivoCol[di] && mins >= risActivoCol[di].hasta) {
           risActivoCol[di] = null;
+        }
+
+        // Todo lo que arranca mientras dura este turno (2/10/2026, a pedido:
+        // "si autorizo con PIN de jefatura que un turno pise otro tienen que
+        // mostrarse ambos y el de RIS si es que está"): otros turnos de la
+        // PWA (el backend los manda en `solapados` del slot donde arrancan)
+        // y estudios de RIS sin turno propio. Antes las filas tapadas por el
+        // rowspan se salteaban enteras y eso quedaba invisible.
+        let risEnTurno = [];
+        if (inicioTurno) {
+          const hastaTurno = activosPorCol[di].hasta;
+          risEnTurno = (risMap[dia.fecha]||[])
+            .filter(r => { const rm = _minsRIS(r); return rm >= mins && rm < hastaTurno && _risSinTurno(r); })
+            .sort((a, b) => _minsRIS(a) - _minsRIS(b));
+          s._solapadosVista = dia.slots
+            .filter(sl => sl.fila === s.fila)
+            .flatMap(sl => sl.solapados || [])
+            .sort((a, b) => a.mins - b.mins);
+          // Un RIS de adentro que sigue después del turno: su barra de
+          // continuación se dibuja en las filas siguientes (salvo que ya
+          // hubiera uno de antes que termina todavía más tarde).
+          const ultimoRIS = risEnTurno
+            .map(r => ({ ris: r, hasta: _minsRIS(r) + _duracionRIS(r.practica) }))
+            .sort((a, b) => b.hasta - a.hasta)[0];
+          if (ultimoRIS && ultimoRIS.hasta > hastaTurno && !(risActivoCol[di] && risActivoCol[di].hasta >= ultimoRIS.hasta)) {
+            risActivoCol[di] = { ris: ultimoRIS.ris, hasta: ultimoRIS.hasta, mostrado: true };
+          }
         }
 
         const risActivo       = risActivoCol[di];
@@ -401,7 +432,7 @@ const AgendaView = (() => {
 
           if (!skipRender) {
             if (risNuevo && risActivoCol[di]) risActivoCol[di].mostrado = true;
-            const renderRIS = cardioRender.length > 0 ? cardioRender : (risNuevo ? [risNuevo] : []);
+            const renderRIS = cardioRender.length > 0 ? cardioRender : (inicioTurno ? risEnTurno : (risNuevo ? [risNuevo] : []));
             const rowSpan = inicioTurno ? activosPorCol[di].rowSpan : 1;
             // Sin slot propio (fila "rara" de RIS) pero dentro de una franja
             // — usar el fallback para no perder el color a mitad de bloque.
@@ -430,49 +461,17 @@ const AgendaView = (() => {
     // libre/franja/bloqueo, según corresponda, como si no hubiera RIS.
     // Cardiología no es RIS (otra planilla) — no se toca con este toggle.
     const esCardio = tieneRIS && risSlot[0] && risSlot[0]._cardio;
+    const solapados = (tipo === "turno" && slot._solapadosVista) || [];
     if (_ocultarRIS && !esCardio) {
       if (!slot) return `<td${rowspanAttr}></td>`;
+      // "Mostrar RIS" apaga solo el RIS — los turnos propios que se pisan se siguen viendo.
+      if (solapados.length) return _renderTurnoConSuperpuestos(slot, [], solapados, fecha, mins, rowspan);
       return _renderSlot(slot, fecha, mins, risDelDia || [], rowspan);
     }
 
-    // Si hay turno propio + RIS → celda dividida side by side
-    if (tipo === "turno" && tieneRIS) {
-      const col = _coloresOrigen(slot.origen);
-      const pres = slot.presente === "Presente" ? "✅" : "";
-      // slot.risEstado es el cruce por DNI (¿este turno YA está en RIS?),
-      // resuelto por el backend — distinto de `ris` acá arriba, que es el
-      // registro de RIS que coincide por HORARIO (de otro paciente, el
-      // "sobreturno" que arma la celda dividida). Mismo texto que usa la
-      // celda de turno normal, para que sea consistente en toda la agenda.
-      const risLinea = slot.risEstado ? `\n🏥 RIS: ${slot.risEstado}` : `\n🚫 NO ASIGNADO EN RIS`;
-      const sinSolicitudLinea = slot.solicitudDigital === false ? `\n🚫 SIN SOLICITUD DIGITAL` : "";
-      const creadoLinea = slot.creadoEn ? `\n🗓️ Cargado el: ${slot.creadoEn}` : "";
-      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${slot.tecnicoAsigno?"\n🧑‍⚕️ Asignó: "+slot.tecnicoAsigno:""}${risLinea}${sinSolicitudLinea}${creadoLinea}`;
-      let horaFinBadge = "";
-      if (rowspan > 1) {
-        const hasta = mins + (slot.duracion || _paso);
-        const horaF = String(Math.floor(hasta/60)).padStart(2,"0")+":"+String(hasta%60).padStart(2,"0");
-        horaFinBadge = `<span style="color:${col.text};opacity:.7;font-size:9px;font-weight:700;margin-left:3px">→${horaF}</span>`;
-      }
-      const sinSolicitudBadge = slot.solicitudDigital === false
-        ? `<span style="background:#c62828;color:#fff;border-radius:3px;padding:0 4px;font-size:7px;font-weight:700;margin-left:3px">SIN SOLICITUD</span>` : "";
-      return `<td${rowspanAttr} style="padding:0;border:1px solid #e4e8ee;height:36px${slot.solicitudDigital === false ? ";box-shadow:inset 0 0 0 2px #c62828" : ""}">
-        <div style="display:flex;height:100%;gap:1px">
-          <div class="slot-turno slot-content" style="flex:1;background:${slot.color||"#a8d5a2"};border-left:3px solid ${col.border};cursor:pointer;overflow:hidden"
-            data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-turno-id="${slot.turnoId||""}" data-tooltip="${encodeURIComponent(tip)}"
-            data-fturno="1" data-origen="${slot.origen||""}" data-presente="${slot.presente==="Presente"?"1":"0"}" data-estudio="${(slot.estudio||"").toLowerCase()}">
-            <span class="slot-nombre" style="color:${col.text}">${slot.apellido}, ${slot.nombre} ${pres}${horaFinBadge}${sinSolicitudBadge}</span>
-            <span class="slot-estudio" style="color:${col.text}">${slot.estudio}</span>
-          </div>
-          <div class="slot-ris-side slot-content" style="flex:1;background:#f0f0f0;border-left:2px dashed #bbb;cursor:pointer;overflow:hidden"
-            data-fecha="${fecha}" data-mins="${mins}" data-ris-nombre="${encodeURIComponent(ris.apellido_nombre)}" data-ris-practica="${encodeURIComponent(ris.practica)}"
-            data-ya-sobreturno="1"
-            title="Ya hay un sobreturno en este horario (${slot.apellido}, ${slot.nombre})">
-            <span class="slot-nombre" style="color:#888;font-style:italic;font-size:10px">${ris.apellido_nombre}</span>
-            <span class="slot-estudio" style="color:#aaa;font-size:9px">${ris.practica} <span style="background:#ddd;color:#777;border-radius:3px;padding:0 3px;font-size:8px">RIS</span></span>
-          </div>
-        </div>
-      </td>`;
+    // Turno propio + otros turnos y/o RIS que arrancan mientras dura → celda dividida
+    if (tipo === "turno" && (tieneRIS || solapados.length)) {
+      return _renderTurnoConSuperpuestos(slot, risSlot || [], solapados, fecha, mins, rowspan);
     }
 
     // Si hay solo RIS en slot libre → celda RIS clickeable
@@ -577,6 +576,85 @@ const AgendaView = (() => {
     return _renderSlot(slot, fecha, mins, risDelDia || [], rowspan);
   }
 
+  // Texto del tooltip/"Opciones del turno" — texto plano a propósito (se
+  // muestra también dentro de un confirm() nativo al anular). slot.risEstado
+  // es el cruce por DNI (¿este turno YA está en RIS?), resuelto por el
+  // backend. `enBloqueo` (2/10/2026): el turno cae dentro de un bloqueo
+  // puntual de agenda.
+  function _tipTurno(slot) {
+    const risLinea = slot.risEstado ? `\n🏥 RIS: ${slot.risEstado}` : `\n🚫 NO ASIGNADO EN RIS`;
+    const sinSolicitudLinea = slot.solicitudDigital === false ? `\n🚫 SIN SOLICITUD DIGITAL` : "";
+    const creadoLinea = slot.creadoEn ? `\n🗓️ Cargado el: ${slot.creadoEn}` : "";
+    const bloqueoLinea = slot.enBloqueo ? `\n⛔ Dentro del bloqueo: ${slot.enBloqueo}` : "";
+    return `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${slot.tecnicoAsigno?"\n🧑‍⚕️ Asignó: "+slot.tecnicoAsigno:""}${slot.presente === "Presente"?"\n✅ Presente":""}${risLinea}${sinSolicitudLinea}${creadoLinea}${bloqueoLinea}`;
+  }
+
+  function _badgeBloqueo(slot) {
+    return slot.enBloqueo
+      ? `<span style="background:#e06666;color:#fff;border-radius:3px;padding:0 4px;font-size:7px;font-weight:700;margin-left:3px" title="Dentro del bloqueo: ${slot.enBloqueo}">⛔ BLOQUEO</span>`
+      : "";
+  }
+
+  // Celda de un turno con otros adentro (2/10/2026, a pedido: "si autorizo
+  // con PIN de jefatura que un turno pise otro tienen que mostrarse ambos y
+  // el de RIS si es que está"). Izquierda: el turno dueño de la celda (el
+  // que empezó primero). Derecha, con su hora: todo lo que arranca mientras
+  // dura — otros turnos de la PWA (clic = opciones del turno, como
+  // cualquier turno) y estudios de RIS sin turno propio (gris; clic = aviso
+  // de sobreturno, igual que antes la celda turno + RIS).
+  function _renderTurnoConSuperpuestos(slot, risItems, solapados, fecha, mins, rowspan) {
+    const rowspanAttr = rowspan > 1 ? ` rowspan="${rowspan}"` : "";
+    const col  = _coloresOrigen(slot.origen);
+    const pres = slot.presente === "Presente" ? "✅" : "";
+    let horaFinBadge = "";
+    if (rowspan > 1) {
+      const hasta = mins + (slot.duracion || _paso);
+      const horaF = String(Math.floor(hasta/60)).padStart(2,"0")+":"+String(hasta%60).padStart(2,"0");
+      horaFinBadge = `<span style="color:${col.text};opacity:.7;font-size:9px;font-weight:700;margin-left:3px">→${horaF}</span>`;
+    }
+    const sinSolicitudBadge = slot.solicitudDigital === false
+      ? `<span style="background:#c62828;color:#fff;border-radius:3px;padding:0 4px;font-size:7px;font-weight:700;margin-left:3px">SIN SOLICITUD</span>` : "";
+
+    const horaDe = m => String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0");
+    const items = [
+      ...solapados.map(t => {
+        const c = _coloresOrigen(t.origen);
+        return { mins: t.mins, html: `
+          <div class="slot-turno slot-solapado" style="flex-shrink:0;background:${t.color||"#a8d5a2"};border-left:3px solid ${c.border};padding:1px 4px;overflow:hidden${t.solicitudDigital === false ? ";box-shadow:inset 0 0 0 2px #c62828" : ""}"
+            data-fecha="${fecha}" data-mins="${t.mins}" data-fila="${t.fila}" data-turno-id="${t.turnoId||""}" data-tooltip="${encodeURIComponent(_tipTurno(t))}"
+            data-fturno="1" data-origen="${t.origen||""}" data-presente="${t.presente==="Presente"?"1":"0"}" data-estudio="${(t.estudio||"").toLowerCase()}">
+            <span class="slot-nombre" style="color:${c.text}">${t.hora} ${t.apellido}, ${t.nombre}${t.presente === "Presente" ? " ✅" : ""}${t.horaFin ? `<span style="opacity:.7;font-size:9px;margin-left:3px">→${t.horaFin}</span>` : ""}</span>
+            <span class="slot-estudio" style="color:${c.text}">${t.estudio}</span>
+          </div>` };
+      }),
+      ...risItems.map(r => {
+        const rm = typeof r.mins === "number" ? r.mins : parsearMinsJS(r.hora);
+        return { mins: rm, html: `
+          <div class="slot-ris-side" style="flex-shrink:0;padding:1px 4px;cursor:pointer;overflow:hidden"
+            data-fecha="${fecha}" data-mins="${rm}" data-ris-nombre="${encodeURIComponent(r.apellido_nombre)}" data-ris-practica="${encodeURIComponent(r.practica)}"
+            data-ya-sobreturno="1"
+            title="RIS: ${r.apellido_nombre} — ${r.practica}${r.estado ? `\nEstado: ${r.estado}` : ""}\nSe superpone con ${slot.apellido}, ${slot.nombre}">
+            <span class="slot-nombre" style="color:#777;font-style:italic;font-size:10px">${horaDe(rm)} ${r.apellido_nombre}</span>
+            <span class="slot-estudio" style="color:#999;font-size:9px">${r.practica} <span style="background:#ddd;color:#777;border-radius:3px;padding:0 3px;font-size:8px">RIS</span></span>
+          </div>` };
+      }),
+    ].sort((a, b) => a.mins - b.mins);
+
+    return `<td${rowspanAttr} style="padding:0;border:1px solid #e4e8ee;height:36px${slot.solicitudDigital === false ? ";box-shadow:inset 0 0 0 2px #c62828" : ""}">
+      <div style="display:flex;height:100%;gap:1px">
+        <div class="slot-turno slot-content${rowspan > 1 ? " slot-content-expandido" : ""}" style="flex:1;background:${slot.color||"#a8d5a2"};border-left:3px solid ${col.border};cursor:pointer;overflow:hidden"
+          data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-turno-id="${slot.turnoId||""}" data-tooltip="${encodeURIComponent(_tipTurno(slot))}"
+          data-fturno="1" data-origen="${slot.origen||""}" data-presente="${slot.presente==="Presente"?"1":"0"}" data-estudio="${(slot.estudio||"").toLowerCase()}">
+          <span class="slot-nombre" style="color:${col.text}">${slot.apellido}, ${slot.nombre} ${pres}${horaFinBadge}${sinSolicitudBadge}${_badgeBloqueo(slot)}</span>
+          <span class="slot-estudio" style="color:${col.text}">${slot.estudio}</span>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:2px;padding:2px;overflow-y:auto;background:#f4f4f4;border-left:2px dashed #bbb" title="También en este horario">
+          ${items.map(i => i.html).join("")}
+        </div>
+      </div>
+    </td>`;
+  }
+
   function _renderSlot(slot, fecha, mins, risDelDia, rowspan = 1) {
     const tipo = slot.tipo || "libre";
     const bg   = slot.color || "#fff";
@@ -610,21 +688,16 @@ const AgendaView = (() => {
       const iconRIS   = atendido ? `<span style="color:#2e7d32;font-weight:700;margin-right:2px">✓</span>`
                       : ausente  ? `<span style="color:#c62828;font-weight:700;margin-right:2px">✗</span>`
                       : "";
-      // Línea de RIS para el tooltip/"Opciones del turno" (29/8/2026, a
-      // pedido) — texto plano a propósito (nada de HTML acá): esta misma
-      // cadena también se muestra tal cual dentro de un confirm() nativo
-      // al anular, que no interpreta HTML. El resaltado en rojo de "NO
-      // ASIGNADO EN RIS" se aplica después, solo donde sí se renderiza
-      // como HTML (ver _posTip/mostrarOpcionesTurno).
-      const risLinea = estRIS ? `\n🏥 RIS: ${estRIS}` : `\n🚫 NO ASIGNADO EN RIS`;
+      // Línea de RIS en el tooltip/"Opciones del turno" (29/8/2026): ver
+      // _tipTurno. El resaltado en rojo de "NO ASIGNADO EN RIS" se aplica
+      // después, solo donde sí se renderiza como HTML (ver
+      // _posTip/mostrarOpcionesTurno).
       // "SIN SOLICITUD DIGITAL" (29/8/2026, a pedido) — checkbox del panel
       // de turno; se guarda en Postgres y se muestra bien visible acá:
       // borde rojo en toda la celda + badge junto al nombre + línea en el
       // tooltip/"Opciones del turno".
       const sinSolicitud = slot.solicitudDigital === false;
-      const sinSolicitudLinea = sinSolicitud ? `\n🚫 SIN SOLICITUD DIGITAL` : "";
-      const creadoLinea = slot.creadoEn ? `\n🗓️ Cargado el: ${slot.creadoEn}` : "";
-      const tip  = `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${slot.observaciones?"\n📝 "+slot.observaciones:""}${slot.tecnicoAsigno?"\n🧑‍⚕️ Asignó: "+slot.tecnicoAsigno:""}${pres?"\n✅ Presente":""}${risLinea}${sinSolicitudLinea}${creadoLinea}`;
+      const tip  = _tipTurno(slot);
       // Mismo texto que ve el estado real de RIS (ej. "Asignado") — antes
       // acá solo decía "RIS" genérico, sin decir si ya está confirmado o
       // no en el sistema del hospital.
@@ -645,12 +718,12 @@ const AgendaView = (() => {
       // en vez de esconderla detrás del tooltip al pasar el mouse.
       const contenido = rowspan > 1
         ? `<div class="slot-content slot-content-expandido">
-            <span class="slot-nombre" style="color:${col.text}">${iconRIS}${slot.apellido}, ${slot.nombre} ${pres}${horaFinBadge}${sinSolicitudBadge}</span>
+            <span class="slot-nombre" style="color:${col.text}">${iconRIS}${slot.apellido}, ${slot.nombre} ${pres}${horaFinBadge}${sinSolicitudBadge}${_badgeBloqueo(slot)}</span>
             ${dniTexto ? `<span class="slot-detalle" style="color:${col.text}">${dniTexto}</span>` : ""}
             <span class="slot-estudio-full" style="color:${col.text}">${slot.estudio}${badgeRIS}</span>
             <span class="slot-origen-badge" style="color:${col.text}">${slot.origen||""}</span>
           </div>`
-        : `<div class="slot-content"><span class="slot-nombre" style="color:${col.text}">${iconRIS}${slot.apellido}, ${slot.nombre} ${pres}${sinSolicitudBadge}</span><span class="slot-estudio" style="color:${col.text}">${slot.estudio}${badgeRIS}</span></div>`;
+        : `<div class="slot-content"><span class="slot-nombre" style="color:${col.text}">${iconRIS}${slot.apellido}, ${slot.nombre} ${pres}${sinSolicitudBadge}${_badgeBloqueo(slot)}</span><span class="slot-estudio" style="color:${col.text}">${slot.estudio}${badgeRIS}</span></div>`;
 
       return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border}${sinSolicitud ? ";box-shadow:inset 0 0 0 2px #c62828" : ""}" data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-turno-id="${slot.turnoId||""}" data-tooltip="${encodeURIComponent(tip)}"${rowspanAttr}
         data-fturno="1" data-origen="${slot.origen||""}" data-presente="${slot.presente==="Presente"?"1":"0"}" data-estudio="${(slot.estudio||"").toLowerCase()}"
