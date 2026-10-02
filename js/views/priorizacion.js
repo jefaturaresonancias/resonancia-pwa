@@ -22,7 +22,8 @@ const PriorizacionView = (() => {
     });
     document.getElementById('pri-manual-btn').addEventListener('click', () => _mostrarFormManual());
     document.getElementById('pri-exportar-btn').addEventListener('click', exportarPDF);
-    document.getElementById('pri-verificar-todos-btn').addEventListener('click', _verificarTodos);
+    document.getElementById('pri-verificar-todos-btn').addEventListener('click', () => _verificarLote(false));
+    document.getElementById('pri-super-btn').addEventListener('click', () => _verificarLote(true));
     document.getElementById('pri-orden').addEventListener('change', (e) => {
       _orden = e.target.value;
       _render();
@@ -482,33 +483,53 @@ const PriorizacionView = (() => {
   // liviano (leerEstadoPelTodos, sin cruzar reclamos-rmn-backend) y se
   // frena solo apenas ve que ya se verificaron todos, sin esperar el
   // timeout entero.
-  async function _verificarTodos() {
-    const btn = document.getElementById('pri-verificar-todos-btn');
-    const activos = _items.length;
-    if (!activos) { App.toast('No hay pacientes en la lista', 'warn'); return; }
-    if (!confirm(`Esto va a consultar PEL para los ${activos} pacientes activos de la lista, uno por uno en una sola corrida — puede tardar bastante (varios minutos cada 10 pacientes aprox.). ¿Confirmar?`)) return;
+  //
+  // "🚀 Súper verificador" (2/10/2026, a pedido) — mismo lote, pero solo con
+  // lo que todavía no tiene verificación vigente (it.pelVigente, ver
+  // rpc/listaPrioridad.js): lo recién cargado primero. En los dos modos, lo
+  // que PEL devuelve FIRMADO/FINALIZADO sale de la lista activa apenas se
+  // ve (el servidor lo archiva a Resueltos en la próxima lectura), así queda
+  // solo lo que falta informar.
+  const PEL_INFORMADO = ['FIRMADO', 'FINALIZADO'];
+  const _docKey = (dni) => String(dni || '').replace(/^(DNI|CIBO|RP)\s*/i, '').trim().replace(/^0+/, '');
+
+  async function _verificarLote(soloSinVerificar) {
+    if (_vista !== 'activos') { App.toast('Pasá a la vista Activos para verificar', 'warn'); return; }
+    const btn = document.getElementById(soloSinVerificar ? 'pri-super-btn' : 'pri-verificar-todos-btn');
+    const textoBtn = soloSinVerificar ? '🚀 Súper verificador PEL' : '🔍 Verificar todos en PEL';
+    const enLote = soloSinVerificar ? _items.filter((it) => !it.pelVigente) : _items.slice();
+    if (!_items.length) { App.toast('No hay pacientes en la lista', 'warn'); return; }
+    if (!enLote.length) { App.toast('Todos los pacientes ya tienen verificación de PEL vigente — usá "Verificar todos" para repetirla', 'warn'); return; }
+    if (_polleoTodosActivo) { App.toast('Ya hay una verificación en lote en curso', 'warn'); return; }
+    const minutos = Math.max(5, Math.round(enLote.length * 12 / 60));
+    if (!confirm((soloSinVerificar
+      ? `Súper verificador: consulta PEL para los ${enLote.length} pacientes sin verificación vigente (lo recién cargado primero).`
+      : `Consulta PEL para los ${enLote.length} pacientes activos de la lista.`) +
+      `\n\nLo que esté FIRMADO pasa solo a Resueltos y quedan en Activos solo los que faltan informar.\nTarda aprox. ${minutos} min — podés seguir usando la app. ¿Confirmar?`)) return;
 
     btn.disabled = true;
     btn.textContent = '⏳ Disparando…';
-    let cantidad = activos;
+    let cantidad = enLote.length;
     try {
-      const res = await RailwayAPI.verificarPelTodos();
-      cantidad = res.cantidad || activos;
+      const res = await RailwayAPI.verificarPelTodos(soloSinVerificar);
+      cantidad = res.cantidad || cantidad;
       App.toast(`🤖 Verificando ${cantidad} paciente(s) en PEL — se va actualizando solo, podés seguir usando la app`, 'ok');
     } catch (err) {
       App.toast('Error: ' + err.message, 'error');
       btn.disabled = false;
-      btn.textContent = '🔍 Verificar todos en PEL';
+      btn.textContent = textoBtn;
       return;
     }
     btn.textContent = `⏳ Verificando (0/${cantidad})…`;
 
-    if (_polleoTodosActivo) return;
     _polleoTodosActivo = true;
     const desde = new Date();
-    const TIMEOUT_MS = 50 * 60 * 1000, INTERVALO_MS = 30000;
-
-    const _docKey = (dni) => String(dni || '').replace(/^(DNI|CIBO|RP)\s*/i, '').trim().replace(/^0+/, '');
+    // ~12 s por paciente + margen, nunca menos de los 50 min de siempre.
+    const TIMEOUT_MS = Math.max(50 * 60 * 1000, cantidad * 20 * 1000), INTERVALO_MS = 30000;
+    const claves = new Set(enLote.map((it) => it.fechaEstudio + '_' + _docKey(it.dni)));
+    cantidad = claves.size; // mismo DNI y fecha = una sola consulta (igual que el servidor)
+    const vistos = new Set();
+    let aResueltos = 0;
 
     const poll = async () => {
       let verificaciones = [];
@@ -516,27 +537,35 @@ const PriorizacionView = (() => {
 
       const porClave = {};
       verificaciones.forEach((v) => { porClave[v.fecha + '_' + v.documento] = v; });
-      let cambiaron = false, verificadosDesde = 0;
-      _items.forEach((it) => {
-        const v = porClave[it.fechaEstudio + '_' + _docKey(it.dni)];
-        const vigente = v && v.pelVerificadoEn && new Date(v.pelVerificadoEn) >= desde;
-        if (vigente) {
-          verificadosDesde++;
-          if (it.pelEstado !== v.pelEstado) cambiaron = true;
-          it.pelEstado = v.pelEstado;
-          it.pelVerificadoEn = v.pelVerificadoEn;
-        }
+      let cambiaron = false;
+      claves.forEach((clave) => {
+        const v = porClave[clave];
+        if (v && v.pelVerificadoEn && new Date(v.pelVerificadoEn) >= desde) vistos.add(clave);
       });
-      if (cambiaron) _render();
-      btn.textContent = `⏳ Verificando (${verificadosDesde}/${cantidad})…`;
+      // Solo sobre Activos: si mientras tanto se pasó a ver Resueltos, esa
+      // lista no se toca (al volver, cargar() trae Activos ya actualizado).
+      if (_vista === 'activos') _items = _items.filter((it) => {
+        const clave = it.fechaEstudio + '_' + _docKey(it.dni);
+        const v = porClave[clave];
+        if (!vistos.has(clave) || !v) return true;
+        if (it.pelEstado !== v.pelEstado) cambiaron = true;
+        it.pelEstado = v.pelEstado;
+        it.pelVerificadoEn = v.pelVerificadoEn;
+        it.pelVigente = true;
+        if (PEL_INFORMADO.includes(v.pelEstado)) { aResueltos++; cambiaron = true; return false; }
+        return true;
+      });
+      if (cambiaron && _vista === 'activos') _render();
+      btn.textContent = `⏳ Verificando (${vistos.size}/${cantidad})…`;
 
-      if (verificadosDesde >= cantidad || Date.now() - desde.getTime() >= TIMEOUT_MS) {
+      if (vistos.size >= cantidad || Date.now() - desde.getTime() >= TIMEOUT_MS) {
         _polleoTodosActivo = false;
         btn.disabled = false;
-        btn.textContent = '🔍 Verificar todos en PEL';
-        App.toast(verificadosDesde >= cantidad
-          ? `✅ Verificación en lote terminada (${verificadosDesde}/${cantidad})`
-          : `Se dejó de sondear tras 50 min (${verificadosDesde}/${cantidad}) — puede seguir corriendo del lado del bot, revisar panel de Bots`, 'ok');
+        btn.textContent = textoBtn;
+        App.toast(vistos.size >= cantidad
+          ? `✅ Verificación terminada (${vistos.size}/${cantidad}) — ${aResueltos} firmado(s) pasaron a Resueltos`
+          : `Se dejó de sondear (${vistos.size}/${cantidad}) — puede seguir corriendo del lado del bot, revisar panel de Bots`, 'ok');
+        if (_vista === 'activos') cargar(); // el servidor archiva los firmados al leer
         return;
       }
       setTimeout(poll, INTERVALO_MS);
@@ -595,6 +624,12 @@ const PriorizacionView = (() => {
     document.getElementById('pri-contador').textContent = _items.length
       ? `${filtrados.length} de ${_items.length} paciente${_items.length === 1 ? '' : 's'}`
       : '';
+    // Cuántos le faltan verificar al Súper verificador (solo en Activos).
+    const superBtn = document.getElementById('pri-super-btn');
+    if (superBtn && !_polleoTodosActivo) {
+      const sinVerificar = _vista === 'activos' ? _items.filter((it) => !it.pelVigente).length : 0;
+      superBtn.textContent = '🚀 Súper verificador PEL' + (sinVerificar ? ` (${sinVerificar})` : '');
+    }
 
     if (!filtrados.length) {
       const vacioTexto = _items.length ? 'Sin pacientes en esta pestaña'
