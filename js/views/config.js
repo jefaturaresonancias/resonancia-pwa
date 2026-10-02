@@ -740,18 +740,137 @@ const ConfigView = (() => {
   }
 
   // ── Editar bloqueo ────────────────────────────────────────
+  // Formulario con calendario (2/10/2026, a pedido): antes eran 4 prompt()
+  // de texto libre y un error en la fecha pasaba sin aviso (se quiso
+  // bloquear el 09/10 y quedó el 10/10). Antes de guardar se muestra el día
+  // de la semana y los turnos ya dados en ese horario — el bloqueo no los
+  // cancela, hay que reprogramarlos aparte. Usa el modal genérico de
+  // sugerir-modal-overlay (mismo que Categorías/Franjas preferidas).
+  const DIAS_LARGO = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+
+  function _escHtml(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function _dmyAIso(dmy) {
+    const [d, m, y] = String(dmy || '').split('/');
+    return (d && m && y) ? `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}` : '';
+  }
+  function _isoADmy(iso) {
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+  }
+  function _diaLargo(iso) {
+    const [y, m, d] = iso.split('-').map(Number);
+    return DIAS_LARGO[new Date(y, m - 1, d).getDay()];
+  }
+  function _horaAMin(h) {
+    const [hh, mm] = String(h || '').split(':').map(Number);
+    return hh * 60 + (mm || 0);
+  }
+
   function _editarBloqueo(idx) {
     const nuevo = idx === -1;
     const b     = nuevo ? { fecha:"", horaDesde:"", horaHasta:"", concepto:"" } : {..._datos.bloqueos[idx]};
-    const fecha    = prompt("Fecha del bloqueo (dd/MM/yyyy):", b.fecha);
-    if (!fecha) return;
-    const horaDesde = prompt("Hora desde (HH:MM):", b.horaDesde);
-    if (!horaDesde) return;
-    const horaHasta = prompt("Hora hasta (HH:MM):", b.horaHasta);
-    if (!horaHasta) return;
-    const concepto = prompt("Concepto:", b.concepto);
-    if (!concepto) return;
-    _guardarSeccion(RailwayAPI.guardarAgendaBloqueo, { id: b.id, fecha, horaDesde, horaHasta, concepto }, "Bloqueo guardado");
+    const form  = { id: b.id, fechaIso: _dmyAIso(b.fecha), horaDesde: b.horaDesde || '', horaHasta: b.horaHasta || '', concepto: b.concepto || '' };
+    document.getElementById('sugerir-modal-overlay').classList.remove('hidden');
+    _renderFormularioBloqueo(form, nuevo);
+  }
+
+  function _renderFormularioBloqueo(form, nuevo) {
+    document.getElementById('sugerir-modal-titulo').textContent = nuevo ? 'Nuevo bloqueo puntual' : 'Editar bloqueo puntual';
+    document.getElementById('sugerir-modal-body').innerHTML = `
+      <div class="form-group" style="margin-bottom:.75rem">
+        <label>Fecha</label>
+        <input type="date" id="bloq-form-fecha" value="${form.fechaIso}">
+        <div id="bloq-form-dia" style="font-size:.8rem;color:var(--text-2);margin-top:4px"></div>
+      </div>
+      <div style="display:flex;gap:.75rem;margin-bottom:.75rem">
+        <div class="form-group" style="flex:1">
+          <label>Hora desde</label>
+          <input type="time" id="bloq-form-desde" value="${form.horaDesde}">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label>Hora hasta</label>
+          <input type="time" id="bloq-form-hasta" value="${form.horaHasta}">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:.75rem">
+        <label>Concepto</label>
+        <input type="text" id="bloq-form-concepto" value="${_escHtml(form.concepto)}" placeholder="Ej: Mantenimiento del Resonador">
+      </div>
+      <div id="bloq-form-error" style="color:#c62828;font-size:.8rem;margin-top:.5rem"></div>`;
+    document.getElementById('sugerir-modal-footer').innerHTML = `
+      <button class="btn-sm" id="btn-bloq-cancelar">Cancelar</button>
+      <button class="btn-primary" id="btn-bloq-revisar">Revisar y guardar</button>`;
+
+    const inputFecha = document.getElementById('bloq-form-fecha');
+    const mostrarDia = () => {
+      document.getElementById('bloq-form-dia').textContent = inputFecha.value
+        ? `Cae ${_diaLargo(inputFecha.value)} ${_isoADmy(inputFecha.value)}` : '';
+    };
+    inputFecha.addEventListener('input', mostrarDia);
+    mostrarDia();
+    document.getElementById('btn-bloq-cancelar').addEventListener('click', _cerrarModalSugerir);
+    document.getElementById('btn-bloq-revisar').addEventListener('click', () => _revisarBloqueo(form, nuevo));
+  }
+
+  async function _revisarBloqueo(form, nuevo) {
+    const errorEl = document.getElementById('bloq-form-error');
+    errorEl.textContent = '';
+    form.fechaIso  = document.getElementById('bloq-form-fecha').value;
+    form.horaDesde = document.getElementById('bloq-form-desde').value;
+    form.horaHasta = document.getElementById('bloq-form-hasta').value;
+    form.concepto  = document.getElementById('bloq-form-concepto').value.trim();
+    if (!form.fechaIso) { errorEl.textContent = 'Elegí la fecha.'; return; }
+    if (!form.horaDesde || !form.horaHasta) { errorEl.textContent = 'Completá las dos horas.'; return; }
+    if (form.horaHasta <= form.horaDesde) { errorEl.textContent = 'La hora hasta debe ser mayor a la hora desde.'; return; }
+    if (!form.concepto) { errorEl.textContent = 'Completá el concepto.'; return; }
+
+    const btn = document.getElementById('btn-bloq-revisar');
+    btn.disabled = true; btn.textContent = '⏳ Revisando…';
+    const fechaDmy = _isoADmy(form.fechaIso);
+    let turnosEnFranja = [];
+    let avisoTurnos = '';
+    try {
+      const desde = _horaAMin(form.horaDesde), hasta = _horaAMin(form.horaHasta);
+      turnosEnFranja = ((await RailwayAPI.turnos(fechaDmy)) || []).filter(t => t.mins >= desde && t.mins < hasta);
+    } catch (err) {
+      avisoTurnos = `<div style="color:var(--text-2)">No se pudieron revisar los turnos de ese día (${_escHtml(err.message)}).</div>`;
+    }
+    if (turnosEnFranja.length) {
+      avisoTurnos = `
+        <div style="background:#fff4e5;border:1px solid #f0b46c;border-radius:8px;padding:.6rem .75rem;color:#7a4a00">
+          ⚠️ Ya hay ${turnosEnFranja.length} turno${turnosEnFranja.length > 1 ? 's' : ''} en ese horario. El bloqueo no los cancela: reprogramalos o anulalos aparte.
+          <ul style="margin:.4rem 0 0 1.1rem;padding:0">
+            ${turnosEnFranja.map(t => `<li>${_escHtml(t.hora)} — ${_escHtml(t.apellido)} — ${_escHtml(t.estudio)}${t.origen ? ` (${_escHtml(t.origen)})` : ''}</li>`).join('')}
+          </ul>
+        </div>`;
+    }
+
+    document.getElementById('sugerir-modal-body').innerHTML = `
+      <p style="font-size:.95rem;margin-bottom:.75rem">
+        Vas a bloquear el <strong>${_diaLargo(form.fechaIso)} ${fechaDmy}</strong> de <strong>${_escHtml(form.horaDesde)} a ${_escHtml(form.horaHasta)}</strong>
+        — ${_escHtml(form.concepto)}.
+      </p>
+      ${avisoTurnos}
+      <div id="bloq-form-error" style="color:#c62828;font-size:.8rem;margin-top:.5rem"></div>`;
+    document.getElementById('sugerir-modal-footer').innerHTML = `
+      <button class="btn-sm" id="btn-bloq-volver">Volver</button>
+      <button class="btn-primary" id="btn-bloq-confirmar">Confirmar bloqueo</button>`;
+    document.getElementById('btn-bloq-volver').addEventListener('click', () => _renderFormularioBloqueo(form, nuevo));
+    document.getElementById('btn-bloq-confirmar').addEventListener('click', async () => {
+      const btnOk = document.getElementById('btn-bloq-confirmar');
+      btnOk.disabled = true; btnOk.textContent = '⏳ Guardando…';
+      try {
+        await RailwayAPI.guardarAgendaBloqueo({ id: form.id, fecha: fechaDmy, horaDesde: form.horaDesde, horaHasta: form.horaHasta, concepto: form.concepto });
+        _cerrarModalSugerir();
+        App.toast('Bloqueo guardado', 'ok');
+        cargar();
+      } catch (err) {
+        btnOk.disabled = false; btnOk.textContent = 'Confirmar bloqueo';
+        document.getElementById('bloq-form-error').textContent = 'Error: ' + err.message;
+      }
+    });
   }
 
   // ── Editar franja ─────────────────────────────────────────
