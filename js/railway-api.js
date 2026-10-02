@@ -153,6 +153,12 @@ const RailwayAPI = (() => {
     return rpc('api_turnos_anular', [{ turnoId }]);
   }
 
+  /** Turno de internado que no se hizo: lo anula con el motivo y cancela su reclamo en reclamos-rmn. Devuelve { reclamo: { ok, encontrado, nroReclamo } }. */
+  async function noRealizado(turnoId, motivo) {
+    _invalidarCacheAgenda();
+    return rpc('api_turnos_noRealizado', [{ turnoId, motivo }]);
+  }
+
   /** Registra presente de un paciente. @param {string} turnoId */
   async function presente(turnoId) {
     return rpc('api_turnos_presente', [{ turnoId }]);
@@ -688,7 +694,7 @@ const RailwayAPI = (() => {
   }
 
   return {
-    rpc, leerRISRango, leerCardiologia, asignar, anular, presente,
+    rpc, leerRISRango, leerCardiologia, asignar, anular, noRealizado, presente,
     modificar, turnos, buscar, agenda, slots,
     leerValidacionesAgenda, marcarValidacionReportada, leerReglasAgenda, guardarReglaAgenda, eliminarReglaAgenda,
     leerLimitesSobreturno, guardarLimiteSobreturno, eliminarLimiteSobreturno,

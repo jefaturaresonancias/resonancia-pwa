@@ -121,12 +121,67 @@ const App = (() => {
     // HTML) — acá sí se renderiza como HTML, así que se resalta en rojo.
     const tipHtml = tip.replace("NO ASIGNADO EN RIS", '<span style="color:#c62828;font-weight:700">NO ASIGNADO EN RIS</span>')
       .replace("SIN SOLICITUD DIGITAL", '<span style="color:#c62828;font-weight:700">SIN SOLICITUD DIGITAL</span>');
+    // "🚫 No se realizó" (2/10/2026, a pedido): solo turnos de internación
+    // (línea 4 del tooltip = origen). Anula el turno con el motivo y cancela
+    // el reclamo del internado en reclamos-rmn — el médico lo ve al buscarlo.
+    const esInternacion = /INTERNACI/i.test(tip.split("\n")[3] || "");
+    const MOTIVOS_NO_REALIZADO = ["Alta", "Paciente inestable / no apto", "No bajó de piso", "Sin preparación / ayuno", "Falla del equipo", "Otro"];
     const body = document.getElementById("panel-opciones-body");
     body.innerHTML = `
       <div style="background:var(--bg);border-radius:8px;padding:1rem;font-size:13px;white-space:pre-line;color:var(--text-2)">${tipHtml}</div>
       <button id="btn-op-modificar" class="btn-primary" style="padding:12px;font-size:14px">✏️ Modificar turno</button>
       <button id="btn-op-anular" style="padding:12px;font-size:14px;border-radius:6px;border:2px solid var(--danger);background:transparent;color:var(--danger);font-weight:700;cursor:pointer">🗑 Anular turno</button>
+      ${esInternacion ? `
+      <button id="btn-op-norealizado" style="padding:12px;font-size:14px;border-radius:6px;border:2px solid var(--warn);background:transparent;color:var(--warn);font-weight:700;cursor:pointer">🚫 No se realizó (internado)</button>
+      <div id="op-nr-form" class="hidden" style="display:flex;flex-direction:column;gap:8px;padding:.85rem;border:1px solid var(--warn);border-radius:8px;background:var(--warn-bg)">
+        <div style="font-size:12px;font-weight:700;color:var(--warn)">¿Por qué no se realizó? Se anula el turno y se cancela el reclamo del internado en reclamos.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${MOTIVOS_NO_REALIZADO.map(m => `<button type="button" class="btn-sm op-nr-motivo" data-motivo="${m}">${m}</button>`).join("")}
+        </div>
+        <textarea id="op-nr-detalle" rows="2" placeholder="Detalle (opcional)" style="padding:8px;border:1px solid var(--border);border-radius:6px;font:inherit;font-size:13px;resize:vertical"></textarea>
+        <button id="btn-op-nr-confirmar" class="btn-primary" style="padding:10px;font-size:13px">Confirmar: no se realizó</button>
+      </div>` : ""}
     `;
+
+    if (esInternacion) {
+      let motivoElegido = "";
+      document.getElementById("btn-op-norealizado").addEventListener("click", () => {
+        document.getElementById("op-nr-form").classList.toggle("hidden");
+      });
+      body.querySelectorAll(".op-nr-motivo").forEach(b => b.addEventListener("click", () => {
+        motivoElegido = b.dataset.motivo;
+        body.querySelectorAll(".op-nr-motivo").forEach(x => {
+          const sel = x === b;
+          x.style.background = sel ? "var(--warn)" : "";
+          x.style.color = sel ? "#fff" : "";
+          x.style.borderColor = sel ? "var(--warn)" : "";
+        });
+      }));
+      document.getElementById("btn-op-nr-confirmar").addEventListener("click", async (ev) => {
+        const detalle = document.getElementById("op-nr-detalle").value.trim();
+        const motivo = [motivoElegido, detalle].filter(Boolean).join(" — ");
+        if (!motivo) { toast("Elegí un motivo o escribí el detalle", "warn"); return; }
+        if (!confirm(`¿Confirmar que NO se realizó?\n\n${tip}\n\nMotivo: ${motivo}\n\nSe anula el turno y se cancela el reclamo del internado en reclamos.`)) return;
+        const turnoId = _turnoSeleccionado.turnoId;
+        const btn = ev.currentTarget;
+        body.querySelectorAll("button").forEach(x => { x.disabled = true; });
+        btn.textContent = "Guardando…";
+        try {
+          const res = await RailwayAPI.noRealizado(turnoId, motivo);
+          const r = res.reclamo || {};
+          if (r.ok && r.encontrado) toast(`Turno anulado — reclamo #${r.nroReclamo} cancelado en reclamos`, "ok");
+          else if (r.ok) toast("Turno anulado — no se encontró el reclamo del internado en reclamos (avisale al médico)", "warn");
+          else toast("Turno anulado, pero no se pudo avisar a reclamos: " + (r.error || "error"), "error");
+          cerrarOpcionesTurno();
+          refrescarAgenda();
+        } catch (e) {
+          console.error("Error marcando no realizado:", e);
+          toast("Error: " + e.message, "error");
+          body.querySelectorAll("button").forEach(x => { x.disabled = false; });
+          btn.textContent = "Confirmar: no se realizó";
+        }
+      });
+    }
 
     document.getElementById("btn-op-anular").addEventListener("click", async (ev) => {
       if (!confirm(`¿Anular este turno?\n\n${tip}\n\nEsta acción no se puede deshacer.`)) return;
