@@ -6,6 +6,7 @@ const ASSETS = [
   "./js/views/agenda.js", "./js/views/lista.js", "./js/views/turno.js",
   "./js/views/parte.js", "./js/views/pami.js",
   "./js/views/config.js", "./js/views/validaciones.js", "./js/views/priorizacion.js", "./js/views/licencias.js",
+  "./js/avisosEspera.js",
   "./manifest.json",
   "./icons/Icon-192.png", "./icons/Icon-512.png", "./icons/loading.jpg"
 ];
@@ -46,5 +47,17 @@ self.addEventListener("fetch", e => {
         return resp;
       })
       .catch(() => caches.match(e.request))
+  );
+});
+
+// Clic en una notificación de "🔔 Paciente esperando" (js/avisosEspera.js):
+// trae al frente la ventana de la PWA que ya está abierta (o abre una).
+self.addEventListener("notificationclick", e => {
+  e.notification.close();
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(ventanas => {
+      if (ventanas.length) return ventanas[0].focus();
+      return self.clients.openWindow("./");
+    })
   );
 });

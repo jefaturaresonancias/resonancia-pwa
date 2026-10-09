@@ -48,6 +48,35 @@ const ListaView = (() => {
     return ORIGEN_STYLE[(o||"").toUpperCase()] || { bg: "#fce4ec", border: "#c9506a", text: "#7a1f35" };
   }
 
+  // Aviso "🔔 Paciente esperando" (9/10/2026) — ver js/avisosEspera.js.
+  // Avisos de hoy por turnoId (turno de la agenda, o 'ris:<dni>:<hh:mm>'
+  // para un paciente que solo está en RIS), para mostrar el estado en cada
+  // fila. Solo se carga mirando el día de hoy y fuera del rol técnico.
+  let _avisosHoy = {};
+
+  function _attr(s) {
+    return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  }
+
+  function _horaAviso(ts) {
+    try {
+      return new Date(ts).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Argentina/Buenos_Aires" });
+    } catch (_) { return ""; }
+  }
+
+  // Estado del aviso (si ya se avisó) o el botón "🔔 Avisar" (si no).
+  function _celdaAviso(clave, paciente, detalle) {
+    const a = _avisosHoy[clave];
+    if (a && a.vistoEn) return `<span class="aviso-estado visto">✓ Visto${a.vistoPor ? " (" + _attr(a.vistoPor) + ")" : ""} ${_horaAviso(a.vistoEn)}</span>`;
+    if (a) return `<span class="aviso-estado">🔔 Avisado ${_horaAviso(a.creadoEn)} — esperando</span>`;
+    return `<button class="btn-sm btn-avisar" data-clave="${_attr(clave)}" data-paciente="${_attr(paciente)}" data-detalle="${_attr(detalle)}" title="Avisar a técnicos que el paciente está esperando">🔔 Avisar</button>`;
+  }
+
+  async function _avisar(clave, paciente, detalle, origen) {
+    await RailwayAPI.crearAvisoEspera({ paciente, detalle, turnoId: clave, origen, por: Config.getRol() });
+    if (typeof AvisosEspera !== "undefined") AvisosEspera.refrescar();
+  }
+
   // Carga manual en Suitestensa (26/8/2026) — dada de baja del todo
   // 22/9/2026 (bot-cargar-suitestensa.js pausado, "ya no se usa"): se
   // sacaron los botones "Cargar en Suitestensa" de todas las tarjetas/
@@ -62,6 +91,7 @@ const ListaView = (() => {
 
     const MIN_I = 0, MIN_F = 24*60;
     const fechaStr = API.fechaAStr(_fecha);
+    const esHoy = fechaStr === API.fechaAStr(new Date());
 
     // Construir mapa minutos → turno
     const turnoMap = {};
@@ -337,6 +367,9 @@ Esta acción no se puede deshacer.`)) return;
         const nombre   = (partes[1] || "").trim();
         // Extraer solo el número del documento
         const dniNum   = String(r.documento || "").replace(/^(DNI|CIBO|RP)\s*/i,"").trim();
+        const celdaAviso = esHoy && !esTecnico
+          ? _celdaAviso(`ris:${dniNum}:${hora}`, `${apellido}, ${nombre}`, `${hora} · ${r.practica || ""}`)
+          : "";
         return `<tr class="fila-ris-row">
           <td class="td-hora" style="color:#999;font-size:13px">${hora}</td>
           <td class="ris-nombre">${nombre}</td>
@@ -346,7 +379,7 @@ Esta acción no se puede deshacer.`)) return;
           <td><span class="ris-badge">RIS</span></td>
           <td></td>
           <td></td>
-          <td></td>
+          <td>${celdaAviso}</td>
           <td></td>
         </tr>`;
       }
@@ -390,9 +423,13 @@ Esta acción no se puede deshacer.`)) return;
       const est  = _origen(turno.origen);
       const pres = turno.presente === "Presente";
       const rowCls = pres ? "presente-row" : "";
+      const pacienteAviso = `${turno.apellido}, ${turno.nombre}`;
+      const detalleAviso  = `turno ${hora} · ${turno.estudio || ""}`;
       const presBadge = pres
-        ? `<span class="presente-badge">✅ Presente<br><span style="font-weight:400;font-size:10px;color:#666">${turno.tsPresente||""}</span></span>`
-        : `<button class="btn-presente" data-turno-id="${turno.turnoId}" data-nombre="${turno.nombre} ${turno.apellido}">Presente</button>`;
+        ? `<span class="presente-badge">✅ Presente<br><span style="font-weight:400;font-size:10px;color:#666">${turno.tsPresente||""}</span></span>` +
+          (esHoy && !esTecnico ? _celdaAviso(turno.turnoId, pacienteAviso, detalleAviso) : "")
+        : `<button class="btn-presente" data-turno-id="${turno.turnoId}" data-nombre="${turno.nombre} ${turno.apellido}"
+             data-paciente="${_attr(pacienteAviso)}" data-detalle="${_attr(detalleAviso)}">Presente</button>`;
 
       return `<tr class="${rowCls}" data-fila="${turno.fila}" data-turno-id="${turno.turnoId}">
         <td class="td-hora">${hora}</td>
@@ -421,7 +458,8 @@ Esta acción no se puede deshacer.`)) return;
       });
     });
 
-    // ── botón presente ──
+    // ── botón presente ── (hoy, fuera del rol técnico: además avisa a
+    // técnicos que el paciente está esperando — ver js/avisosEspera.js)
     tbody.querySelectorAll(".btn-presente").forEach(btn => {
       btn.addEventListener("click", async () => {
         const turnoId = btn.dataset.turnoId;
@@ -430,11 +468,37 @@ Esta acción no se puede deshacer.`)) return;
         btn.disabled = true; btn.textContent = "Guardando…";
         try {
           await RailwayAPI.presente(turnoId);
-          App.toast(`Presente: ${nombre}`, "ok");
-          await cargar();
         } catch(err) {
           App.toast("Error: "+err.message, "error");
           btn.disabled = false; btn.textContent = "Presente";
+          return;
+        }
+        let msg = `Presente: ${nombre}`;
+        if (esHoy && !esTecnico) {
+          try {
+            await _avisar(turnoId, btn.dataset.paciente, btn.dataset.detalle, "presente");
+            msg += " — se avisó a técnicos 🔔";
+          } catch (err) {
+            msg += " — no se pudo avisar a técnicos (" + err.message + ")";
+          }
+        }
+        App.toast(msg, "ok");
+        await cargar();
+      });
+    });
+
+    // ── botón 🔔 Avisar (paciente de RIS, o presente sin aviso) ──
+    tbody.querySelectorAll(".btn-avisar").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        btn.disabled = true; btn.textContent = "Avisando…";
+        const esRisFila = btn.dataset.clave.startsWith("ris:");
+        try {
+          await _avisar(btn.dataset.clave, btn.dataset.paciente, btn.dataset.detalle, esRisFila ? "ris" : "presente");
+          App.toast(`🔔 Se avisó a técnicos: ${btn.dataset.paciente}`, "ok");
+          await cargar();
+        } catch (err) {
+          App.toast("No se pudo avisar: " + err.message, "error");
+          btn.disabled = false; btn.textContent = "🔔 Avisar";
         }
       });
     });
@@ -473,6 +537,11 @@ Esta acción no se puede deshacer.`)) return;
       ]);
       const risDelDia = risPorFecha[fechaStr] || [];
       await _cargarDuracionesRIS(risDelDia);
+      _avisosHoy = {};
+      if (fechaStr === API.fechaAStr(new Date()) && Config.getRol() !== "tecnico") {
+        const avisos = await RailwayAPI.leerAvisosEspera().catch(() => null);
+        (avisos || []).forEach(a => { if (a.turnoId) _avisosHoy[a.turnoId] = a; });
+      }
       const agendaDia = agendaArr && agendaArr[0] ? agendaArr[0] : null;
       _render(agendaDia, turnos, filtro, risDelDia);
     } catch(err) {

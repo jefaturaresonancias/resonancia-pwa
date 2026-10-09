@@ -164,6 +164,23 @@ const RailwayAPI = (() => {
     return rpc('api_turnos_presente', [{ turnoId }]);
   }
 
+  // Aviso "🔔 Paciente esperando" (9/10/2026) — ver js/avisosEspera.js.
+  async function crearAvisoEspera(aviso) {
+    return rpc('api_avisosEspera_crear', [aviso]);
+  }
+  async function marcarAvisoEsperaVisto(id, por) {
+    return rpc('api_avisosEspera_marcarVisto', [{ id, por }]);
+  }
+  // Para el polling de fondo: nunca abre el prompt del PIN (cada 15 s sería
+  // insoportable si la sesión venció) — sin sesión válida devuelve null y
+  // listo; el PIN se pide cuando el usuario hace algo en la app, como siempre.
+  async function leerAvisosEspera() {
+    const token = localStorage.getItem(KEY_TOKEN);
+    if (!token) return null;
+    const json = await _post('api_avisosEspera_leer', [], token);
+    return json && json.ok !== false ? (json.avisos || []) : null;
+  }
+
   // Carga manual en Suitestensa (25/8/2026) — dada de baja 22/9/2026,
   // bot-cargar-suitestensa.js pausado ("ya no se usa"). Los wrappers
   // cargarEnSuitestensa/estadoSuitestensa se sacaron de acá junto con los
@@ -696,6 +713,7 @@ const RailwayAPI = (() => {
 
   return {
     rpc, leerRISRango, leerCardiologia, asignar, anular, noRealizado, presente,
+    crearAvisoEspera, leerAvisosEspera, marcarAvisoEsperaVisto,
     modificar, turnos, buscar, agenda, slots,
     leerValidacionesAgenda, marcarValidacionReportada, leerReglasAgenda, guardarReglaAgenda, eliminarReglaAgenda,
     leerLimitesSobreturno, guardarLimiteSobreturno, eliminarLimiteSobreturno,

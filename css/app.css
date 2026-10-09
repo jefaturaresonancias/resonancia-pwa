@@ -923,3 +923,40 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
   display: flex; justify-content: flex-end; gap: .5rem;
   padding: 1rem 1.25rem; border-top: 1px solid var(--border); flex-shrink: 0;
 }
+/* ── Aviso "🔔 Paciente esperando" (9/10/2026) — ver js/avisosEspera.js ── */
+#avisos-espera {
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 10000;
+  display: flex; flex-direction: column; gap: 8px; align-items: center;
+  width: min(560px, calc(100vw - 32px));
+}
+#avisos-espera[hidden] { display: none; }
+.aviso-espera-item {
+  width: 100%; display: flex; align-items: center; gap: 12px;
+  background: #fff4d6; color: #4a3200; border: 2px solid #f0a500; border-radius: 12px;
+  padding: 10px 12px; box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  animation: aviso-espera-entra .25s ease-out;
+}
+.aviso-espera-icono { font-size: 26px; animation: aviso-espera-campana 1s ease-in-out infinite; }
+.aviso-espera-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.aviso-espera-texto strong { font-size: 15px; }
+.aviso-espera-texto span { font-size: 13px; }
+.aviso-espera-texto small { font-size: 11px; opacity: .75; }
+.aviso-espera-visto {
+  flex-shrink: 0; background: #2e7d32; color: #fff; border: none; border-radius: 8px;
+  padding: 8px 14px; font-weight: 700; font-size: 14px; cursor: pointer;
+}
+.aviso-espera-visto:hover { filter: brightness(1.1); }
+.aviso-espera-visto:focus-visible, .aviso-espera-permiso:focus-visible { outline: 3px solid #1a5a95; outline-offset: 2px; }
+.aviso-espera-permiso {
+  background: #1a2e4a; color: #fff; border: none; border-radius: 999px;
+  padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,.2);
+}
+@keyframes aviso-espera-entra { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+@keyframes aviso-espera-campana { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-14deg); } 75% { transform: rotate(14deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .aviso-espera-item, .aviso-espera-icono { animation: none; }
+}
+/* Estado del aviso en la Lista del día */
+.aviso-estado { display: block; font-size: 10px; margin-top: 3px; color: #8a5a00; }
+.aviso-estado.visto { color: #2e7d32; }
+.btn-avisar { font-size: 11px; padding: 3px 8px; margin-top: 3px; }
