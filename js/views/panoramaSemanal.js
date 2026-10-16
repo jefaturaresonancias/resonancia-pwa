@@ -123,7 +123,8 @@ const PanoramaSemanal = (() => {
     estudio: (r) => `sobreturno de "${r.valor}"`,
     region: (r) => `sobreturno «${r.valor}»`,
     global_dia: () => 'regiones de sobreturno',
-    pacientes_dia: () => 'pacientes de sobreturno'
+    pacientes_dia: () => 'pacientes de sobreturno',
+    franja: (r) => `sobreturnos de ${String(r.valor || '').replace('-', ' a ')}`
   };
   function _diasAbrev(dias) {
     return (dias && dias.length) ? dias.map(d => DIAS_LABEL[d]).join('/') : 'todos los días';

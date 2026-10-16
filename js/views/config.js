@@ -1038,7 +1038,8 @@ const ConfigView = (() => {
     region:        'Por región por día',
     estudio:       'Por estudio (palabra clave) + día',
     global_dia:    'Tope diario global de regiones',
-    pacientes_dia: 'Tope diario de pacientes de sobreturno'
+    pacientes_dia: 'Tope diario de pacientes de sobreturno',
+    franja:        'Por franja horaria (0 = sin sobreturnos)'
   };
   // Copia de EST_REGIONES (sistema2-node/lib/clasificacion.js) para el
   // dropdown — si se agrega/renombra una región allá, actualizar acá.
@@ -1089,6 +1090,10 @@ const ConfigView = (() => {
 
   function _resumenLimite(r) {
     const dias = (r.dias && r.dias.length) ? r.dias.map(d => DIAS_LABEL[d]).join('/') : 'todos los días';
+    if (r.ambito === 'franja') {
+      const [desde, hasta] = String(r.valor || '').split('-');
+      return `${r.limite === 0 ? 'Sin sobreturnos' : `Máx ${r.limite} sobreturno(s)`} de ${desde} a ${hasta} — ${dias}`;
+    }
     const valor = r.valor ? ` "${r.valor}"` : '';
     return `Máx ${r.limite} sobreturno(s)${valor} — ${dias}`;
   }
@@ -1151,6 +1156,18 @@ const ConfigView = (() => {
         <input type="text" id="limites-form-valor" value="${(valorActual || '').replace(/"/g,'&quot;')}" placeholder="Ej: pelvis alta resolución — o varias separadas por coma">
       </div>`;
     }
+    if (ambito === 'franja') {
+      // valor = "HH:MM-HH:MM"; el backend guarda el fin del día como "24:00",
+      // que <input type="time"> no acepta → se edita como "00:00".
+      const [desde, hasta] = String(valorActual || '').split('-');
+      return `<div id="limites-form-valor-wrap" style="margin-bottom:.75rem">
+        <div style="display:flex;gap:.75rem">
+          <div class="form-group" style="flex:1"><label>Desde</label><input type="time" id="limites-form-desde" value="${desde || ''}"></div>
+          <div class="form-group" style="flex:1"><label>Hasta</label><input type="time" id="limites-form-hasta" value="${hasta === '24:00' ? '00:00' : (hasta || '')}"></div>
+        </div>
+        <div style="font-size:.75rem;color:var(--text-3);margin-top:.25rem">Cuenta los sobreturnos que empiezan en ese horario (el "hasta" queda afuera). Hasta 00:00 = fin del día.</div>
+      </div>`;
+    }
     return `<div id="limites-form-valor-wrap"></div>`;
   }
 
@@ -1174,7 +1191,7 @@ const ConfigView = (() => {
       ${_htmlCampoValor(regla ? regla.ambito : 'paciente', regla ? regla.valor : '')}
       <div class="form-group" style="margin-bottom:.75rem">
         <label>Límite (máximo de sobreturnos)</label>
-        <input type="number" id="limites-form-limite" min="1" step="1" value="${regla ? regla.limite : 1}">
+        <input type="number" id="limites-form-limite" min="0" step="1" value="${regla ? regla.limite : 1}">
       </div>
       <div style="margin-bottom:.75rem">
         <label style="font-size:.85rem;display:block;margin-bottom:4px">Días de la semana (vacío = todos los días)</label>
@@ -1215,14 +1232,21 @@ const ConfigView = (() => {
     const nombre = document.getElementById('limites-form-nombre').value.trim();
     const ambito = document.getElementById('limites-form-ambito').value;
     const valorEl = document.getElementById('limites-form-valor');
-    const valor = valorEl ? valorEl.value.trim() : '';
+    let valor = valorEl ? valorEl.value.trim() : '';
     const limite = parseInt(document.getElementById('limites-form-limite').value, 10);
     const motivo = document.getElementById('limites-form-motivo').value.trim();
     const activa = document.getElementById('limites-form-activa').checked;
     const dias = [...document.querySelectorAll('.limite-dia:checked')].map(cb => parseInt(cb.value, 10));
 
     if (!nombre) { errorEl.textContent = 'Completá el nombre.'; return; }
-    if (!Number.isInteger(limite) || limite <= 0) { errorEl.textContent = 'El límite tiene que ser un número entero mayor a 0.'; return; }
+    if (ambito === 'franja') {
+      if (!Number.isInteger(limite) || limite < 0) { errorEl.textContent = 'El límite tiene que ser un número entero, 0 o más.'; return; }
+      const desde = document.getElementById('limites-form-desde').value;
+      const hasta = document.getElementById('limites-form-hasta').value;
+      if (!desde || !hasta) { errorEl.textContent = 'Completá las dos horas.'; return; }
+      if (hasta !== '00:00' && hasta <= desde) { errorEl.textContent = 'La hora hasta debe ser mayor a la hora desde (00:00 = fin del día).'; return; }
+      valor = `${desde}-${hasta}`;
+    } else if (!Number.isInteger(limite) || limite <= 0) { errorEl.textContent = 'El límite tiene que ser un número entero mayor a 0.'; return; }
     if ((ambito === 'region' || ambito === 'estudio') && !valor) {
       errorEl.textContent = 'Este ámbito necesita completar el valor (región o palabra clave).';
       return;
