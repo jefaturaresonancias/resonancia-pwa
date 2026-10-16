@@ -201,39 +201,49 @@ const AgendaView = (() => {
     });
   }
 
-  // Turnos del MISMO paciente que se pisan (16/10/2026, a pedido: "se pintan
-  // los dos de verde pero son el mismo paciente y eso confunde"): cuando se
-  // da un turno por estudio al mismo DNI, se muestran como UN bloque — la
-  // celda del que empieza primero se estira hasta el final del último y lista
-  // los otros estudios adentro (cada uno sigue clickeable: en la base siguen
-  // siendo turnos distintos). Usa los `solapados` que manda el backend; la
-  // columna de superpuestos de la derecha queda para otros pacientes y RIS.
-  // Devuelve { filas: Set de filas del bloque, mismos: [solapados], hasta }.
+  // Bloque de turnos que se pisan (16/10/2026, a pedido). Primero: "se pintan
+  // los dos de verde pero son el mismo paciente y eso confunde" — y después,
+  // con pacientes distintos, el turno que arrancaba adentro de otro y
+  // terminaba más tarde aparecía dos veces (en la columna de superpuestos Y
+  // con su propia celda abajo). Ahora la celda del que empieza primero se
+  // estira hasta el final de TODOS los que se pisan con él (transitivo: A
+  // pisa a B y B pisa a C), así nadie abre una segunda celda. Adentro de la
+  // celda: el turno principal y los otros estudios del MISMO DNI (cada uno
+  // clickeable, en la base siguen siendo turnos distintos); a la derecha:
+  // los de OTROS pacientes (con su "→hora fin") y el RIS. Usa los
+  // `solapados` que manda el backend.
+  // Devuelve { filas: Set de filas del bloque, mismos, otros, hasta (fin del
+  // bloque), hastaPaciente (fin del principal + sus mismos DNI) }.
   function _dniNormAg(d) { return String(d || "").replace(/\D/g, "").replace(/^0+/, ""); }
   function _horaAMinsAg(h) { const [a, b] = String(h || "").split(":").map(Number); return (a || 0) * 60 + (b || 0); }
-  function _agruparMismoPaciente(dia, s, hastaInicial) {
+  function _agruparBloque(dia, s, hastaPropio) {
     const dni = _dniNormAg(s.dni);
     const filas = new Set([s.fila]);
-    const mismos = [];
-    let hasta = hastaInicial;
-    if (!dni) return { filas, mismos, hasta };
+    const mismos = [], otros = [];
+    let hasta = hastaPropio, hastaPaciente = hastaPropio;
     let cambio = true;
-    while (cambio) { // transitivo: A pisa a B y B pisa a C, los tres del mismo DNI
+    while (cambio) {
       cambio = false;
       for (const sl of dia.slots) {
         if (!filas.has(sl.fila)) continue;
         for (const t of (sl.solapados || [])) {
-          if (filas.has(t.fila) || _dniNormAg(t.dni) !== dni) continue;
+          if (filas.has(t.fila)) continue;
           filas.add(t.fila);
-          mismos.push(t);
           cambio = true;
           const fin = t.horaFin ? _horaAMinsAg(t.horaFin) : t.mins + _paso;
           if (fin > hasta) hasta = fin;
+          if (dni && _dniNormAg(t.dni) === dni) {
+            mismos.push(t);
+            if (fin > hastaPaciente) hastaPaciente = fin;
+          } else {
+            otros.push(t);
+          }
         }
       }
     }
     mismos.sort((a, b) => a.mins - b.mins);
-    return { filas, mismos, hasta };
+    otros.sort((a, b) => a.mins - b.mins);
+    return { filas, mismos, otros, hasta, hastaPaciente };
   }
 
   // Los otros estudios del mismo paciente, adentro de la celda del bloque —
@@ -320,16 +330,16 @@ const AgendaView = (() => {
         const sFranja = s || dia.slots.find(sl => sl.mins === Math.floor(mins/20)*20);
         const esContinuacion = s && s.tipo === "continuacion";
 
-        // Actualizar turno activo y rowspan. Un turno del mismo paciente que ya
-        // quedó adentro del bloque de arriba (ver _agruparMismoPaciente) no
-        // abre una celda nueva.
+        // Actualizar turno activo y rowspan. Un turno que ya quedó adentro del
+        // bloque de arriba (ver _agruparBloque) no abre una celda nueva.
         const yaAgrupado = s && s.tipo === "turno" && activosPorCol[di] &&
           mins < activosPorCol[di].hasta && activosPorCol[di].filas && activosPorCol[di].filas.has(s.fila);
         if (s && s.tipo === "turno" && !yaAgrupado) {
-          const grupo = _agruparMismoPaciente(dia, s, mins + (s.duracion || _paso));
+          const grupo = _agruparBloque(dia, s, mins + (s.duracion || _paso));
           const hasta = grupo.hasta;
           s._mismoPaciente = grupo.mismos;
-          s._hastaUnido = hasta;
+          s._otrosBloque = grupo.otros;
+          s._hastaUnido = grupo.hastaPaciente; // el "→hora" de la celda: el principal + sus mismos DNI
           const spanCount = Math.max(1, slots.slice(si).filter(tm => tm < hasta).length);
           activosPorCol[di] = { slot: s, hasta, rowSpan: spanCount, filas: grupo.filas };
         } else if (activosPorCol[di] && mins >= activosPorCol[di].hasta) {
@@ -381,14 +391,8 @@ const AgendaView = (() => {
             .filter(r => { const rm = _minsRIS(r); return rm >= mins && rm < hastaTurno && _risSinTurno(r); })
             .sort((a, b) => _minsRIS(a) - _minsRIS(b));
           // Superpuestos de OTROS pacientes en todo el bloque (los del mismo
-          // paciente ya van adentro de la celda, ver _agruparMismoPaciente).
-          const filasBloque = activosPorCol[di].filas || new Set([s.fila]);
-          const vistos = new Set();
-          s._solapadosVista = dia.slots
-            .filter(sl => filasBloque.has(sl.fila))
-            .flatMap(sl => sl.solapados || [])
-            .filter(t => !filasBloque.has(t.fila) && !vistos.has(t.fila) && vistos.add(t.fila))
-            .sort((a, b) => a.mins - b.mins);
+          // paciente van adentro de la celda) — ver _agruparBloque.
+          s._solapadosVista = s._otrosBloque || [];
           // Un RIS de adentro que sigue después del turno: su barra de
           // continuación se dibuja en las filas siguientes (salvo que ya
           // hubiera uno de antes que termina todavía más tarde).

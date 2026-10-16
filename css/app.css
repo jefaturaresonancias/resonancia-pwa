@@ -961,7 +961,7 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 .aviso-estado.visto { color: #2e7d32; }
 .btn-avisar { font-size: 11px; padding: 3px 8px; margin-top: 3px; }
 /* Turnos del mismo paciente agrupados en un bloque (16/10/2026) — ver
-   _agruparMismoPaciente en js/views/agenda.js. Cada línea es otro turno. */
+   _agruparBloque en js/views/agenda.js. Cada línea es otro turno. */
 .slot-mismo { font-size: 10px; line-height: 1.25; padding: 2px 0 1px; margin-top: 2px;
   border-top: 1px dashed currentColor; opacity: .9; cursor: pointer; white-space: normal; }
 .slot-mismo:hover { opacity: 1; text-decoration: underline; }
