@@ -445,7 +445,16 @@ const TurnoView = (() => {
         document.getElementById("form-turno").dataset.turnoIdOriginal = "";
         document.getElementById("form-turno").dataset.estudioOriginal = "";
       } else {
-        await RailwayAPI.asignar({ nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs, tecnicoAsigno, solicitudDigital, ...datosExcepcion });
+        const res = await RailwayAPI.asignar({ nombre, apellido, dni, estudio, origen, fecha, hora: _slotSeleccionado.hora, observaciones: obs, tecnicoAsigno, solicitudDigital, ...datosExcepcion });
+        // Internación (20/10/2026): el servidor verifica el pedido de piso —
+        // si lo vinculó o no pudo, se avisa además del toast de siempre.
+        if (res && res.pedidoVinculado) {
+          const p = res.pedidoVinculado;
+          alert(`✔ Turno vinculado al pedido de piso\n\n${p.estudio}${p.cama ? ` — Cama ${p.cama}` : ""}${p.sector ? `, ${p.sector}` : ""}` +
+            `${p.autorizadoPor ? `\nAutorizó: ${p.autorizadoPor}` : ""}\n\nPiso ya lo ve con turno asignado.`);
+        } else if (res && res.avisoPedido) {
+          alert("⚠️ " + res.avisoPedido);
+        }
       }
       App.toast(`Turno asignado: ${apellido} — ${_slotSeleccionado.hora} hs`, "ok");
       cerrarPanel();
