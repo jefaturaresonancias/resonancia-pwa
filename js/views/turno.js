@@ -472,6 +472,7 @@ const TurnoView = (() => {
 
   function _resetForm() {
     document.getElementById("form-turno").reset();
+    _limpiarModoModificar();
     document.getElementById("t-pegar-datos").value = "";
     document.getElementById("t-pegar-wrap").classList.add("hidden");
     document.getElementById("t-excepcion-pin").value = "";
@@ -552,7 +553,30 @@ const TurnoView = (() => {
   }
 
   // ── Panel flotante ───────────────────────────────────────
+  // Deshace el modo "Modificar" (abrirPanelModificar) — al cerrar el panel y
+  // al abrir uno nuevo (21/10/2026, a pedido: un sobreturno se abría como
+  // "Modificando turno de …"). form.reset() no alcanzaba: quedaban el aviso,
+  // los datos del paciente bloqueados, un botón "Cambiar datos del paciente"
+  // por cada vez que se había abierto y, lo peor, el turnoIdOriginal — el
+  // "turno nuevo" confirmado después anulaba el turno que se quiso modificar.
+  function _limpiarModoModificar() {
+    const form = document.getElementById("form-turno");
+    delete form.dataset.turnoIdOriginal;
+    delete form.dataset.tooltipOriginal;
+    delete form.dataset.estudioOriginal;
+    const aviso = document.getElementById("turno-ris-aviso");
+    if (aviso) aviso.remove();
+    form.querySelectorAll(".btn-cambiar-datos").forEach(b => b.remove());
+    ["t-nombre", "t-apellido", "t-dni", "t-origen", "t-obs"].forEach(id => {
+      const el = document.getElementById(id);
+      el.disabled = false;
+      el.style.background = "";
+      el.style.color = "";
+    });
+  }
+
   function abrirPanel(fecha, hora, condicion) {
+    _limpiarModoModificar();
     const panel   = document.getElementById("turno-panel");
     const overlay = document.getElementById("panel-overlay");
     panel.style.display   = "flex";
@@ -607,6 +631,7 @@ const TurnoView = (() => {
 
     const btnCambiar = document.createElement("button");
     btnCambiar.type = "button";
+    btnCambiar.className = "btn-cambiar-datos";
     btnCambiar.textContent = "✏️ Cambiar datos del paciente";
     btnCambiar.style.cssText = "background:none;border:1px solid #aaa;color:#666;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;margin-bottom:.5rem";
     btnCambiar.addEventListener("click", () => {
