@@ -121,6 +121,7 @@ const App = (() => {
     // HTML) — acá sí se renderiza como HTML, así que se resalta en rojo.
     const tipHtml = tip.replace("NO ASIGNADO EN RIS", '<span style="color:#c62828;font-weight:700">NO ASIGNADO EN RIS</span>')
       .replace("SIN SOLICITUD DIGITAL", '<span style="color:#c62828;font-weight:700">SIN SOLICITUD DIGITAL</span>');
+    const tipHtmlPiso = PedidoPiso.resaltar(tipHtml);
     // "🚫 No se realizó" (2/10/2026, a pedido): solo turnos de internación
     // (línea 4 del tooltip = origen). Anula el turno con el motivo y cancela
     // el reclamo del internado en reclamos-rmn — el médico lo ve al buscarlo.
@@ -128,7 +129,7 @@ const App = (() => {
     const MOTIVOS_NO_REALIZADO = ["Alta", "Paciente inestable / no apto", "No bajó de piso", "Sin preparación / ayuno", "Falla del equipo", "Otro"];
     const body = document.getElementById("panel-opciones-body");
     body.innerHTML = `
-      <div style="background:var(--bg);border-radius:8px;padding:1rem;font-size:13px;white-space:pre-line;color:var(--text-2)">${tipHtml}</div>
+      <div style="background:var(--bg);border-radius:8px;padding:1rem;font-size:13px;white-space:pre-line;color:var(--text-2)">${tipHtmlPiso}</div>
       <button id="btn-op-modificar" class="btn-primary" style="padding:12px;font-size:14px">✏️ Modificar turno</button>
       <button id="btn-op-anular" style="padding:12px;font-size:14px;border-radius:6px;border:2px solid var(--danger);background:transparent;color:var(--danger);font-weight:700;cursor:pointer">🗑 Anular turno</button>
       ${esInternacion ? `

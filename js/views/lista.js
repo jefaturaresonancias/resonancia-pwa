@@ -247,7 +247,8 @@ const ListaView = (() => {
                   <div class="card-body" style="flex:1;border-right:2px dashed #ddd;padding-right:8px">
                     <div class="card-nombre ${pres?"ok":""}">${turno.apellido}, ${turno.nombre}</div>
                     <div class="card-estudio">${turno.estudio}</div>
-                    <div class="card-meta"><span class="card-dni">${turno.dni}</span>${turno.observaciones?`<span class="card-obs-icon" title="${turno.observaciones.replace(/"/g,'&quot;')}">📝</span>`:""}</div>
+                    <div class="card-meta"><span class="card-dni">${turno.dni}</span>${PedidoPiso.badge(turno)}${turno.observaciones?`<span class="card-obs-icon" title="${turno.observaciones.replace(/"/g,'&quot;')}">📝</span>`:""}</div>
+                    ${PedidoPiso.lineaComentario(turno) ? `<div class="card-obs">${PedidoPiso.lineaComentario(turno)}</div>` : ""}
                     ${turno.creadoEn?`<div class="card-obs" style="opacity:.6">🗓️ Cargado el: ${turno.creadoEn}</div>`:""}
                     ${turno.tecnicoAsigno?`<div class="card-obs" style="opacity:.6">👤 ${turno.tecnicoAsigno}</div>`:""}
                   </div>
@@ -280,7 +281,8 @@ const ListaView = (() => {
                 <div class="card-body">
                   <div class="card-nombre ${pres?"ok":""}">${turno.apellido}, ${turno.nombre}</div>
                   <div class="card-estudio">${turno.estudio}</div>
-                  <div class="card-meta"><span class="card-dni">${turno.dni}</span>${turno.observaciones?`<span class="card-obs-icon" title="${turno.observaciones.replace(/"/g,'&quot;')}">📝</span>`:""}</div>
+                  <div class="card-meta"><span class="card-dni">${turno.dni}</span>${PedidoPiso.badge(turno)}${turno.observaciones?`<span class="card-obs-icon" title="${turno.observaciones.replace(/"/g,'&quot;')}">📝</span>`:""}</div>
+                  ${PedidoPiso.lineaComentario(turno) ? `<div class="card-obs">${PedidoPiso.lineaComentario(turno)}</div>` : ""}
                   ${turno.creadoEn?`<div class="card-obs" style="opacity:.6">🗓️ Cargado el: ${turno.creadoEn}</div>`:""}
                   ${turno.tecnicoAsigno?`<div class="card-obs" style="opacity:.6">👤 ${turno.tecnicoAsigno}</div>`:""}
                 </div>

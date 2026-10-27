@@ -6,7 +6,7 @@ const ASSETS = [
   "./js/views/agenda.js", "./js/views/lista.js", "./js/views/turno.js",
   "./js/views/parte.js", "./js/views/pami.js",
   "./js/views/config.js", "./js/views/validaciones.js", "./js/views/priorizacion.js", "./js/views/licencias.js",
-  "./js/avisosEspera.js",
+  "./js/avisosEspera.js", "./js/pedido-piso.js",
   "./manifest.json",
   "./icons/Icon-192.png", "./icons/Icon-512.png", "./icons/loading.jpg"
 ];
