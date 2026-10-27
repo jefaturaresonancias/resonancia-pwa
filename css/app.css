@@ -972,21 +972,31 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
   font-size: 9px; font-weight: 800; letter-spacing: .02em; margin-left: 3px; white-space: nowrap;
 }
 
-/* Turnos que se pisan, en carriles lado a lado (27/10/2026) — ver
+/* Turnos que se pisan, en dos columnas (27/10/2026) — ver
    _renderTurnoConSuperpuestos en js/views/agenda.js. Cada caja arranca en
-   la fila de su hora y baja hasta donde termina; top/height los corrige
-   _ajustarCarriles con la altura real de las filas. */
+   la fila de su hora (o abajo del que termina primero si las dos columnas
+   están ocupadas); --t/--h los corrige _ajustarCarriles con la altura
+   real de las filas. Con "ver todos" se usan --ta/--ha/--la/--wa. */
 .agenda-table td.celda-carriles { padding: 0; position: relative; }
 .carriles { position: absolute; inset: 0; overflow: hidden; }
 .carril-item {
   position: absolute; box-sizing: border-box;
-  left: var(--l3); width: var(--w3);
+  top: var(--t); height: var(--h); left: var(--l); width: var(--w);
   display: flex; overflow: hidden; cursor: pointer;
 }
 .carril-oculto { display: none; }
-.celda-carriles.ver-todos .carril-item { left: var(--la); width: var(--wa); }
+.celda-carriles.ver-todos .carril-item { top: var(--ta); height: var(--ha); left: var(--la); width: var(--wa); }
 .celda-carriles.ver-todos .carril-oculto { display: flex; }
+.celda-carriles.ver-todos .carril-sin-todos { display: none; }
+/* Hora de inicio en negrita, al principio de cada caja */
+.carril-hora {
+  font-weight: 900; font-style: normal; color: #1a1a1a;
+  background: rgba(255,255,255,.55); border-radius: 3px;
+  padding: 0 3px; margin-right: 3px;
+}
 .carril-cuerpo { flex: 1; min-width: 0; height: auto; padding: 2px 4px; }
+/* Las líneas no se aplastan: lo que no entra en la caja se corta abajo */
+.carril-cuerpo > * { flex-shrink: 0; }
 .carril-cuerpo.slot-content-expandido { padding: 3px 4px; }
 /* Turno que ya está en RIS: el estado pegado al costado */
 .carril-ris-tira {

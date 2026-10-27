@@ -397,10 +397,6 @@ const AgendaView = (() => {
           // Superpuestos de OTROS pacientes en todo el bloque (los del mismo
           // paciente van adentro de la celda) — ver _agruparBloque.
           s._solapadosVista = s._otrosBloque || [];
-          // Un RIS sin turno que arrancó ANTES y todavía sigue: en la celda
-          // de carriles va como uno más (antes el turno lo tapaba).
-          const ra = risActivoCol[di];
-          s._risPrevio = (ra && ra.mostrado && mins < ra.hasta) ? { ris: ra.ris, hasta: ra.hasta } : null;
           // Un RIS de adentro que sigue después del turno: su barra de
           // continuación se dibuja en las filas siguientes (salvo que ya
           // hubiera uno de antes que termina todavía más tarde).
@@ -531,10 +527,17 @@ const AgendaView = (() => {
       if (!filas[si]) return;
       const top0 = filas[si].offsetTop;
       const topDe = k => (k < n && filas[si + k] ? filas[si + k].offsetTop - top0 : td.offsetHeight);
-      td.querySelectorAll("[data-r0]").forEach(el => {
-        const y0 = topDe(+el.dataset.r0), y1 = topDe(+el.dataset.r1);
-        el.style.top = (y0 + 1) + "px";
-        el.style.height = Math.max(8, y1 - y0 - 2) + "px";
+      // data-a/data-b: filas que ocupa en la vista normal (2 columnas);
+      // data-aa/data-ba: en "ver todos".
+      const ubicar = (el, a, b, sufijo) => {
+        if (a === undefined) return;
+        const y0 = topDe(+a), y1 = topDe(+b);
+        el.style.setProperty("--t" + sufijo, (y0 + 1) + "px");
+        el.style.setProperty("--h" + sufijo, Math.max(8, y1 - y0 - 2) + "px");
+      };
+      td.querySelectorAll(".carril-item").forEach(el => {
+        ubicar(el, el.dataset.a, el.dataset.b, "");
+        ubicar(el, el.dataset.aa, el.dataset.ba, "a");
       });
     });
   }
@@ -694,24 +697,51 @@ const AgendaView = (() => {
       : "";
   }
 
-  // Celda de turnos que se pisan, en CARRILES (27/10/2026, a pedido: "que
-  // los dos pacientes que tienen el mismo horario o se superponen compartan
-  // las celdas del horario que ocupan… y el segundo ocupe hasta donde
-  // termina. Y que si el paciente está en el RIS se fusione de costado con
-  // el turno de la agenda"). Antes (2/10/2026) era el dueño a la izquierda
-  // y una lista con lo demás a la derecha. Ahora cada cosa arranca en la
-  // fila de SU hora y baja hasta donde termina; lo que se pisa va lado a
-  // lado, como en un calendario:
+  // Celda de turnos que se pisan, en DOS columnas (27/10/2026, a pedido:
+  // "que los dos pacientes que tienen el mismo horario o se superponen
+  // compartan las celdas del horario que ocupan… y que si el paciente está
+  // en el RIS se fusione de costado con el turno de la agenda"; y después:
+  // "poné uno abajo del otro y marcales en negrita el horario de inicio
+  // para que se divida la celda en dos, no en tres"). Antes (2/10/2026)
+  // era el dueño a la izquierda y una lista con lo demás a la derecha.
+  // Va todo lo que arranca mientras dura el bloque:
   //  - el turno dueño de la celda (el que empezó primero), con sus otros
   //    estudios del mismo DNI adentro, como antes;
   //  - los turnos de OTROS pacientes (también agrupados por DNI);
-  //  - los de RIS sin turno propio (ej. sobreturnos), en gris;
-  //  - un RIS sin turno que arrancó antes y sigue en este horario.
-  // Si un turno ya está en RIS, el estado va en una tira pegada a su
-  // costado. Hasta 3 carriles; si hay más, "+N más" (clic: muestra todos).
-  // Clics: igual que siempre (turno = opciones del turno; RIS = aviso de
-  // sobreturno).
-  const MAX_CARRILES = 3;
+  //  - los de RIS sin turno propio (ej. sobreturnos), en gris.
+  // Cada uno arranca en la fila de su hora; si las dos columnas están
+  // ocupadas, va abajo del que termina primero — por eso cada uno lleva su
+  // hora de inicio en negrita. Si un turno ya está en RIS, el estado va en
+  // una tira pegada a su costado. Lo que no entra en el alto de la celda:
+  // "+N más" (clic: abre más columnas). Clics como siempre (turno =
+  // opciones del turno; RIS = aviso de sobreturno).
+  const COLUMNAS_CARRILES = 2;
+
+  // Ubica cada cosa en L columnas: en la que la deja más arriba (la de la
+  // izquierda si empata), nunca antes de su hora. Devuelve Map item →
+  // { c: columna, a: primera fila, b: primera fila que ya no ocupa, ancho }.
+  function _colocarCarriles(orden, n, L) {
+    const fondo = new Array(L).fill(0); // primera fila libre de cada columna
+    const lugar = new Map();
+    for (const it of orden) {
+      let c = 0;
+      for (let k = 1; k < L; k++) if (Math.max(it.r0, fondo[k]) < Math.max(it.r0, fondo[c])) c = k;
+      const a = Math.max(it.r0, fondo[c]);
+      if (a >= n) continue; // ya no entra en el alto de la celda
+      const b = a + Math.max(1, Math.min(it.r1 - it.r0, n - a));
+      lugar.set(it, { c, a, b });
+      fondo[c] = b;
+    }
+    // Se estira a la derecha si la columna de al lado está libre en todo su alto.
+    const todos = [...lugar.values()];
+    for (const l of todos) {
+      let s = 1;
+      while (l.c + s < L && !todos.some(o => o.c === l.c + s && o.a < l.b && l.a < o.b)) s++;
+      l.ancho = s;
+    }
+    return lugar;
+  }
+
   function _renderTurnoConSuperpuestos(slot, risItems, solapados, fecha, mins, rowspan) {
     const rowspanAttr = rowspan > 1 ? ` rowspan="${rowspan}"` : "";
     const filasOk = Array.isArray(slot._filasBloque) && slot._filasBloque.length === rowspan;
@@ -729,8 +759,16 @@ const AgendaView = (() => {
     const pasado = new Date(+fp[2], +fp[1] - 1, +fp[0]) < hoy;
 
     // ── Qué va en la celda ──
-    const items = [{ tipo: "turno", t: slot, mismos: slot._mismoPaciente || [], ini: mins,
-                     fin: slot._hastaUnido || (mins + (slot.duracion || _paso)), orden: 0, duenio: true }];
+    // El dueño cae en la casilla de 20 min que lo contiene; su hora real
+    // (horaInicio/horaFinTurno) la manda sistema2 desde el 27/10/2026.
+    const mismosDuenio = slot._mismoPaciente || [];
+    const finesDuenio = [slot.horaFinTurno ? _horaAMinsAg(slot.horaFinTurno) : 0, ...mismosDuenio.map(finTurno)].filter(x => x > mins);
+    const items = [{
+      tipo: "turno", t: slot, mismos: mismosDuenio,
+      ini: slot.horaInicio ? _horaAMinsAg(slot.horaInicio) : mins,
+      fin: slot._hastaUnido || (mins + (slot.duracion || _paso)),
+      finVer: finesDuenio.length ? Math.max(...finesDuenio) : null,
+    }];
     const porDni = new Map();
     for (const t of solapados) {
       const k = _dniNormAg(t.dni) || ("fila:" + t.fila);
@@ -739,46 +777,45 @@ const AgendaView = (() => {
     }
     for (const grupo of porDni.values()) {
       grupo.sort((a, b) => a.mins - b.mins);
-      items.push({ tipo: "turno", t: grupo[0], mismos: grupo.slice(1), ini: grupo[0].mins,
-                   fin: Math.max(...grupo.map(finTurno)), orden: 1 });
+      items.push({ tipo: "turno", t: grupo[0], mismos: grupo.slice(1), ini: grupo[0].mins, fin: Math.max(...grupo.map(finTurno)) });
     }
     for (const r of risItems) {
       const rm = minsDe(r);
-      items.push({ tipo: "ris", r, ini: rm, fin: rm + _duracionRIS(r.practica), orden: 2 });
-    }
-    if (slot._risPrevio && !_ocultarRIS) {
-      const rp = slot._risPrevio;
-      items.push({ tipo: "ris", r: rp.ris, ini: minsDe(rp.ris), fin: rp.hasta, previo: true, orden: 3 });
+      items.push({ tipo: "ris", r, ini: rm, fin: rm + _duracionRIS(r.practica) });
     }
     for (const it of items) { it.r0 = r0De(it.ini); it.r1 = r1De(it.fin, it.r0); }
 
-    // ── Carriles: el dueño primero, después los turnos, el RIS al final ──
-    const orden = items.slice().sort((a, b) => a.orden - b.orden || a.ini - b.ini || b.fin - a.fin);
-    const carriles = [];
-    const pisa = (c, it) => carriles[c].some(([a, b]) => it.r0 < b && a < it.r1);
-    for (const it of orden) {
-      let c = 0;
-      while (carriles[c] && pisa(c, it)) c++;
-      (carriles[c] = carriles[c] || []).push([it.r0, it.r1]);
-      it.carril = c;
+    // ── Columnas: el dueño primero; después por hora (turno antes que RIS) ──
+    const orden = [items[0], ...items.slice(1).sort((a, b) =>
+      a.ini - b.ini || (a.tipo === "turno" ? 0 : 1) - (b.tipo === "turno" ? 0 : 1) || b.fin - a.fin)];
+    const lugar2 = _colocarCarriles(orden, n, COLUMNAS_CARRILES);
+    const ocultos = orden.filter(it => !lugar2.has(it));
+    // "Ver todos": más columnas, hasta que entre todo (máximo 6).
+    let lugarT = null, LT = 0;
+    if (ocultos.length) {
+      for (LT = COLUMNAS_CARRILES + 1; LT <= 6; LT++) {
+        lugarT = _colocarCarriles(orden, n, LT);
+        if (lugarT.size === orden.length) break;
+      }
+      LT = Math.min(LT, 6);
     }
-    const total = carriles.length;
-    const L3 = Math.min(total, MAX_CARRILES);
-    // Se estira hacia la derecha sobre los carriles que están libres en todo su alto.
-    const ancho = (it, L) => { let s = 1; while (it.carril + s < L && !pisa(it.carril + s, it)) s++; return s; };
     const pct = x => (x * 100).toFixed(3) + "%";
+    const vars = (l, L, suf) => !l ? "" :
+      `--t${suf}:calc(${pct(l.a / n)} + 1px);--h${suf}:calc(${pct((l.b - l.a) / n)} - 2px);` +
+      `--l${suf}:calc(${pct(l.c / L)} + 1px);--w${suf}:calc(${pct(l.ancho / L)} - 2px);`;
     const pos = it => {
-      const oculto = it.carril >= L3;
+      const l2 = lugar2.get(it), lT = lugarT && lugarT.get(it), l = l2 || lT;
       return {
-        clase: oculto ? " carril-oculto" : "",
-        style: `top:calc(${pct(it.r0 / n)} + 1px);height:calc(${pct((it.r1 - it.r0) / n)} - 2px);` +
-          (oculto ? "" : `--l3:calc(${pct(it.carril / L3)} + 1px);--w3:calc(${pct(ancho(it, L3) / L3)} - 2px);`) +
-          `--la:calc(${pct(it.carril / total)} + 1px);--wa:calc(${pct(ancho(it, total) / total)} - 2px);`,
+        clase: (l2 ? "" : " carril-oculto") + (lugarT && !lT ? " carril-sin-todos" : ""),
+        datos: (l2 ? ` data-a="${l2.a}" data-b="${l2.b}"` : "") + (lT ? ` data-aa="${lT.a}" data-ba="${lT.b}"` : ""),
+        style: vars(l2, COLUMNAS_CARRILES, "") + vars(lT, LT, "a"),
+        alto: l ? l.b - l.a : 1,
       };
     };
+    const horaNegrita = txt => `<span class="carril-hora">${txt}</span>`;
 
     const htmlTurno = it => {
-      const t = it.t, p = pos(it), alto = it.r1 - it.r0;
+      const t = it.t, p = pos(it), alto = p.alto;
       const col = _coloresOrigen(t.origen);
       const sinSol = t.solicitudDigital === false;
       const est = t.risEstado || "";
@@ -791,19 +828,19 @@ const AgendaView = (() => {
       const badges = `${t.presente === "Presente" ? " ✅" : ""}` +
         (sinSol ? `<span style="background:#c62828;color:#fff;border-radius:3px;padding:0 4px;font-size:7px;font-weight:700;margin-left:3px">SIN SOLICITUD</span>` : "") +
         `${PedidoPiso.badge(t)}${_badgeBloqueo(t)}`;
-      // El dueño de la celda arranca en la fila de 20 min que lo contiene
-      // (puede no ser su hora exacta): para él va solo el "→ fin", como antes.
-      const inicioTxt = it.duenio ? "" : (t.hora || horaDe(it.ini)) + " ";
+      const inicio = it === items[0] ? (t.horaInicio || horaDe(mins)) : (t.hora || horaDe(it.ini));
+      const finVer = horaDe(it.finVer || it.fin);
+      const nombre = `<span class="slot-nombre" style="color:${col.text}">${horaNegrita(inicio)}${t.apellido}, ${t.nombre}${badges}</span>`;
       const cuerpo = alto > 1
-        ? `<span class="slot-nombre" style="color:${col.text}">${t.apellido}, ${t.nombre}${badges}</span>
-           <span class="slot-detalle" style="color:${col.text}">${inicioTxt}→ ${horaDe(it.fin)}${t.dni ? " · DNI " + t.dni : ""}</span>
+        ? `${nombre}
            <span class="slot-estudio-full" style="color:${col.text}">${t.estudio}</span>
+           <span class="slot-detalle" style="color:${col.text}">→ ${finVer}${t.dni ? " · DNI " + t.dni : ""}</span>
            ${PedidoPiso.lineaComentario(t, col.text)}
            ${_lineasMismoPaciente(t, fecha, col, it.mismos)}`
-        : `<span class="slot-nombre" style="color:${col.text}">${t.apellido}, ${t.nombre}${badges}</span>
+        : `${nombre}
            <span class="slot-estudio" style="color:${col.text}">${t.estudio}</span>
            ${_lineasMismoPaciente(t, fecha, col, it.mismos)}`;
-      return `<div class="carril-item slot-turno${p.clase}" data-r0="${it.r0}" data-r1="${it.r1}"
+      return `<div class="carril-item slot-turno${p.clase}"${p.datos}
           style="${p.style}background:${t.color || "#a8d5a2"};border-left:3px solid ${col.border}${sinSol ? ";box-shadow:inset 0 0 0 2px #c62828" : ""}"
           data-fecha="${fecha}" data-mins="${t.mins}" data-fila="${t.fila}" data-turno-id="${t.turnoId || ""}" data-tooltip="${encodeURIComponent(_tipTurno(t))}"
           data-fturno="1" data-origen="${t.origen || ""}" data-presente="${t.presente === "Presente" ? "1" : "0"}" data-estudio="${(t.estudio || "").toLowerCase()}">
@@ -812,28 +849,27 @@ const AgendaView = (() => {
     };
 
     const htmlRis = it => {
-      const r = it.r, p = pos(it), alto = it.r1 - it.r0;
+      const r = it.r, p = pos(it), alto = p.alto;
       const est = r.estado || "";
       const atendido = est === "Atendido" || est === "Presente";
       const ausente = est === "Asignado" && pasado;
       const icono = atendido ? `<span style="color:#2e7d32;font-weight:700">✓</span> `
                   : ausente  ? `<span style="color:#c62828;font-weight:700">✗</span> ` : "";
-      return `<div class="carril-item carril-ris slot-ris-side${p.clase}" data-r0="${it.r0}" data-r1="${it.r1}" style="${p.style}"
+      return `<div class="carril-item carril-ris slot-ris-side${p.clase}"${p.datos} style="${p.style}"
           data-fecha="${fecha}" data-mins="${it.ini}" data-ris-nombre="${encodeURIComponent(r.apellido_nombre)}" data-ris-practica="${encodeURIComponent(r.practica)}"
           data-ya-sobreturno="1"
-          title="RIS (sin turno en la agenda): ${r.apellido_nombre} — ${r.practica}${est ? `\nEstado: ${est}` : ""}\n${horaDe(it.ini)} → ${horaDe(it.fin)} (duración estimada)${it.previo ? "\nArrancó antes y sigue en este horario" : ""}">
+          title="RIS (sin turno en la agenda): ${r.apellido_nombre} — ${r.practica}${est ? `\nEstado: ${est}` : ""}\n${horaDe(it.ini)} → ${horaDe(it.fin)} (duración estimada)">
           <div class="slot-content carril-cuerpo${alto > 1 ? " slot-content-expandido" : ""}">
-            <span class="slot-nombre" style="color:#777;font-style:italic;font-size:10px">${icono}${it.previo ? "↑ " : horaDe(it.ini) + " "}${r.apellido_nombre}</span>
+            <span class="slot-nombre" style="color:#666;font-style:italic;font-size:10px">${horaNegrita(horaDe(it.ini))}${icono}${r.apellido_nombre}</span>
             <span class="slot-estudio" style="color:#999;font-size:9px">${r.practica} <span class="carril-ris-badge">RIS</span>${alto > 1 ? ` →${horaDe(it.fin)}` : ""}</span>
           </div>
         </div>`;
     };
 
-    const ocultos = orden.filter(it => it.carril >= L3);
     const chip = ocultos.length
       ? `<div class="carril-mas" data-texto="+${ocultos.length} más" title="Clic para ver todos"
           data-tooltip="${encodeURIComponent("También en este horario:\n" + ocultos.map(it => it.tipo === "turno"
-            ? `${horaDe(it.ini)} ${it.t.apellido}, ${it.t.nombre} — ${it.t.estudio}`
+            ? `${it.t.hora || horaDe(it.ini)} ${it.t.apellido}, ${it.t.nombre} — ${it.t.estudio}`
             : `${horaDe(it.ini)} ${it.r.apellido_nombre} — ${it.r.practica} (RIS)`).join("\n") + "\n\nClic para verlos todos")}">+${ocultos.length} más</div>`
       : "";
 
