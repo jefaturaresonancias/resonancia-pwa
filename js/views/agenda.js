@@ -248,8 +248,8 @@ const AgendaView = (() => {
 
   // Los otros estudios del mismo paciente, adentro de la celda del bloque —
   // cada línea abre las opciones de SU turno (data-turno-id propio).
-  function _lineasMismoPaciente(slot, fecha, col) {
-    return (slot._mismoPaciente || []).map(t => `
+  function _lineasMismoPaciente(slot, fecha, col, lista) {
+    return (lista || slot._mismoPaciente || []).map(t => `
       <div class="slot-mismo" style="color:${col.text}"
         data-fecha="${fecha}" data-mins="${t.mins}" data-fila="${t.fila}" data-turno-id="${t.turnoId || ""}"
         data-tooltip="${encodeURIComponent(_tipTurno(t))}"
@@ -341,6 +341,10 @@ const AgendaView = (() => {
           s._otrosBloque = grupo.otros;
           s._hastaUnido = grupo.hastaPaciente; // el "→hora" de la celda: el principal + sus mismos DNI
           const spanCount = Math.max(1, slots.slice(si).filter(tm => tm < hasta).length);
+          // Para los carriles (ver _renderTurnoConSuperpuestos): la hora de
+          // cada fila que ocupa la celda y la posición de la primera.
+          s._filasBloque = slots.slice(si, si + spanCount);
+          s._si = si;
           activosPorCol[di] = { slot: s, hasta, rowSpan: spanCount, filas: grupo.filas };
         } else if (activosPorCol[di] && mins >= activosPorCol[di].hasta) {
           activosPorCol[di] = null;
@@ -393,6 +397,10 @@ const AgendaView = (() => {
           // Superpuestos de OTROS pacientes en todo el bloque (los del mismo
           // paciente van adentro de la celda) — ver _agruparBloque.
           s._solapadosVista = s._otrosBloque || [];
+          // Un RIS sin turno que arrancó ANTES y todavía sigue: en la celda
+          // de carriles va como uno más (antes el turno lo tapaba).
+          const ra = risActivoCol[di];
+          s._risPrevio = (ra && ra.mostrado && mins < ra.hasta) ? { ris: ra.ris, hasta: ra.hasta } : null;
           // Un RIS de adentro que sigue después del turno: su barra de
           // continuación se dibuja en las filas siguientes (salvo que ya
           // hubiera uno de antes que termina todavía más tarde).
@@ -506,9 +514,38 @@ const AgendaView = (() => {
     }
     html += "</tbody></table>";
     container.innerHTML = html;
+    _ajustarCarriles(container);
     _bindSlotClicks(container);
     _aplicarFiltros();
   }
+
+  // Los carriles se ubican primero en % (todas las filas iguales); acá se
+  // corrigen en píxeles con la altura real de cada fila, porque una fila
+  // puede estirarse si otra columna tiene más texto.
+  function _ajustarCarriles(container) {
+    const tds = container.querySelectorAll("td.celda-carriles");
+    if (!tds.length) return;
+    const filas = container.querySelectorAll(".agenda-table tbody tr");
+    tds.forEach(td => {
+      const si = +td.dataset.si, n = +td.dataset.n;
+      if (!filas[si]) return;
+      const top0 = filas[si].offsetTop;
+      const topDe = k => (k < n && filas[si + k] ? filas[si + k].offsetTop - top0 : td.offsetHeight);
+      td.querySelectorAll("[data-r0]").forEach(el => {
+        const y0 = topDe(+el.dataset.r0), y1 = topDe(+el.dataset.r1);
+        el.style.top = (y0 + 1) + "px";
+        el.style.height = Math.max(8, y1 - y0 - 2) + "px";
+      });
+    });
+  }
+  let _resizeCarriles = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(_resizeCarriles);
+    _resizeCarriles = setTimeout(() => {
+      const c = document.getElementById("agenda-container");
+      if (c) _ajustarCarriles(c);
+    }, 150);
+  });
 
   // ── Celda combinada: turno propio + RIS en la misma fila ──
   function _renderCeldaCombinada(slot, risSlot, fecha, mins, risDelDia, rowspan = 1) {
@@ -657,64 +694,151 @@ const AgendaView = (() => {
       : "";
   }
 
-  // Celda de un turno con otros adentro (2/10/2026, a pedido: "si autorizo
-  // con PIN de jefatura que un turno pise otro tienen que mostrarse ambos y
-  // el de RIS si es que está"). Izquierda: el turno dueño de la celda (el
-  // que empezó primero). Derecha, con su hora: todo lo que arranca mientras
-  // dura — otros turnos de la PWA (clic = opciones del turno, como
-  // cualquier turno) y estudios de RIS sin turno propio (gris; clic = aviso
-  // de sobreturno, igual que antes la celda turno + RIS).
+  // Celda de turnos que se pisan, en CARRILES (27/10/2026, a pedido: "que
+  // los dos pacientes que tienen el mismo horario o se superponen compartan
+  // las celdas del horario que ocupan… y el segundo ocupe hasta donde
+  // termina. Y que si el paciente está en el RIS se fusione de costado con
+  // el turno de la agenda"). Antes (2/10/2026) era el dueño a la izquierda
+  // y una lista con lo demás a la derecha. Ahora cada cosa arranca en la
+  // fila de SU hora y baja hasta donde termina; lo que se pisa va lado a
+  // lado, como en un calendario:
+  //  - el turno dueño de la celda (el que empezó primero), con sus otros
+  //    estudios del mismo DNI adentro, como antes;
+  //  - los turnos de OTROS pacientes (también agrupados por DNI);
+  //  - los de RIS sin turno propio (ej. sobreturnos), en gris;
+  //  - un RIS sin turno que arrancó antes y sigue en este horario.
+  // Si un turno ya está en RIS, el estado va en una tira pegada a su
+  // costado. Hasta 3 carriles; si hay más, "+N más" (clic: muestra todos).
+  // Clics: igual que siempre (turno = opciones del turno; RIS = aviso de
+  // sobreturno).
+  const MAX_CARRILES = 3;
   function _renderTurnoConSuperpuestos(slot, risItems, solapados, fecha, mins, rowspan) {
     const rowspanAttr = rowspan > 1 ? ` rowspan="${rowspan}"` : "";
-    const col  = _coloresOrigen(slot.origen);
-    const pres = slot.presente === "Presente" ? "✅" : "";
-    let horaFinBadge = "";
-    if (rowspan > 1) {
-      const hasta = slot._hastaUnido || (mins + (slot.duracion || _paso));
-      const horaF = String(Math.floor(hasta/60)).padStart(2,"0")+":"+String(hasta%60).padStart(2,"0");
-      horaFinBadge = `<span style="color:${col.text};opacity:.7;font-size:9px;font-weight:700;margin-left:3px">→${horaF}</span>`;
-    }
-    const sinSolicitudBadge = slot.solicitudDigital === false
-      ? `<span style="background:#c62828;color:#fff;border-radius:3px;padding:0 4px;font-size:7px;font-weight:700;margin-left:3px">SIN SOLICITUD</span>` : "";
-
+    const filasOk = Array.isArray(slot._filasBloque) && slot._filasBloque.length === rowspan;
+    const filasMins = filasOk ? slot._filasBloque : Array.from({ length: rowspan }, (_, k) => mins + k * _paso);
+    const n = filasMins.length;
     const horaDe = m => String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0");
-    const items = [
-      ...solapados.map(t => {
-        const c = _coloresOrigen(t.origen);
-        return { mins: t.mins, html: `
-          <div class="slot-turno slot-solapado" style="flex-shrink:0;background:${t.color||"#a8d5a2"};border-left:3px solid ${c.border};padding:1px 4px;overflow:hidden${t.solicitudDigital === false ? ";box-shadow:inset 0 0 0 2px #c62828" : ""}"
-            data-fecha="${fecha}" data-mins="${t.mins}" data-fila="${t.fila}" data-turno-id="${t.turnoId||""}" data-tooltip="${encodeURIComponent(_tipTurno(t))}"
-            data-fturno="1" data-origen="${t.origen||""}" data-presente="${t.presente==="Presente"?"1":"0"}" data-estudio="${(t.estudio||"").toLowerCase()}">
-            <span class="slot-nombre" style="color:${c.text}">${t.hora} ${t.apellido}, ${t.nombre}${t.presente === "Presente" ? " ✅" : ""}${PedidoPiso.badge(t)}${t.horaFin ? `<span style="opacity:.7;font-size:9px;margin-left:3px">→${t.horaFin}</span>` : ""}</span>
-            <span class="slot-estudio" style="color:${c.text}">${t.estudio}</span>
-          </div>` };
-      }),
-      ...risItems.map(r => {
-        const rm = typeof r.mins === "number" ? r.mins : parsearMinsJS(r.hora);
-        return { mins: rm, html: `
-          <div class="slot-ris-side" style="flex-shrink:0;padding:1px 4px;cursor:pointer;overflow:hidden"
-            data-fecha="${fecha}" data-mins="${rm}" data-ris-nombre="${encodeURIComponent(r.apellido_nombre)}" data-ris-practica="${encodeURIComponent(r.practica)}"
-            data-ya-sobreturno="1"
-            title="RIS: ${r.apellido_nombre} — ${r.practica}${r.estado ? `\nEstado: ${r.estado}` : ""}\nSe superpone con ${slot.apellido}, ${slot.nombre}">
-            <span class="slot-nombre" style="color:#777;font-style:italic;font-size:10px">${horaDe(rm)} ${r.apellido_nombre}</span>
-            <span class="slot-estudio" style="color:#999;font-size:9px">${r.practica} <span style="background:#ddd;color:#777;border-radius:3px;padding:0 3px;font-size:8px">RIS</span></span>
-          </div>` };
-      }),
-    ].sort((a, b) => a.mins - b.mins);
+    const minsDe = r => typeof r.mins === "number" ? r.mins : parsearMinsJS(r.hora);
+    const finTurno = t => { const f = t.horaFin ? _horaAMinsAg(t.horaFin) : 0; return f > t.mins ? f : t.mins + _paso; };
+    // Fila donde arranca (la última que empieza antes o en esa hora) y
+    // primera fila que ya no ocupa.
+    const r0De = m => Math.max(0, filasMins.filter(t => t <= m).length - 1);
+    const r1De = (e, r0) => Math.min(n, Math.max(r0 + 1, filasMins.filter(t => t < e).length));
+    const fp = fecha.split("/");
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const pasado = new Date(+fp[2], +fp[1] - 1, +fp[0]) < hoy;
 
-    return `<td${rowspanAttr} style="padding:0;border:1px solid #e4e8ee;height:36px${slot.solicitudDigital === false ? ";box-shadow:inset 0 0 0 2px #c62828" : ""}">
-      <div style="display:flex;height:100%;gap:1px">
-        <div class="slot-turno slot-content${rowspan > 1 ? " slot-content-expandido" : ""}" style="flex:1;background:${slot.color||"#a8d5a2"};border-left:3px solid ${col.border};cursor:pointer;overflow:hidden"
-          data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-turno-id="${slot.turnoId||""}" data-tooltip="${encodeURIComponent(_tipTurno(slot))}"
-          data-fturno="1" data-origen="${slot.origen||""}" data-presente="${slot.presente==="Presente"?"1":"0"}" data-estudio="${(slot.estudio||"").toLowerCase()}">
-          <span class="slot-nombre" style="color:${col.text}">${slot.apellido}, ${slot.nombre} ${pres}${horaFinBadge}${sinSolicitudBadge}${PedidoPiso.badge(slot)}${_badgeBloqueo(slot)}</span>
-          <span class="slot-estudio" style="color:${col.text}">${slot.estudio}</span>
-          ${_lineasMismoPaciente(slot, fecha, col)}
-        </div>
-        <div style="flex:1;display:flex;flex-direction:column;gap:2px;padding:2px;overflow-y:auto;background:#f4f4f4;border-left:2px dashed #bbb" title="También en este horario">
-          ${items.map(i => i.html).join("")}
-        </div>
-      </div>
+    // ── Qué va en la celda ──
+    const items = [{ tipo: "turno", t: slot, mismos: slot._mismoPaciente || [], ini: mins,
+                     fin: slot._hastaUnido || (mins + (slot.duracion || _paso)), orden: 0, duenio: true }];
+    const porDni = new Map();
+    for (const t of solapados) {
+      const k = _dniNormAg(t.dni) || ("fila:" + t.fila);
+      if (!porDni.has(k)) porDni.set(k, []);
+      porDni.get(k).push(t);
+    }
+    for (const grupo of porDni.values()) {
+      grupo.sort((a, b) => a.mins - b.mins);
+      items.push({ tipo: "turno", t: grupo[0], mismos: grupo.slice(1), ini: grupo[0].mins,
+                   fin: Math.max(...grupo.map(finTurno)), orden: 1 });
+    }
+    for (const r of risItems) {
+      const rm = minsDe(r);
+      items.push({ tipo: "ris", r, ini: rm, fin: rm + _duracionRIS(r.practica), orden: 2 });
+    }
+    if (slot._risPrevio && !_ocultarRIS) {
+      const rp = slot._risPrevio;
+      items.push({ tipo: "ris", r: rp.ris, ini: minsDe(rp.ris), fin: rp.hasta, previo: true, orden: 3 });
+    }
+    for (const it of items) { it.r0 = r0De(it.ini); it.r1 = r1De(it.fin, it.r0); }
+
+    // ── Carriles: el dueño primero, después los turnos, el RIS al final ──
+    const orden = items.slice().sort((a, b) => a.orden - b.orden || a.ini - b.ini || b.fin - a.fin);
+    const carriles = [];
+    const pisa = (c, it) => carriles[c].some(([a, b]) => it.r0 < b && a < it.r1);
+    for (const it of orden) {
+      let c = 0;
+      while (carriles[c] && pisa(c, it)) c++;
+      (carriles[c] = carriles[c] || []).push([it.r0, it.r1]);
+      it.carril = c;
+    }
+    const total = carriles.length;
+    const L3 = Math.min(total, MAX_CARRILES);
+    // Se estira hacia la derecha sobre los carriles que están libres en todo su alto.
+    const ancho = (it, L) => { let s = 1; while (it.carril + s < L && !pisa(it.carril + s, it)) s++; return s; };
+    const pct = x => (x * 100).toFixed(3) + "%";
+    const pos = it => {
+      const oculto = it.carril >= L3;
+      return {
+        clase: oculto ? " carril-oculto" : "",
+        style: `top:calc(${pct(it.r0 / n)} + 1px);height:calc(${pct((it.r1 - it.r0) / n)} - 2px);` +
+          (oculto ? "" : `--l3:calc(${pct(it.carril / L3)} + 1px);--w3:calc(${pct(ancho(it, L3) / L3)} - 2px);`) +
+          `--la:calc(${pct(it.carril / total)} + 1px);--wa:calc(${pct(ancho(it, total) / total)} - 2px);`,
+      };
+    };
+
+    const htmlTurno = it => {
+      const t = it.t, p = pos(it), alto = it.r1 - it.r0;
+      const col = _coloresOrigen(t.origen);
+      const sinSol = t.solicitudDigital === false;
+      const est = t.risEstado || "";
+      const atendido = est === "Atendido" || est === "Presente";
+      const ausente = est === "Asignado" && pasado;
+      // RIS del mismo paciente, pegado al costado del turno.
+      const tira = est
+        ? `<div class="carril-ris-tira" style="color:${atendido ? "#2e7d32" : ausente ? "#c62828" : "#555"}" title="En RIS: ${est}">${atendido ? "✓ " : ausente ? "✗ " : ""}RIS${alto > 1 ? " · " + est : ""}</div>`
+        : "";
+      const badges = `${t.presente === "Presente" ? " ✅" : ""}` +
+        (sinSol ? `<span style="background:#c62828;color:#fff;border-radius:3px;padding:0 4px;font-size:7px;font-weight:700;margin-left:3px">SIN SOLICITUD</span>` : "") +
+        `${PedidoPiso.badge(t)}${_badgeBloqueo(t)}`;
+      // El dueño de la celda arranca en la fila de 20 min que lo contiene
+      // (puede no ser su hora exacta): para él va solo el "→ fin", como antes.
+      const inicioTxt = it.duenio ? "" : (t.hora || horaDe(it.ini)) + " ";
+      const cuerpo = alto > 1
+        ? `<span class="slot-nombre" style="color:${col.text}">${t.apellido}, ${t.nombre}${badges}</span>
+           <span class="slot-detalle" style="color:${col.text}">${inicioTxt}→ ${horaDe(it.fin)}${t.dni ? " · DNI " + t.dni : ""}</span>
+           <span class="slot-estudio-full" style="color:${col.text}">${t.estudio}</span>
+           ${PedidoPiso.lineaComentario(t, col.text)}
+           ${_lineasMismoPaciente(t, fecha, col, it.mismos)}`
+        : `<span class="slot-nombre" style="color:${col.text}">${t.apellido}, ${t.nombre}${badges}</span>
+           <span class="slot-estudio" style="color:${col.text}">${t.estudio}</span>
+           ${_lineasMismoPaciente(t, fecha, col, it.mismos)}`;
+      return `<div class="carril-item slot-turno${p.clase}" data-r0="${it.r0}" data-r1="${it.r1}"
+          style="${p.style}background:${t.color || "#a8d5a2"};border-left:3px solid ${col.border}${sinSol ? ";box-shadow:inset 0 0 0 2px #c62828" : ""}"
+          data-fecha="${fecha}" data-mins="${t.mins}" data-fila="${t.fila}" data-turno-id="${t.turnoId || ""}" data-tooltip="${encodeURIComponent(_tipTurno(t))}"
+          data-fturno="1" data-origen="${t.origen || ""}" data-presente="${t.presente === "Presente" ? "1" : "0"}" data-estudio="${(t.estudio || "").toLowerCase()}">
+          <div class="slot-content carril-cuerpo${alto > 1 ? " slot-content-expandido" : ""}">${cuerpo}</div>${tira}
+        </div>`;
+    };
+
+    const htmlRis = it => {
+      const r = it.r, p = pos(it), alto = it.r1 - it.r0;
+      const est = r.estado || "";
+      const atendido = est === "Atendido" || est === "Presente";
+      const ausente = est === "Asignado" && pasado;
+      const icono = atendido ? `<span style="color:#2e7d32;font-weight:700">✓</span> `
+                  : ausente  ? `<span style="color:#c62828;font-weight:700">✗</span> ` : "";
+      return `<div class="carril-item carril-ris slot-ris-side${p.clase}" data-r0="${it.r0}" data-r1="${it.r1}" style="${p.style}"
+          data-fecha="${fecha}" data-mins="${it.ini}" data-ris-nombre="${encodeURIComponent(r.apellido_nombre)}" data-ris-practica="${encodeURIComponent(r.practica)}"
+          data-ya-sobreturno="1"
+          title="RIS (sin turno en la agenda): ${r.apellido_nombre} — ${r.practica}${est ? `\nEstado: ${est}` : ""}\n${horaDe(it.ini)} → ${horaDe(it.fin)} (duración estimada)${it.previo ? "\nArrancó antes y sigue en este horario" : ""}">
+          <div class="slot-content carril-cuerpo${alto > 1 ? " slot-content-expandido" : ""}">
+            <span class="slot-nombre" style="color:#777;font-style:italic;font-size:10px">${icono}${it.previo ? "↑ " : horaDe(it.ini) + " "}${r.apellido_nombre}</span>
+            <span class="slot-estudio" style="color:#999;font-size:9px">${r.practica} <span class="carril-ris-badge">RIS</span>${alto > 1 ? ` →${horaDe(it.fin)}` : ""}</span>
+          </div>
+        </div>`;
+    };
+
+    const ocultos = orden.filter(it => it.carril >= L3);
+    const chip = ocultos.length
+      ? `<div class="carril-mas" data-texto="+${ocultos.length} más" title="Clic para ver todos"
+          data-tooltip="${encodeURIComponent("También en este horario:\n" + ocultos.map(it => it.tipo === "turno"
+            ? `${horaDe(it.ini)} ${it.t.apellido}, ${it.t.nombre} — ${it.t.estudio}`
+            : `${horaDe(it.ini)} ${it.r.apellido_nombre} — ${it.r.practica} (RIS)`).join("\n") + "\n\nClic para verlos todos")}">+${ocultos.length} más</div>`
+      : "";
+
+    return `<td${rowspanAttr} class="celda-carriles"${filasOk && Number.isInteger(slot._si) ? ` data-si="${slot._si}"` : ""} data-n="${n}">
+      <div class="carriles">${orden.map(it => it.tipo === "turno" ? htmlTurno(it) : htmlRis(it)).join("")}${chip}</div>
     </td>`;
   }
 
@@ -925,6 +1049,16 @@ const AgendaView = (() => {
     container.querySelectorAll(".slot-ris-side").forEach(div => {
       div.addEventListener("click", () => {
         App.toast("Ese horario ya tiene un paciente de RIS — para sobreturno, usá \"Nuevo turno\" → \"Sugerir sobreturno\"", "error");
+      });
+    });
+
+    // "+N más" en una celda con más de 3 carriles: muestra/oculta el resto.
+    container.querySelectorAll(".carril-mas").forEach(el => {
+      el.addEventListener("click", ev => {
+        ev.stopPropagation();
+        const td = el.closest("td");
+        const todos = td.classList.toggle("ver-todos");
+        el.textContent = todos ? "ver menos" : el.dataset.texto;
       });
     });
 

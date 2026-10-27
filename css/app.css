@@ -971,3 +971,41 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
   background: #e65100; color: #fff; border-radius: 3px; padding: 0 5px;
   font-size: 9px; font-weight: 800; letter-spacing: .02em; margin-left: 3px; white-space: nowrap;
 }
+
+/* Turnos que se pisan, en carriles lado a lado (27/10/2026) — ver
+   _renderTurnoConSuperpuestos en js/views/agenda.js. Cada caja arranca en
+   la fila de su hora y baja hasta donde termina; top/height los corrige
+   _ajustarCarriles con la altura real de las filas. */
+.agenda-table td.celda-carriles { padding: 0; position: relative; }
+.carriles { position: absolute; inset: 0; overflow: hidden; }
+.carril-item {
+  position: absolute; box-sizing: border-box;
+  left: var(--l3); width: var(--w3);
+  display: flex; overflow: hidden; cursor: pointer;
+}
+.carril-oculto { display: none; }
+.celda-carriles.ver-todos .carril-item { left: var(--la); width: var(--wa); }
+.celda-carriles.ver-todos .carril-oculto { display: flex; }
+.carril-cuerpo { flex: 1; min-width: 0; height: auto; padding: 2px 4px; }
+.carril-cuerpo.slot-content-expandido { padding: 3px 4px; }
+/* Turno que ya está en RIS: el estado pegado al costado */
+.carril-ris-tira {
+  flex: 0 0 13px; writing-mode: vertical-rl;
+  display: flex; align-items: center; justify-content: flex-start;
+  padding: 3px 0; font-size: 8px; font-weight: 800; letter-spacing: .03em;
+  white-space: nowrap; overflow: hidden;
+  background: rgba(255,255,255,.6); border-left: 1px dashed rgba(0,0,0,.25);
+}
+/* RIS sin turno en la agenda (ej. sobreturno): carril gris propio */
+.carril-ris { background: #f4f4f4; border: 1px dashed #bbb; border-radius: 4px; }
+.carril-ris-badge {
+  background: #ddd; color: #777; border-radius: 3px; padding: 0 3px;
+  font-size: 8px; font-style: normal;
+}
+.carril-mas {
+  position: absolute; right: 2px; bottom: 2px; z-index: 2;
+  background: #37474f; color: #fff; border-radius: 8px; padding: 1px 6px;
+  font-size: 9px; font-weight: 700; cursor: pointer; white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,.25);
+}
+.carril-mas:hover { background: #263238; }
