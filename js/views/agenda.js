@@ -254,7 +254,7 @@ const AgendaView = (() => {
         data-fecha="${fecha}" data-mins="${t.mins}" data-fila="${t.fila}" data-turno-id="${t.turnoId || ""}"
         data-tooltip="${encodeURIComponent(_tipTurno(t))}"
         data-fturno="1" data-origen="${t.origen || ""}" data-presente="${t.presente === "Presente" ? "1" : "0"}" data-estudio="${(t.estudio || "").toLowerCase()}">
-        ＋ ${t.hora} ${t.estudio}${t.horaFin ? ` →${t.horaFin}` : ""}${t.presente === "Presente" ? " ✅" : ""}</div>`).join("");
+        ＋ ${t.hora} ${t.estudio}${t.horaFin ? ` →${t.horaFin}` : ""}${t.presente === "Presente" ? " ✅" : ""}${ExcepcionPin.badge(t)}</div>`).join("");
   }
 
   // ── VISTA SEMANA ──────────────────────────────────────────
@@ -688,7 +688,7 @@ const AgendaView = (() => {
     const sinSolicitudLinea = slot.solicitudDigital === false ? `\n🚫 SIN SOLICITUD DIGITAL` : "";
     const creadoLinea = slot.creadoEn ? `\n🗓️ Cargado el: ${slot.creadoEn}` : "";
     const bloqueoLinea = slot.enBloqueo ? `\n⛔ Dentro del bloqueo: ${slot.enBloqueo}` : "";
-    return `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${PedidoPiso.lineasTip(slot)}${slot.observaciones?"\n📝 "+slot.observaciones:""}${slot.tecnicoAsigno?"\n🧑‍⚕️ Asignó: "+slot.tecnicoAsigno:""}${slot.presente === "Presente"?"\n✅ Presente":""}${risLinea}${sinSolicitudLinea}${creadoLinea}${bloqueoLinea}`;
+    return `${slot.apellido}, ${slot.nombre}\nDNI: ${slot.dni}\n${slot.estudio}\n${slot.origen}${PedidoPiso.lineasTip(slot)}${slot.observaciones?"\n📝 "+slot.observaciones:""}${slot.tecnicoAsigno?"\n🧑‍⚕️ Asignó: "+slot.tecnicoAsigno:""}${slot.presente === "Presente"?"\n✅ Presente":""}${risLinea}${sinSolicitudLinea}${creadoLinea}${bloqueoLinea}${ExcepcionPin.lineaTip(slot)}`;
   }
 
   function _badgeBloqueo(slot) {
@@ -825,7 +825,7 @@ const AgendaView = (() => {
       const tira = est
         ? `<div class="carril-ris-tira" style="color:${atendido ? "#2e7d32" : ausente ? "#c62828" : "#555"}" title="En RIS: ${est}">${atendido ? "✓ " : ausente ? "✗ " : ""}RIS${alto > 1 ? " · " + est : ""}</div>`
         : "";
-      const badges = `${t.presente === "Presente" ? " ✅" : ""}` +
+      const badges = `${t.presente === "Presente" ? " ✅" : ""}${ExcepcionPin.badge(t)}` +
         (sinSol ? `<span style="background:#c62828;color:#fff;border-radius:3px;padding:0 4px;font-size:7px;font-weight:700;margin-left:3px">SIN SOLICITUD</span>` : "") +
         `${PedidoPiso.badge(t)}${_badgeBloqueo(t)}`;
       const inicio = it === items[0] ? (t.horaInicio || horaDe(mins)) : (t.hora || horaDe(it.ini));
@@ -840,7 +840,7 @@ const AgendaView = (() => {
         : `${nombre}
            <span class="slot-estudio" style="color:${col.text}">${t.estudio}</span>
            ${_lineasMismoPaciente(t, fecha, col, it.mismos)}`;
-      return `<div class="carril-item slot-turno${p.clase}"${p.datos}
+      return `<div class="carril-item slot-turno${p.clase}${ExcepcionPin.clase(t)}"${p.datos}
           style="${p.style}background:${t.color || "#a8d5a2"};border-left:3px solid ${col.border}${sinSol ? ";box-shadow:inset 0 0 0 2px #c62828" : ""}"
           data-fecha="${fecha}" data-mins="${t.mins}" data-fila="${t.fila}" data-turno-id="${t.turnoId || ""}" data-tooltip="${encodeURIComponent(_tipTurno(t))}"
           data-fturno="1" data-origen="${t.origen || ""}" data-presente="${t.presente === "Presente" ? "1" : "0"}" data-estudio="${(t.estudio || "").toLowerCase()}">
@@ -941,16 +941,16 @@ const AgendaView = (() => {
       // en vez de esconderla detrás del tooltip al pasar el mouse.
       const contenido = rowspan > 1
         ? `<div class="slot-content slot-content-expandido">
-            <span class="slot-nombre" style="color:${col.text}">${iconRIS}${slot.apellido}, ${slot.nombre} ${pres}${horaFinBadge}${sinSolicitudBadge}${PedidoPiso.badge(slot)}${_badgeBloqueo(slot)}</span>
+            <span class="slot-nombre" style="color:${col.text}">${iconRIS}${slot.apellido}, ${slot.nombre} ${pres}${horaFinBadge}${ExcepcionPin.badge(slot)}${sinSolicitudBadge}${PedidoPiso.badge(slot)}${_badgeBloqueo(slot)}</span>
             ${dniTexto ? `<span class="slot-detalle" style="color:${col.text}">${dniTexto}</span>` : ""}
             <span class="slot-estudio-full" style="color:${col.text}">${slot.estudio}${badgeRIS}</span>
             ${PedidoPiso.lineaComentario(slot, col.text)}
             ${_lineasMismoPaciente(slot, fecha, col)}
             <span class="slot-origen-badge" style="color:${col.text}">${slot.origen||""}</span>
           </div>`
-        : `<div class="slot-content"><span class="slot-nombre" style="color:${col.text}">${iconRIS}${slot.apellido}, ${slot.nombre} ${pres}${sinSolicitudBadge}${PedidoPiso.badge(slot)}${_badgeBloqueo(slot)}</span><span class="slot-estudio" style="color:${col.text}">${slot.estudio}${badgeRIS}</span>${_lineasMismoPaciente(slot, fecha, col)}</div>`;
+        : `<div class="slot-content"><span class="slot-nombre" style="color:${col.text}">${iconRIS}${slot.apellido}, ${slot.nombre} ${pres}${ExcepcionPin.badge(slot)}${sinSolicitudBadge}${PedidoPiso.badge(slot)}${_badgeBloqueo(slot)}</span><span class="slot-estudio" style="color:${col.text}">${slot.estudio}${badgeRIS}</span>${_lineasMismoPaciente(slot, fecha, col)}</div>`;
 
-      return `<td class="slot-turno" style="background:${bg};border-left:3px solid ${col.border}${sinSolicitud ? ";box-shadow:inset 0 0 0 2px #c62828" : ""}" data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-turno-id="${slot.turnoId||""}" data-tooltip="${encodeURIComponent(tip)}"${rowspanAttr}
+      return `<td class="slot-turno${ExcepcionPin.clase(slot)}" style="background:${bg};border-left:3px solid ${col.border}${sinSolicitud ? ";box-shadow:inset 0 0 0 2px #c62828" : ""}" data-fecha="${fecha}" data-mins="${mins}" data-fila="${slot.fila}" data-turno-id="${slot.turnoId||""}" data-tooltip="${encodeURIComponent(tip)}"${rowspanAttr}
         data-fturno="1" data-origen="${slot.origen||""}" data-presente="${slot.presente==="Presente"?"1":"0"}" data-estudio="${(slot.estudio||"").toLowerCase()}"
         >${contenido}</td>`;
     }
@@ -1124,7 +1124,7 @@ const AgendaView = (() => {
         tip.innerHTML = decodeURIComponent(td.dataset.tooltip).replace(/\n/g,"<br>")
           .replace("NO ASIGNADO EN RIS", '<span style="color:#e05a5a;font-weight:700">NO ASIGNADO EN RIS</span>')
           .replace("SIN SOLICITUD DIGITAL", '<span style="color:#e05a5a;font-weight:700">SIN SOLICITUD DIGITAL</span>');
-        tip.innerHTML = PedidoPiso.resaltar(tip.innerHTML);
+        tip.innerHTML = ExcepcionPin.resaltar(PedidoPiso.resaltar(tip.innerHTML));
         document.body.appendChild(tip);
         _posTip(e, tip);
       });

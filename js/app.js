@@ -121,7 +121,7 @@ const App = (() => {
     // HTML) — acá sí se renderiza como HTML, así que se resalta en rojo.
     const tipHtml = tip.replace("NO ASIGNADO EN RIS", '<span style="color:#c62828;font-weight:700">NO ASIGNADO EN RIS</span>')
       .replace("SIN SOLICITUD DIGITAL", '<span style="color:#c62828;font-weight:700">SIN SOLICITUD DIGITAL</span>');
-    const tipHtmlPiso = PedidoPiso.resaltar(tipHtml);
+    const tipHtmlPiso = ExcepcionPin.resaltar(PedidoPiso.resaltar(tipHtml));
     // "🚫 No se realizó" (2/10/2026, a pedido): solo turnos de internación
     // (línea 4 del tooltip = origen). Anula el turno con el motivo y cancela
     // el reclamo del internado en reclamos-rmn — el médico lo ve al buscarlo.

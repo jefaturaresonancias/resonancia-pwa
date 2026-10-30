@@ -238,7 +238,7 @@ const ListaView = (() => {
               const presBadge = pres
                 ? `<span class="btn-card-done">✓ Presente</span>`
                 : `<button class="btn-card-pres" data-turno-id="${turno.turnoId}" data-nombre="${turno.nombre} ${turno.apellido}">Presente</button>`;
-              cards.push(`<div class="card-turno card-split ${pres?"presente":""} ${esInt?"card-int":""}">
+              cards.push(`<div class="card-turno card-split ${pres?"presente":""} ${esInt?"card-int":""}${ExcepcionPin.clase(turno)}">
                 <div>
                   <div class="hora-big ${pres?"ok":""}">${hora}</div>
                   <div class="hora-sub">${origenUp}</div>
@@ -247,7 +247,7 @@ const ListaView = (() => {
                   <div class="card-body" style="flex:1;border-right:2px dashed #ddd;padding-right:8px">
                     <div class="card-nombre ${pres?"ok":""}">${turno.apellido}, ${turno.nombre}</div>
                     <div class="card-estudio">${turno.estudio}</div>
-                    <div class="card-meta"><span class="card-dni">${turno.dni}</span>${PedidoPiso.badge(turno)}${turno.observaciones?`<span class="card-obs-icon" title="${turno.observaciones.replace(/"/g,'&quot;')}">📝</span>`:""}</div>
+                    <div class="card-meta"><span class="card-dni">${turno.dni}</span>${ExcepcionPin.badge(turno)}${PedidoPiso.badge(turno)}${turno.observaciones?`<span class="card-obs-icon" title="${turno.observaciones.replace(/"/g,'&quot;')}">📝</span>`:""}</div>
                     ${PedidoPiso.lineaComentario(turno) ? `<div class="card-obs">${PedidoPiso.lineaComentario(turno)}</div>` : ""}
                     ${turno.creadoEn?`<div class="card-obs" style="opacity:.6">🗓️ Cargado el: ${turno.creadoEn}</div>`:""}
                     ${turno.tecnicoAsigno?`<div class="card-obs" style="opacity:.6">👤 ${turno.tecnicoAsigno}</div>`:""}
@@ -273,7 +273,7 @@ const ListaView = (() => {
               const presBadge = pres
                 ? `<span class="btn-card-done">✓ Presente</span>`
                 : `<button class="btn-card-pres" data-turno-id="${turno.turnoId}" data-nombre="${turno.nombre} ${turno.apellido}">Presente</button>`;
-              cards.push(`<div class="card-turno ${pres?"presente":""} ${esInt?"card-int":""}">
+              cards.push(`<div class="card-turno ${pres?"presente":""} ${esInt?"card-int":""}${ExcepcionPin.clase(turno)}">
                 <div>
                   <div class="hora-big ${pres?"ok":""}">${hora}</div>
                   <div class="hora-sub">${origenUp}</div>
@@ -281,7 +281,7 @@ const ListaView = (() => {
                 <div class="card-body">
                   <div class="card-nombre ${pres?"ok":""}">${turno.apellido}, ${turno.nombre}</div>
                   <div class="card-estudio">${turno.estudio}</div>
-                  <div class="card-meta"><span class="card-dni">${turno.dni}</span>${PedidoPiso.badge(turno)}${turno.observaciones?`<span class="card-obs-icon" title="${turno.observaciones.replace(/"/g,'&quot;')}">📝</span>`:""}</div>
+                  <div class="card-meta"><span class="card-dni">${turno.dni}</span>${ExcepcionPin.badge(turno)}${PedidoPiso.badge(turno)}${turno.observaciones?`<span class="card-obs-icon" title="${turno.observaciones.replace(/"/g,'&quot;')}">📝</span>`:""}</div>
                   ${PedidoPiso.lineaComentario(turno) ? `<div class="card-obs">${PedidoPiso.lineaComentario(turno)}</div>` : ""}
                   ${turno.creadoEn?`<div class="card-obs" style="opacity:.6">🗓️ Cargado el: ${turno.creadoEn}</div>`:""}
                   ${turno.tecnicoAsigno?`<div class="card-obs" style="opacity:.6">👤 ${turno.tecnicoAsigno}</div>`:""}
@@ -433,10 +433,10 @@ Esta acción no se puede deshacer.`)) return;
         : `<button class="btn-presente" data-turno-id="${turno.turnoId}" data-nombre="${turno.nombre} ${turno.apellido}"
              data-paciente="${_attr(pacienteAviso)}" data-detalle="${_attr(detalleAviso)}">Presente</button>`;
 
-      return `<tr class="${rowCls}" data-fila="${turno.fila}" data-turno-id="${turno.turnoId}">
+      return `<tr class="${rowCls}${ExcepcionPin.clase(turno)}" data-fila="${turno.fila}" data-turno-id="${turno.turnoId}">
         <td class="td-hora">${hora}</td>
         <td class="td-nombre">${turno.nombre}</td>
-        <td>${turno.apellido}</td>
+        <td>${turno.apellido}${ExcepcionPin.badge(turno)}</td>
         <td class="td-dni">${turno.dni}</td>
         <td>${turno.estudio}</td>
         <td><span class="origen-tag" style="background:${est.bg};border-color:${est.border};color:${est.text}">${turno.origen}</span></td>

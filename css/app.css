@@ -1019,3 +1019,14 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
   box-shadow: 0 1px 3px rgba(0,0,0,.25);
 }
 .carril-mas:hover { background: #263238; }
+
+/* Turno asignado con PIN de excepción de jefatura/admin (30/10/2026, a
+   pedido: "que quede marcado en rojo visible") — ver js/excepcion-pin.js. */
+.badge-excepcion-pin {
+  background: #d50000; color: #fff; border-radius: 3px; padding: 0 5px;
+  font-size: 9px; font-weight: 800; letter-spacing: .02em; margin-left: 3px; white-space: nowrap;
+}
+.slot-turno.turno-excepcion-pin,
+.card-turno.turno-excepcion-pin { box-shadow: inset 0 0 0 3px #d50000 !important; }
+tr.turno-excepcion-pin > td { border-top: 2px solid #d50000; border-bottom: 2px solid #d50000; }
+tr.turno-excepcion-pin > td:first-child { border-left: 4px solid #d50000; }
